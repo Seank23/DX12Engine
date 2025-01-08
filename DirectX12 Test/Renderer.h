@@ -11,7 +11,7 @@ namespace DX12Engine
 		~Renderer();
 
 		void CreatePipeline(Shader* vertexShader, Shader* pixelShader);
-		void Render(D3D12_VERTEX_BUFFER_VIEW vertexBufferView, D3D12_VIEWPORT viewport, D3D12_RECT scissorRect);
+		void Render(D3D12_VERTEX_BUFFER_VIEW vertexBufferView, D3D12_INDEX_BUFFER_VIEW indexBufferView, D3D12_VIEWPORT viewport, D3D12_RECT scissorRect);
 		bool PollWindow();
 
 		HWND GetWindowHandle() const { return m_RenderWindow->GetWindowHandle(); }
@@ -25,6 +25,10 @@ namespace DX12Engine
 		std::unique_ptr<RenderDevice> m_RenderDevice;
 
 		Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList> m_CommandList;
+
+		DirectX::XMMATRIX m_WorldMatrix;
+		DirectX::XMMATRIX m_ViewMatrix;
+		DirectX::XMMATRIX m_ProjectionMatrix;
 	};
 }
 

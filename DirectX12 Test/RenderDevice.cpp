@@ -1,4 +1,7 @@
 #include "RenderDevice.h"
+#include <stdexcept>
+
+#define _DEBUG 1
 
 namespace DX12Engine
 {
@@ -58,9 +61,12 @@ namespace DX12Engine
 
 	void RenderDevice::CreatePipelineState(Shader* vertexShader, Shader* pixelShader)
 	{
+		CD3DX12_ROOT_PARAMETER rootParameters[1];
+		rootParameters[0].InitAsConstantBufferView(0); // Bind to register b0
+
 		// Root signature description
 		CD3DX12_ROOT_SIGNATURE_DESC rootSignatureDesc;
-		rootSignatureDesc.Init(0, nullptr, 0, nullptr, D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
+		rootSignatureDesc.Init(_countof(rootParameters), rootParameters, 0, nullptr, D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
 
 		Microsoft::WRL::ComPtr<ID3DBlob> signature;
 		Microsoft::WRL::ComPtr<ID3DBlob> error;
@@ -70,7 +76,9 @@ namespace DX12Engine
 		// Describe the vertex input layout
 		D3D12_INPUT_ELEMENT_DESC inputElementDescs[] = {
 			{ "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
-			{ "COLOR",    0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, 12, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 }
+			{ "COLOR",    0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, 12, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+			{ "NORMAL", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 28, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+			{ "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, 40, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
 		};
 
 		// Describe and create the graphics pipeline state object (PSO)
@@ -89,7 +97,10 @@ namespace DX12Engine
 		psoDesc.RTVFormats[0] = DXGI_FORMAT_R8G8B8A8_UNORM;
 		psoDesc.SampleDesc.Count = 1;
 
-		m_Device->CreateGraphicsPipelineState(&psoDesc, IID_PPV_ARGS(&m_PipelineState));
+		HRESULT psResult = m_Device->CreateGraphicsPipelineState(&psoDesc, IID_PPV_ARGS(&m_PipelineState));
+		if (FAILED(psResult)) {
+			throw std::runtime_error("Failed to create pipeline state. HRESULT: " + std::to_string(psResult));
+		}
 	}
 
 	void RenderDevice::ResetCommandAllocatorAndList(Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList> commandList)
@@ -115,5 +126,25 @@ namespace DX12Engine
 			m_Fence->SetEventOnCompletion(currentFenceValue, m_FenceEvent);
 			WaitForSingleObject(m_FenceEvent, INFINITE);
 		}
+	}
+	void RenderDevice::SetConstantBuffer(ConstantBuffer constantBufferData)
+	{
+		D3D12_HEAP_PROPERTIES heapProperties = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD);
+		D3D12_RESOURCE_DESC bufferDesc = CD3DX12_RESOURCE_DESC::Buffer(sizeof(ConstantBuffer));
+
+		m_Device->CreateCommittedResource(
+			&heapProperties,
+			D3D12_HEAP_FLAG_NONE,
+			&bufferDesc,
+			D3D12_RESOURCE_STATE_GENERIC_READ,
+			nullptr,
+			IID_PPV_ARGS(&m_ConstantBuffer)
+		);
+
+		// Map and initialize the constant buffer
+		void* mappedData;
+		m_ConstantBuffer->Map(0, nullptr, &mappedData);
+		memcpy(mappedData, &constantBufferData, sizeof(ConstantBuffer));
+		m_ConstantBuffer->Unmap(0, nullptr);
 	}
 }

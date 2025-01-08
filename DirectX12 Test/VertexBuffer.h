@@ -8,22 +8,17 @@
 #include "d3dx12.h"
 
 #include "RenderDevice.h"
+#include "Mesh.h"
 
 namespace DX12Engine
 {
-	struct Vertex 
-	{
-		DirectX::XMFLOAT3 position;
-		DirectX::XMFLOAT4 color;
-	};
-
 	class VertexBuffer
 	{
 	public:
 		VertexBuffer();
 		~VertexBuffer();
 
-		void SetVertices(Microsoft::WRL::ComPtr<ID3D12Device> device, std::vector<Vertex>& vertices);
+		void SetData(Microsoft::WRL::ComPtr<ID3D12Device> device, std::vector<Vertex>& vertices);
 
 		D3D12_VERTEX_BUFFER_VIEW GetVertexBufferView() const { return m_VertexBufferView; }
 

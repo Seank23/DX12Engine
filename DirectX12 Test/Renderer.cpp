@@ -4,6 +4,19 @@ namespace DX12Engine
 {
 	Renderer::Renderer(int width, int height)
 	{
+		m_WorldMatrix = DirectX::XMMatrixIdentity(); // No transformation
+		m_ViewMatrix = DirectX::XMMatrixLookAtLH(
+			DirectX::XMVectorSet(0.0f, 0.0f, 5.0f, 1.0f), // Camera position
+			DirectX::XMVectorSet(0.0f, 0.0f, 0.0f, 1.0f),  // Look-at target
+			DirectX::XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f)   // Up direction
+		);
+		m_ProjectionMatrix = DirectX::XMMatrixPerspectiveFovLH(
+			DirectX::XM_PIDIV4,           // Field of view (radians)
+			static_cast<float>(width) / height, // Aspect ratio (width / height)
+			0.1f,                // Near plane
+			100.0f               // Far plane
+		);
+
 		m_RenderWindow = std::make_unique<RenderWindow>();
 		HWND windowHandle = m_RenderWindow->Init(width, height);
 
@@ -14,6 +27,10 @@ namespace DX12Engine
 		m_RenderWindow->CreateRTVHeap(m_RenderDevice->GetDevice());
 
 		m_RenderDevice->InitCommandList(m_CommandList);
+
+		ConstantBuffer constantBufferData;
+		constantBufferData.WVPMatrix = m_WorldMatrix * m_ViewMatrix * m_ProjectionMatrix;
+		m_RenderDevice->SetConstantBuffer(constantBufferData);
 	}
 
 	Renderer::~Renderer()
@@ -25,7 +42,7 @@ namespace DX12Engine
 		m_RenderDevice->CreatePipelineState(vertexShader, pixelShader);
 	}
 
-	void Renderer::Render(D3D12_VERTEX_BUFFER_VIEW vertexBufferView, D3D12_VIEWPORT viewport, D3D12_RECT scissorRect)
+	void Renderer::Render(D3D12_VERTEX_BUFFER_VIEW vertexBufferView, D3D12_INDEX_BUFFER_VIEW indexBufferView, D3D12_VIEWPORT viewport, D3D12_RECT scissorRect)
 	{
 		m_RenderDevice->ResetCommandAllocatorAndList(m_CommandList);
 
@@ -39,13 +56,15 @@ namespace DX12Engine
 		m_CommandList->ClearRenderTargetView(rtvHandle, clearColor, 0, nullptr);
 
 		m_CommandList->SetGraphicsRootSignature(m_RenderDevice->GetRootSignature().Get());
+		m_CommandList->SetPipelineState(m_RenderDevice->GetPipelineState().Get());
+		m_CommandList->SetGraphicsRootConstantBufferView(0, m_RenderDevice->GetConstantBuffer()->GetGPUVirtualAddress());
 		m_CommandList->RSSetViewports(1, &viewport);
 		m_CommandList->RSSetScissorRects(1, &scissorRect);
 		m_CommandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 		m_CommandList->IASetVertexBuffers(0, 1, &vertexBufferView);
+		m_CommandList->IASetIndexBuffer(&indexBufferView);
 
-		int vertexCount = vertexBufferView.SizeInBytes / vertexBufferView.StrideInBytes;
-		m_CommandList->DrawInstanced(vertexCount, 1, 0, 0);
+		m_CommandList->DrawIndexedInstanced(indexBufferView.SizeInBytes / 2, 1, 0, 0, 0);
 
 		barrier = m_RenderWindow->TransitionRenderTarget(false);
 		m_CommandList->ResourceBarrier(1, &barrier);
@@ -69,7 +88,7 @@ namespace DX12Engine
 		viewport.TopLeftY = 0.0f;
 		viewport.Width = static_cast<float>(m_RenderWindow->GetWindowWidth());
 		viewport.Height = static_cast<float>(m_RenderWindow->GetWindowHeight());
-		viewport.MinDepth = 0.0f;
+		viewport.MinDepth = -1.0f;
 		viewport.MaxDepth = 1.0f;
 		return viewport;
 	}

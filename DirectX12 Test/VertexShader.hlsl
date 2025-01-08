@@ -1,21 +1,30 @@
-// VertexShader.hlsl
+cbuffer ConstantBuffer : register(b0)
+{
+    matrix wvpMatrix;
+};
+
 struct VSInput
 {
-    float3 position : POSITION; // Position of the vertex
-    float4 color : COLOR; // Color of the vertex
+    float3 position : POSITION;
+    float4 color : COLOR;
+    float3 normal : NORMAL;
+    float2 texCoord : TEXCOORD;
 };
 
 struct PSInput
 {
-    float4 position : SV_POSITION; // Transformed position
-    float4 color : COLOR; // Passed color
+    float4 position : SV_POSITION;
+    float4 color : COLOR;
+    float3 normal : NORMAL;
+    float2 texCoord : TEXCOORD;
 };
 
 PSInput main(VSInput input)
 {
     PSInput output;
-    // Directly output position to clip space (for a simple 2D triangle)
-    output.position = float4(input.position, 1.0f);
-    output.color = input.color; // Pass color to the pixel shader
+    output.position = mul(float4(input.position, 1.0f), wvpMatrix);
+    output.color = input.color;
+    output.normal = input.normal;
+    output.texCoord = input.texCoord;
     return output;
 }

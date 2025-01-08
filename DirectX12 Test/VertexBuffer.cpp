@@ -12,9 +12,9 @@ namespace DX12Engine
 	{
 	}
 
-	void VertexBuffer::SetVertices(Microsoft::WRL::ComPtr<ID3D12Device> device, std::vector<Vertex>& vertices)
+	void VertexBuffer::SetData(Microsoft::WRL::ComPtr<ID3D12Device> device, std::vector<Vertex>& vertices)
 	{
-        const UINT vertexBufferSize = sizeof(vertices) * vertices.size();
+        const UINT vertexBufferSize = sizeof(Vertex) * vertices.size();
 
         // Create the vertex buffer resource in the GPU's default heap
         auto heapProperties = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD);

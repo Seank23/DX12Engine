@@ -11,6 +11,11 @@
 
 namespace DX12Engine
 {
+	struct ConstantBuffer
+	{
+		DirectX::XMMATRIX WVPMatrix;
+	};
+
 	class RenderDevice
 	{
 	public:
@@ -25,9 +30,13 @@ namespace DX12Engine
 		void ExecuteCommandList(Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList> commandList);
 		void UpdateFence();
 
+		void SetConstantBuffer(ConstantBuffer constantBufferData);
+		Microsoft::WRL::ComPtr<ID3D12Resource> GetConstantBuffer() const { return m_ConstantBuffer; }
+
 		Microsoft::WRL::ComPtr<ID3D12Device> GetDevice() const { return m_Device; }
 		Microsoft::WRL::ComPtr<ID3D12CommandQueue> GetCommandQueue() const { return m_CommandQueue; }
 		Microsoft::WRL::ComPtr<ID3D12RootSignature> GetRootSignature() const { return m_RootSignature; }
+		Microsoft::WRL::ComPtr<ID3D12PipelineState> GetPipelineState() const { return m_PipelineState; }
 
 	private:
 		Microsoft::WRL::ComPtr<ID3D12Device> m_Device;
@@ -41,5 +50,6 @@ namespace DX12Engine
 
 		Microsoft::WRL::ComPtr<ID3D12PipelineState> m_PipelineState;
 		Microsoft::WRL::ComPtr<ID3D12RootSignature> m_RootSignature;
+		Microsoft::WRL::ComPtr<ID3D12Resource> m_ConstantBuffer;
 	};
 }
