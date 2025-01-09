@@ -13,6 +13,7 @@ namespace DX12Engine
 		void CreatePipeline(Shader* vertexShader, Shader* pixelShader);
 		void Render(D3D12_VERTEX_BUFFER_VIEW vertexBufferView, D3D12_INDEX_BUFFER_VIEW indexBufferView, D3D12_VIEWPORT viewport, D3D12_RECT scissorRect);
 		bool PollWindow();
+		void UpdateCameraPosition(float x, float y, float z);
 
 		HWND GetWindowHandle() const { return m_RenderWindow->GetWindowHandle(); }
 		Microsoft::WRL::ComPtr<ID3D12Device> GetDevice() const { return m_RenderDevice->GetDevice(); }
@@ -29,6 +30,10 @@ namespace DX12Engine
 		DirectX::XMMATRIX m_WorldMatrix;
 		DirectX::XMMATRIX m_ViewMatrix;
 		DirectX::XMMATRIX m_ProjectionMatrix;
+
+		DirectX::XMFLOAT3 m_CameraPosition;
+
+		ConstantBuffer m_ConstantBufferData;
 	};
 }
 

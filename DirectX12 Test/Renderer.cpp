@@ -3,17 +3,18 @@
 namespace DX12Engine
 {
 	Renderer::Renderer(int width, int height)
+		: m_CameraPosition({ 0.0f, 0.0f, -5.0f }), m_ConstantBufferData({ DirectX::XMMatrixIdentity() })
 	{
 		m_WorldMatrix = DirectX::XMMatrixIdentity(); // No transformation
 		m_ViewMatrix = DirectX::XMMatrixLookAtLH(
-			DirectX::XMVectorSet(0.0f, 0.0f, 5.0f, 1.0f), // Camera position
+			DirectX::XMVectorSet(m_CameraPosition.x, m_CameraPosition.y, m_CameraPosition.z, 1.0f), // Camera position
 			DirectX::XMVectorSet(0.0f, 0.0f, 0.0f, 1.0f),  // Look-at target
 			DirectX::XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f)   // Up direction
 		);
 		m_ProjectionMatrix = DirectX::XMMatrixPerspectiveFovLH(
 			DirectX::XM_PIDIV4,           // Field of view (radians)
 			static_cast<float>(width) / height, // Aspect ratio (width / height)
-			0.1f,                // Near plane
+			0.01f,                // Near plane
 			100.0f               // Far plane
 		);
 
@@ -28,9 +29,8 @@ namespace DX12Engine
 
 		m_RenderDevice->InitCommandList(m_CommandList);
 
-		ConstantBuffer constantBufferData;
-		constantBufferData.WVPMatrix = m_WorldMatrix * m_ViewMatrix * m_ProjectionMatrix;
-		m_RenderDevice->SetConstantBuffer(constantBufferData);
+		m_ConstantBufferData.WVPMatrix = m_WorldMatrix * m_ViewMatrix * m_ProjectionMatrix;
+		m_RenderDevice->SetConstantBuffer(m_ConstantBufferData);
 	}
 
 	Renderer::~Renderer()
@@ -64,7 +64,7 @@ namespace DX12Engine
 		m_CommandList->IASetVertexBuffers(0, 1, &vertexBufferView);
 		m_CommandList->IASetIndexBuffer(&indexBufferView);
 
-		m_CommandList->DrawIndexedInstanced(indexBufferView.SizeInBytes / 2, 1, 0, 0, 0);
+		m_CommandList->DrawIndexedInstanced(indexBufferView.SizeInBytes / 4, 1, 0, 0, 0);
 
 		barrier = m_RenderWindow->TransitionRenderTarget(false);
 		m_CommandList->ResourceBarrier(1, &barrier);
@@ -79,6 +79,21 @@ namespace DX12Engine
 	bool Renderer::PollWindow()
 	{
 		return m_RenderWindow->ProcessWindowMessages();
+	}
+
+	void Renderer::UpdateCameraPosition(float x, float y, float z)
+	{
+		m_CameraPosition.x += x;
+		m_CameraPosition.y += y;
+		m_CameraPosition.z += z;
+		m_ViewMatrix = DirectX::XMMatrixLookAtLH(
+			DirectX::XMVectorSet(m_CameraPosition.x, m_CameraPosition.y, m_CameraPosition.z, 1.0f), // Camera position
+			DirectX::XMVectorSet(0.0f, 0.0f, 0.0f, 1.0f),  // Look-at target
+			DirectX::XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f)   // Up direction
+		);
+
+		m_ConstantBufferData.WVPMatrix = m_WorldMatrix * m_ViewMatrix * m_ProjectionMatrix;
+		m_RenderDevice->SetConstantBuffer(m_ConstantBufferData);
 	}
 
 	D3D12_VIEWPORT Renderer::GetDefaultViewport()

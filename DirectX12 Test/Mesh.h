@@ -14,6 +14,6 @@ namespace DX12Engine
 
     struct Mesh {
         std::vector<Vertex> Vertices;
-        std::vector<UINT16> Indices;
+        std::vector<UINT> Indices;
     };
 }

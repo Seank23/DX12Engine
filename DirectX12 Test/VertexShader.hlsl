@@ -1,6 +1,6 @@
 cbuffer ConstantBuffer : register(b0)
 {
-    matrix wvpMatrix;
+    float4x4 wvpMatrix;
 };
 
 struct VSInput
@@ -22,7 +22,7 @@ struct PSInput
 PSInput main(VSInput input)
 {
     PSInput output;
-    output.position = mul(float4(input.position, 1.0f), wvpMatrix);
+    output.position = mul(wvpMatrix, float4(input.position, 1.0f));
     output.color = input.color;
     output.normal = input.normal;
     output.texCoord = input.texCoord;

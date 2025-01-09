@@ -17,7 +17,7 @@ namespace DX12Engine
 		IndexBuffer();
 		~IndexBuffer();
 
-		void SetData(Microsoft::WRL::ComPtr<ID3D12Device> device, std::vector<UINT16>& indices);
+		void SetData(Microsoft::WRL::ComPtr<ID3D12Device> device, std::vector<UINT>& indices);
 
 		D3D12_INDEX_BUFFER_VIEW GetIndexBufferView() const { return m_IndexBufferView; }
 

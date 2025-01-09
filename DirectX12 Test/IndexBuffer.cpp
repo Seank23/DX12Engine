@@ -10,9 +10,9 @@ namespace DX12Engine
     {
     }
 
-    void IndexBuffer::SetData(Microsoft::WRL::ComPtr<ID3D12Device> device, std::vector<UINT16>& indices)
+    void IndexBuffer::SetData(Microsoft::WRL::ComPtr<ID3D12Device> device, std::vector<UINT>& indices)
 	{
-        const UINT indexBufferSize = sizeof(UINT16) * indices.size();
+        const UINT indexBufferSize = sizeof(UINT) * indices.size();
 
         // Create the index buffer resource in the GPU's default heap
         auto heapProperties = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD);
@@ -34,7 +34,7 @@ namespace DX12Engine
 
         // Initialize the index buffer view
         m_IndexBufferView.BufferLocation = m_IndexBuffer->GetGPUVirtualAddress();
-        m_IndexBufferView.Format = DXGI_FORMAT_R16_UINT;
+        m_IndexBufferView.Format = DXGI_FORMAT_R32_UINT;
         m_IndexBufferView.SizeInBytes = indexBufferSize;
 	}
 }
