@@ -18,10 +18,16 @@ namespace DX12Engine
 		HWND Init(int width, int height);
 		void CreateSwapChain(Microsoft::WRL::ComPtr<ID3D12CommandQueue> commandQueue);
 		void CreateRTVHeap(Microsoft::WRL::ComPtr<ID3D12Device> device);
+		void CreateDepthStencilBuffer(Microsoft::WRL::ComPtr<ID3D12Device> device);
 
 		CD3DX12_CPU_DESCRIPTOR_HANDLE GetRTVHandle() 
 		{ 
 			return CD3DX12_CPU_DESCRIPTOR_HANDLE(m_RTVHeap->GetCPUDescriptorHandleForHeapStart(), m_FrameIndex, m_RTVDescriptorSize); 
+		}
+
+		D3D12_CPU_DESCRIPTOR_HANDLE GetDSVHandle() 
+		{
+			return m_DSVHeap->GetCPUDescriptorHandleForHeapStart();
 		}
 
 		HWND GetWindowHandle() const { return m_WindowHandle; }
@@ -41,10 +47,14 @@ namespace DX12Engine
 
 		Microsoft::WRL::ComPtr<IDXGISwapChain3> m_SwapChain;
 		UINT m_FrameIndex = 0;
-
 		Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> m_RTVHeap;
 		Microsoft::WRL::ComPtr<ID3D12Resource> m_RenderTargets[2];
+		Microsoft::WRL::ComPtr<ID3D12Resource> m_DepthStencilBuffer;
+		Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> m_DSVHeap;
+		D3D12_CPU_DESCRIPTOR_HANDLE m_DSVHandle;
+
 		UINT m_RTVDescriptorSize;
+		UINT m_DSVDescriptorSize;
 	};
 }
 

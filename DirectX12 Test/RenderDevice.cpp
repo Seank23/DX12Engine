@@ -81,6 +81,12 @@ namespace DX12Engine
 			{ "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, 40, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
 		};
 
+		D3D12_DEPTH_STENCIL_DESC depthStencilDesc = {};
+		depthStencilDesc.DepthEnable = TRUE;                // Enable depth testing
+		depthStencilDesc.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ALL; // Write to the depth buffer
+		depthStencilDesc.DepthFunc = D3D12_COMPARISON_FUNC_LESS; // Pass if new depth is less than current
+		depthStencilDesc.StencilEnable = FALSE;             // Disable stencil testing
+
 		// Describe and create the graphics pipeline state object (PSO)
 		D3D12_GRAPHICS_PIPELINE_STATE_DESC psoDesc = {};
 		psoDesc.InputLayout = { inputElementDescs, _countof(inputElementDescs) };
@@ -89,13 +95,15 @@ namespace DX12Engine
 		psoDesc.PS = CD3DX12_SHADER_BYTECODE(pixelShader->GetShader().Get());
 		psoDesc.RasterizerState = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
 		psoDesc.BlendState = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
-		psoDesc.DepthStencilState.DepthEnable = FALSE;
-		psoDesc.DepthStencilState.StencilEnable = FALSE;
+		//psoDesc.DepthStencilState.DepthEnable = FALSE;
+		//psoDesc.DepthStencilState.StencilEnable = FALSE;
 		psoDesc.SampleMask = UINT_MAX;
 		psoDesc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
 		psoDesc.NumRenderTargets = 1;
 		psoDesc.RTVFormats[0] = DXGI_FORMAT_R8G8B8A8_UNORM;
 		psoDesc.SampleDesc.Count = 1;
+		psoDesc.DepthStencilState = depthStencilDesc;
+		psoDesc.DSVFormat = DXGI_FORMAT_D24_UNORM_S8_UINT; // Match depth-stencil buffer format
 
 		HRESULT psResult = m_Device->CreateGraphicsPipelineState(&psoDesc, IID_PPV_ARGS(&m_PipelineState));
 		if (FAILED(psResult)) {
@@ -127,24 +135,12 @@ namespace DX12Engine
 			WaitForSingleObject(m_FenceEvent, INFINITE);
 		}
 	}
-	void RenderDevice::SetConstantBuffer(ConstantBuffer constantBufferData)
+	void RenderDevice::SetConstantBuffer(Microsoft::WRL::ComPtr<ID3D12Resource> constantBufferRes, ConstantBuffer constantBufferData)
 	{
-		D3D12_HEAP_PROPERTIES heapProperties = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD);
-		D3D12_RESOURCE_DESC bufferDesc = CD3DX12_RESOURCE_DESC::Buffer(sizeof(ConstantBuffer));
-
-		m_Device->CreateCommittedResource(
-			&heapProperties,
-			D3D12_HEAP_FLAG_NONE,
-			&bufferDesc,
-			D3D12_RESOURCE_STATE_GENERIC_READ,
-			nullptr,
-			IID_PPV_ARGS(&m_ConstantBuffer)
-		);
-
 		// Map and initialize the constant buffer
-		void* mappedData;
-		m_ConstantBuffer->Map(0, nullptr, &mappedData);
+		UINT* mappedData;
+		constantBufferRes->Map(0, nullptr, reinterpret_cast<void**>(&mappedData));
 		memcpy(mappedData, &constantBufferData, sizeof(ConstantBuffer));
-		m_ConstantBuffer->Unmap(0, nullptr);
+		constantBufferRes->Unmap(0, nullptr);
 	}
 }

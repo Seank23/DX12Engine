@@ -3,9 +3,8 @@
 namespace DX12Engine
 {
 	Renderer::Renderer(int width, int height)
-		: m_CameraPosition({ 0.0f, 0.0f, -5.0f }), m_ConstantBufferData({ DirectX::XMMatrixIdentity() })
+		: m_CameraPosition({ 0.0f, 0.0f, -3.0f }), m_ConstantBufferData({ DirectX::XMMatrixIdentity() })
 	{
-		m_WorldMatrix = DirectX::XMMatrixIdentity(); // No transformation
 		m_ViewMatrix = DirectX::XMMatrixLookAtLH(
 			DirectX::XMVectorSet(m_CameraPosition.x, m_CameraPosition.y, m_CameraPosition.z, 1.0f), // Camera position
 			DirectX::XMVectorSet(0.0f, 0.0f, 0.0f, 1.0f),  // Look-at target
@@ -14,7 +13,7 @@ namespace DX12Engine
 		m_ProjectionMatrix = DirectX::XMMatrixPerspectiveFovLH(
 			DirectX::XM_PIDIV4,           // Field of view (radians)
 			static_cast<float>(width) / height, // Aspect ratio (width / height)
-			0.01f,                // Near plane
+			0.1f,                // Near plane
 			100.0f               // Far plane
 		);
 
@@ -26,11 +25,9 @@ namespace DX12Engine
 
 		m_RenderWindow->CreateSwapChain(m_RenderDevice->GetCommandQueue());
 		m_RenderWindow->CreateRTVHeap(m_RenderDevice->GetDevice());
+		m_RenderWindow->CreateDepthStencilBuffer(m_RenderDevice->GetDevice());
 
 		m_RenderDevice->InitCommandList(m_CommandList);
-
-		m_ConstantBufferData.WVPMatrix = m_WorldMatrix * m_ViewMatrix * m_ProjectionMatrix;
-		m_RenderDevice->SetConstantBuffer(m_ConstantBufferData);
 	}
 
 	Renderer::~Renderer()
@@ -42,31 +39,43 @@ namespace DX12Engine
 		m_RenderDevice->CreatePipelineState(vertexShader, pixelShader);
 	}
 
-	void Renderer::Render(D3D12_VERTEX_BUFFER_VIEW vertexBufferView, D3D12_INDEX_BUFFER_VIEW indexBufferView, D3D12_VIEWPORT viewport, D3D12_RECT scissorRect)
+	void Renderer::InitFrame(D3D12_VIEWPORT viewport, D3D12_RECT scissorRect)
 	{
 		m_RenderDevice->ResetCommandAllocatorAndList(m_CommandList);
+
+		m_CommandList->SetGraphicsRootSignature(m_RenderDevice->GetRootSignature().Get());
+		m_CommandList->RSSetViewports(1, &viewport);
+		m_CommandList->RSSetScissorRects(1, &scissorRect);
 
 		auto barrier = m_RenderWindow->TransitionRenderTarget(true);
 		m_CommandList->ResourceBarrier(1, &barrier);
 
 		auto rtvHandle = m_RenderWindow->GetRTVHandle();
-		m_CommandList->OMSetRenderTargets(1, &rtvHandle, FALSE, nullptr);
+		auto dsvHandle = m_RenderWindow->GetDSVHandle();
+		m_CommandList->OMSetRenderTargets(1, &rtvHandle, FALSE, &dsvHandle);
 
 		const float clearColor[] = { 0.0f, 0.2f, 0.4f, 1.0f };
 		m_CommandList->ClearRenderTargetView(rtvHandle, clearColor, 0, nullptr);
+		m_CommandList->ClearDepthStencilView(dsvHandle, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
 
-		m_CommandList->SetGraphicsRootSignature(m_RenderDevice->GetRootSignature().Get());
 		m_CommandList->SetPipelineState(m_RenderDevice->GetPipelineState().Get());
-		m_CommandList->SetGraphicsRootConstantBufferView(0, m_RenderDevice->GetConstantBuffer()->GetGPUVirtualAddress());
-		m_CommandList->RSSetViewports(1, &viewport);
-		m_CommandList->RSSetScissorRects(1, &scissorRect);
 		m_CommandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+	}
+
+	void Renderer::Render(RenderObject* renderObject)
+	{
+		auto vertexBufferView = renderObject->m_VertexBuffer.GetVertexBufferView();
+		auto indexBufferView = renderObject->m_IndexBuffer.GetIndexBufferView();
+		UpdateMVPMatrix(renderObject);
+		m_CommandList->SetGraphicsRootConstantBufferView(0, renderObject->m_ConstantBufferRes->GetGPUVirtualAddress());
 		m_CommandList->IASetVertexBuffers(0, 1, &vertexBufferView);
 		m_CommandList->IASetIndexBuffer(&indexBufferView);
-
 		m_CommandList->DrawIndexedInstanced(indexBufferView.SizeInBytes / 4, 1, 0, 0, 0);
+	}
 
-		barrier = m_RenderWindow->TransitionRenderTarget(false);
+	void Renderer::PresentFrame()
+	{
+		auto barrier = m_RenderWindow->TransitionRenderTarget(false);
 		m_CommandList->ResourceBarrier(1, &barrier);
 
 		m_CommandList->Close();
@@ -91,9 +100,6 @@ namespace DX12Engine
 			DirectX::XMVectorSet(0.0f, 0.0f, 0.0f, 1.0f),  // Look-at target
 			DirectX::XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f)   // Up direction
 		);
-
-		m_ConstantBufferData.WVPMatrix = m_WorldMatrix * m_ViewMatrix * m_ProjectionMatrix;
-		m_RenderDevice->SetConstantBuffer(m_ConstantBufferData);
 	}
 
 	D3D12_VIEWPORT Renderer::GetDefaultViewport()
@@ -116,5 +122,11 @@ namespace DX12Engine
 		scissorRect.right = static_cast<LONG>(m_RenderWindow->GetWindowWidth());
 		scissorRect.bottom = static_cast<LONG>(m_RenderWindow->GetWindowHeight());
 		return scissorRect;
+	}
+
+	void Renderer::UpdateMVPMatrix(RenderObject* renderObject)
+	{
+		renderObject->UpdateConstantBufferData(renderObject->m_ModelMatrix * m_ViewMatrix * m_ProjectionMatrix);
+		m_RenderDevice->SetConstantBuffer(renderObject->m_ConstantBufferRes, renderObject->m_ConstantBufferData);
 	}
 }

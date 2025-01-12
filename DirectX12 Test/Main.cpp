@@ -1,8 +1,8 @@
 #include "Renderer.h"
 #include "Shader.h"
-#include "VertexBuffer.h" 
-#include "IndexBuffer.h"
 #include "ModelLoader.h"
+#include "Mesh.h"
+#include "RenderObject.h"
 
 int main() 
 {
@@ -15,34 +15,17 @@ int main()
 	DX12Engine::ModelLoader modelLoader;
 	DX12Engine::Mesh mesh = modelLoader.LoadObj(inputfile);
 
-	//std::vector<DX12Engine::Vertex> axisVertices = {
-	//	// X-axis (Red)
-	//	{{0.0f, 0.0f, 0.0f}, {1.0f, 0.0f, 0.0f, 1.0f}, {0.0f, 0.0f, 0.0f}, {0.0f, 0.0f}}, // Origin
-	//	{{1.0f, 0.0f, 0.0f}, {1.0f, 0.0f, 0.0f, 1.0f}, {0.0f, 0.0f, 0.0f}, {0.0f, 0.0f}}, // X direction
-
-	//	// Y-axis (Green)
-	//	{{0.0f, 0.0f, 0.0f}, {0.0f, 1.0f, 0.0f, 1.0f}, {0.0f, 0.0f, 0.0f}, {0.0f, 0.0f}}, // Origin
-	//	{{0.0f, 1.0f, 0.0f}, {0.0f, 1.0f, 0.0f, 1.0f}, {0.0f, 0.0f, 0.0f}, {0.0f, 0.0f}}, // Y direction
-
-	//	// Z-axis (Blue)
-	//	{{0.0f, 0.0f, 0.0f}, {0.0f, 0.0f, 1.0f, 1.0f}, {0.0f, 0.0f, 0.0f}, {0.0f, 0.0f}}, // Origin
-	//	{{0.0f, 0.0f, 1.0f}, {0.0f, 0.0f, 1.0f, 1.0f}, {0.0f, 0.0f, 0.0f}, {0.0f, 0.0f}}, // Z direction
-	//};
-
-	//std::vector<UINT> axisIndices = {
-	//	0, 1, // X-axis
-	//	2, 3, // Y-axis
-	//	4, 5, // Z-axis
-	//};
-
-	DX12Engine::VertexBuffer vertexBuffer;
-	vertexBuffer.SetData(renderer.GetDevice(), mesh.Vertices);
-	DX12Engine::IndexBuffer indexBuffer;
-	indexBuffer.SetData(renderer.GetDevice(), mesh.Indices);
+	DX12Engine::RenderObject cube1(renderer.GetDevice(), mesh);
+	DX12Engine::RenderObject cube2(renderer.GetDevice(), mesh);
+	cube1.SetModelMatrix(DirectX::XMMatrixTranslation(0.5f, 0.5f, 0.5f));
+	cube2.SetModelMatrix(DirectX::XMMatrixTranslation(-0.5f, -0.5f, -0.5f));
 
 	while (renderer.PollWindow())
 	{
+		renderer.InitFrame(renderer.GetDefaultViewport(), renderer.GetDefaultScissorRect());
 		renderer.UpdateCameraPosition(0.01f, 0.01f, 0.0f);
-		renderer.Render(vertexBuffer.GetVertexBufferView(), indexBuffer.GetIndexBufferView(), renderer.GetDefaultViewport(), renderer.GetDefaultScissorRect());
+		renderer.Render(&cube1);
+		renderer.Render(&cube2);
+		renderer.PresentFrame();
 	}
 }

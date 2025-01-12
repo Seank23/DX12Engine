@@ -8,14 +8,10 @@
 #include "d3dx12.h"
 
 #include "Shader.h"
+#include "ConstantBuffer.h"
 
 namespace DX12Engine
 {
-	struct ConstantBuffer
-	{
-		DirectX::XMMATRIX WVPMatrix;
-	};
-
 	class RenderDevice
 	{
 	public:
@@ -30,8 +26,7 @@ namespace DX12Engine
 		void ExecuteCommandList(Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList> commandList);
 		void UpdateFence();
 
-		void SetConstantBuffer(ConstantBuffer constantBufferData);
-		Microsoft::WRL::ComPtr<ID3D12Resource> GetConstantBuffer() const { return m_ConstantBuffer; }
+		void SetConstantBuffer(Microsoft::WRL::ComPtr<ID3D12Resource> constantBufferRes, ConstantBuffer constantBufferData);
 
 		Microsoft::WRL::ComPtr<ID3D12Device> GetDevice() const { return m_Device; }
 		Microsoft::WRL::ComPtr<ID3D12CommandQueue> GetCommandQueue() const { return m_CommandQueue; }
@@ -50,6 +45,5 @@ namespace DX12Engine
 
 		Microsoft::WRL::ComPtr<ID3D12PipelineState> m_PipelineState;
 		Microsoft::WRL::ComPtr<ID3D12RootSignature> m_RootSignature;
-		Microsoft::WRL::ComPtr<ID3D12Resource> m_ConstantBuffer;
 	};
 }
