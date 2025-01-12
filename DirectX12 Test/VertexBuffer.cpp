@@ -5,11 +5,14 @@ namespace DX12Engine
 
     VertexBuffer::VertexBuffer()
     {
-
     }
 
     VertexBuffer::~VertexBuffer()
 	{
+		m_VertexBuffer.Reset();
+		m_VertexBufferView.BufferLocation = 0;
+		m_VertexBufferView.SizeInBytes = 0;
+		m_VertexBufferView.StrideInBytes = 0;
 	}
 
 	void VertexBuffer::SetData(Microsoft::WRL::ComPtr<ID3D12Device> device, std::vector<Vertex>& vertices)

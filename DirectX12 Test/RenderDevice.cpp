@@ -15,7 +15,11 @@ namespace DX12Engine
 		m_Device.Reset();
 		m_CommandQueue.Reset();
         m_Fence.Reset();
+		m_FenceValue = 0;
         m_FenceEvent = nullptr;
+		m_CommandAllocator.Reset();
+		m_PipelineState.Reset();
+		m_RootSignature.Reset();
 	}
 
 	void RenderDevice::Init(HWND hwnd)
@@ -95,8 +99,6 @@ namespace DX12Engine
 		psoDesc.PS = CD3DX12_SHADER_BYTECODE(pixelShader->GetShader().Get());
 		psoDesc.RasterizerState = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
 		psoDesc.BlendState = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
-		//psoDesc.DepthStencilState.DepthEnable = FALSE;
-		//psoDesc.DepthStencilState.StencilEnable = FALSE;
 		psoDesc.SampleMask = UINT_MAX;
 		psoDesc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
 		psoDesc.NumRenderTargets = 1;
@@ -104,11 +106,8 @@ namespace DX12Engine
 		psoDesc.SampleDesc.Count = 1;
 		psoDesc.DepthStencilState = depthStencilDesc;
 		psoDesc.DSVFormat = DXGI_FORMAT_D24_UNORM_S8_UINT; // Match depth-stencil buffer format
-
-		HRESULT psResult = m_Device->CreateGraphicsPipelineState(&psoDesc, IID_PPV_ARGS(&m_PipelineState));
-		if (FAILED(psResult)) {
-			throw std::runtime_error("Failed to create pipeline state. HRESULT: " + std::to_string(psResult));
-		}
+		
+		m_Device->CreateGraphicsPipelineState(&psoDesc, IID_PPV_ARGS(&m_PipelineState));
 	}
 
 	void RenderDevice::ResetCommandAllocatorAndList(Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList> commandList)
@@ -135,6 +134,20 @@ namespace DX12Engine
 			WaitForSingleObject(m_FenceEvent, INFINITE);
 		}
 	}
+	void RenderDevice::CreateConstantBuffer(Microsoft::WRL::ComPtr<ID3D12Resource>& outConstantBufferRes)
+	{
+		D3D12_HEAP_PROPERTIES heapProperties = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD);
+		D3D12_RESOURCE_DESC bufferDesc = CD3DX12_RESOURCE_DESC::Buffer(sizeof(ConstantBuffer));
+		m_Device->CreateCommittedResource(
+			&heapProperties,
+			D3D12_HEAP_FLAG_NONE,
+			&bufferDesc,
+			D3D12_RESOURCE_STATE_GENERIC_READ,
+			nullptr,
+			IID_PPV_ARGS(&outConstantBufferRes)
+		);
+	}
+
 	void RenderDevice::SetConstantBuffer(Microsoft::WRL::ComPtr<ID3D12Resource> constantBufferRes, ConstantBuffer constantBufferData)
 	{
 		// Map and initialize the constant buffer

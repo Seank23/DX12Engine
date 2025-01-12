@@ -1,4 +1,5 @@
 #pragma once
+#include "RenderContext.h"
 #include "Mesh.h"
 #include "VertexBuffer.h"
 #include "IndexBuffer.h"
@@ -11,7 +12,7 @@ namespace DX12Engine
 	public:
 		friend class Renderer;
 
-		RenderObject(Microsoft::WRL::ComPtr<ID3D12Device> device, Mesh mesh);
+		RenderObject(std::shared_ptr<RenderContext> context, Mesh mesh);
 		~RenderObject();
 
 		void SetModelMatrix(DirectX::XMMATRIX modelMatrix) { m_ModelMatrix = modelMatrix; }	
@@ -19,6 +20,7 @@ namespace DX12Engine
 	private:
 		void UpdateConstantBufferData(DirectX::XMMATRIX wvpMatrix);
 
+		std::shared_ptr<RenderContext> m_RenderContext;
 		Mesh m_Mesh;
 		VertexBuffer m_VertexBuffer;
 		IndexBuffer m_IndexBuffer;

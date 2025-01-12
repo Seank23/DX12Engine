@@ -26,6 +26,7 @@ namespace DX12Engine
 		void ExecuteCommandList(Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList> commandList);
 		void UpdateFence();
 
+		void CreateConstantBuffer(Microsoft::WRL::ComPtr<ID3D12Resource>& outConstantBufferRes);
 		void SetConstantBuffer(Microsoft::WRL::ComPtr<ID3D12Resource> constantBufferRes, ConstantBuffer constantBufferData);
 
 		Microsoft::WRL::ComPtr<ID3D12Device> GetDevice() const { return m_Device; }

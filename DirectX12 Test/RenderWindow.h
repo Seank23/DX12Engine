@@ -15,7 +15,7 @@ namespace DX12Engine
 		RenderWindow();
 		~RenderWindow();
 
-		HWND Init(int width, int height);
+		HWND Init(DirectX::XMFLOAT2 windowSize);
 		void CreateSwapChain(Microsoft::WRL::ComPtr<ID3D12CommandQueue> commandQueue);
 		void CreateRTVHeap(Microsoft::WRL::ComPtr<ID3D12Device> device);
 		void CreateDepthStencilBuffer(Microsoft::WRL::ComPtr<ID3D12Device> device);
@@ -37,13 +37,10 @@ namespace DX12Engine
 
 		bool ProcessWindowMessages();
 
-		int GetWindowWidth() const { return m_Width; }
-		int GetWindowHeight() const { return m_Height; }
-
 	private:
 		HWND m_WindowHandle;
 		HINSTANCE m_WindowInstance;
-		int m_Width = 0, m_Height = 0;
+		DirectX::XMFLOAT2 m_WindowSize;
 
 		Microsoft::WRL::ComPtr<IDXGISwapChain3> m_SwapChain;
 		UINT m_FrameIndex = 0;

@@ -8,6 +8,10 @@ namespace DX12Engine
 
     IndexBuffer::~IndexBuffer()
     {
+		m_IndexBuffer.Reset();
+		m_IndexBufferView.BufferLocation = 0;
+		m_IndexBufferView.Format = (DXGI_FORMAT)NULL;
+		m_IndexBufferView.SizeInBytes = 0;
     }
 
     void IndexBuffer::SetData(Microsoft::WRL::ComPtr<ID3D12Device> device, std::vector<UINT>& indices)

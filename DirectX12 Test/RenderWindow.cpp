@@ -13,7 +13,7 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 namespace DX12Engine
 {
 	RenderWindow::RenderWindow()
-		: m_WindowHandle(nullptr), m_WindowInstance(nullptr), m_SwapChain(nullptr)
+		: m_WindowHandle(nullptr), m_WindowInstance(nullptr), m_SwapChain(nullptr), m_RTVHeap(nullptr), m_DepthStencilBuffer(nullptr)
 	{
 	}
 
@@ -22,16 +22,22 @@ namespace DX12Engine
 		m_WindowHandle = nullptr;
 		m_WindowInstance = nullptr;
 		m_SwapChain.Reset();
+		m_RTVHeap.Reset();
+		for (auto& rt : m_RenderTargets)
+			rt.Reset();
+		m_DSVHeap.Reset();
+		m_DepthStencilBuffer.Reset();
 		m_FrameIndex = 0;
+		m_RTVDescriptorSize = 0;
+		m_DSVDescriptorSize = 0;
 	}
 
-	HWND RenderWindow::Init(int width, int height)
+	HWND RenderWindow::Init(DirectX::XMFLOAT2 windowSize)
 	{
-		m_Width = width;
-		m_Height = height;
+		m_WindowSize = windowSize;
 		WNDCLASSEX wc = { sizeof(WNDCLASSEX), CS_CLASSDC, WindowProc, 0, 0, m_WindowInstance, nullptr, nullptr, nullptr, nullptr, L"DX12Window", nullptr };
 		RegisterClassEx(&wc);
-		m_WindowHandle = CreateWindow(wc.lpszClassName, L"DirectX 12 Renderer", WS_OVERLAPPEDWINDOW, 100, 100, width, height, nullptr, nullptr, wc.hInstance, nullptr);
+		m_WindowHandle = CreateWindow(wc.lpszClassName, L"DirectX 12 Renderer", WS_OVERLAPPEDWINDOW, 100, 100, windowSize.x, windowSize.y, nullptr, nullptr, wc.hInstance, nullptr);
 		ShowWindow(m_WindowHandle, SW_SHOWDEFAULT);
 		return m_WindowHandle;
 	}
@@ -43,8 +49,8 @@ namespace DX12Engine
 
 		DXGI_SWAP_CHAIN_DESC swapChainDesc = {};
 		swapChainDesc.BufferCount = 2; // Double buffering
-		swapChainDesc.BufferDesc.Width = m_Width;
-		swapChainDesc.BufferDesc.Height = m_Height;
+		swapChainDesc.BufferDesc.Width = m_WindowSize.x;
+		swapChainDesc.BufferDesc.Height = m_WindowSize.y;
 		swapChainDesc.BufferDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
 		swapChainDesc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
 		swapChainDesc.SwapEffect = DXGI_SWAP_EFFECT_FLIP_DISCARD;
@@ -82,8 +88,8 @@ namespace DX12Engine
 		D3D12_RESOURCE_DESC depthStencilDesc = {};
 		depthStencilDesc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
 		depthStencilDesc.Alignment = 0;
-		depthStencilDesc.Width = m_Width;
-		depthStencilDesc.Height = m_Height;
+		depthStencilDesc.Width = m_WindowSize.x;
+		depthStencilDesc.Height = m_WindowSize.y;
 		depthStencilDesc.DepthOrArraySize = 1;
 		depthStencilDesc.MipLevels = 1;
 		depthStencilDesc.Format = DXGI_FORMAT_D24_UNORM_S8_UINT;

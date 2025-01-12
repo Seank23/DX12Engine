@@ -6,5 +6,10 @@ namespace DX12Engine
 	struct ConstantBuffer
 	{
 		DirectX::XMMATRIX WVPMatrix;
+
+		void Reset()
+		{
+			WVPMatrix = DirectX::XMMatrixIdentity();
+		}
 	};
 }	
