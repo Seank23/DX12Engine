@@ -22,14 +22,18 @@ int main()
 	DX12Engine::RenderObject cube1(context, mesh);
 	DX12Engine::RenderObject cube2(context, mesh);
 	cube1.SetModelMatrix(DirectX::XMMatrixTranslation(0.5f, 0.5f, 0.5f));
-	cube2.SetModelMatrix(DirectX::XMMatrixTranslation(-0.5f, -0.5f, -0.5f));
+	cube2.SetModelMatrix(DirectX::XMMatrixTranslation(0.0f, -0.5f, -0.5f));
+	float count = 0.0f;
 
 	while (renderer.PollWindow())
 	{
 		renderer.InitFrame(renderer.GetDefaultViewport(), renderer.GetDefaultScissorRect());
 		renderer.UpdateCameraPosition(0.005f, 0.005f, 0.0f);
+		cube1.SetModelMatrix(DirectX::XMMatrixTranslation(-2.0f * DirectX::XMScalarSin(count), 0.0f, 0.0f));
+		cube2.SetModelMatrix(DirectX::XMMatrixTranslation(2.0f * DirectX::XMScalarSin(count), -0.5f, -0.5f));
 		renderer.Render(&cube1);
 		renderer.Render(&cube2);
 		renderer.PresentFrame();
+		count += 0.01f;
 	}
 }

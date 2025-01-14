@@ -42,7 +42,7 @@ namespace DX12Engine
 		return m_WindowHandle;
 	}
 
-	void RenderWindow::CreateSwapChain(Microsoft::WRL::ComPtr<ID3D12CommandQueue> commandQueue)
+	void RenderWindow::CreateSwapChain(ID3D12CommandQueue* commandQueue)
 	{
 		Microsoft::WRL::ComPtr<IDXGIFactory4> factory;
 		CreateDXGIFactory1(IID_PPV_ARGS(&factory));
@@ -59,13 +59,13 @@ namespace DX12Engine
 		swapChainDesc.Windowed = TRUE;
 
 		Microsoft::WRL::ComPtr<IDXGISwapChain> tempSwapChain;
-		factory->CreateSwapChain(commandQueue.Get(), &swapChainDesc, &tempSwapChain);
+		factory->CreateSwapChain(commandQueue, &swapChainDesc, &tempSwapChain);
 		tempSwapChain.As(&m_SwapChain);
 
 		m_FrameIndex = m_SwapChain->GetCurrentBackBufferIndex();
 	}
 
-	void RenderWindow::CreateRTVHeap(Microsoft::WRL::ComPtr<ID3D12Device> device)
+	void RenderWindow::CreateRTVHeap(ID3D12Device* device)
 	{
 		D3D12_DESCRIPTOR_HEAP_DESC rtvHeapDesc = {};
 		rtvHeapDesc.NumDescriptors = 2; // Number of descriptors (one for each buffer)
@@ -83,7 +83,7 @@ namespace DX12Engine
 			rtvHandle.Offset(1, m_RTVDescriptorSize); // Move to the next descriptor
 		}
 	}
-	void RenderWindow::CreateDepthStencilBuffer(Microsoft::WRL::ComPtr<ID3D12Device> device)
+	void RenderWindow::CreateDepthStencilBuffer(ID3D12Device* device)
 	{
 		D3D12_RESOURCE_DESC depthStencilDesc = {};
 		depthStencilDesc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;

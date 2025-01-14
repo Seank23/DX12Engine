@@ -22,25 +22,17 @@ namespace DX12Engine
 		void InitCommandList(Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList>& outCommandList);
 		void CreatePipelineState(Shader* vertexShader, Shader* pixelShader);
 
-		void ResetCommandAllocatorAndList(Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList> commandList);
-		void ExecuteCommandList(Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList> commandList);
-		void UpdateFence();
+		void ResetCommandAllocatorAndList(ID3D12GraphicsCommandList* commandList);
 
 		void CreateConstantBuffer(Microsoft::WRL::ComPtr<ID3D12Resource>& outConstantBufferRes);
-		void SetConstantBuffer(Microsoft::WRL::ComPtr<ID3D12Resource> constantBufferRes, ConstantBuffer constantBufferData);
+		void SetConstantBuffer(ID3D12Resource* constantBufferRes, ConstantBuffer constantBufferData);
 
 		Microsoft::WRL::ComPtr<ID3D12Device> GetDevice() const { return m_Device; }
-		Microsoft::WRL::ComPtr<ID3D12CommandQueue> GetCommandQueue() const { return m_CommandQueue; }
 		Microsoft::WRL::ComPtr<ID3D12RootSignature> GetRootSignature() const { return m_RootSignature; }
 		Microsoft::WRL::ComPtr<ID3D12PipelineState> GetPipelineState() const { return m_PipelineState; }
 
 	private:
 		Microsoft::WRL::ComPtr<ID3D12Device> m_Device;
-		Microsoft::WRL::ComPtr<ID3D12CommandQueue> m_CommandQueue;
-
-		Microsoft::WRL::ComPtr<ID3D12Fence> m_Fence;
-		UINT64 m_FenceValue = 0;
-		HANDLE m_FenceEvent;
 
 		Microsoft::WRL::ComPtr<ID3D12CommandAllocator> m_CommandAllocator;
 

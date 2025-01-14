@@ -11,9 +11,11 @@ namespace DX12Engine
 		m_RenderDevice = std::make_unique<RenderDevice>();
 		m_RenderDevice->Init(windowHandle);
 
-		m_RenderWindow->CreateSwapChain(m_RenderDevice->GetCommandQueue());
-		m_RenderWindow->CreateRTVHeap(m_RenderDevice->GetDevice());
-		m_RenderWindow->CreateDepthStencilBuffer(m_RenderDevice->GetDevice());
+		m_QueueManager = std::make_unique<CommandQueueManager>(m_RenderDevice->GetDevice().Get());
+
+		m_RenderWindow->CreateSwapChain(m_QueueManager->GetGraphicsQueue()->GetCommandQueue().Get());
+		m_RenderWindow->CreateRTVHeap(m_RenderDevice->GetDevice().Get());
+		m_RenderWindow->CreateDepthStencilBuffer(m_RenderDevice->GetDevice().Get());
 	}
 
 	RenderContext::~RenderContext()

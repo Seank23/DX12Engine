@@ -5,6 +5,7 @@ namespace DX12Engine
 	Renderer::Renderer(std::shared_ptr<RenderContext> context)
 		: m_CameraPosition({ 0.0f, 0.0f, -3.0f }), m_RenderContext(context)
 	{
+		m_QueueManager = context->GetQueueManager();
 		m_ViewMatrix = DirectX::XMMatrixLookAtLH(
 			DirectX::XMVectorSet(m_CameraPosition.x, m_CameraPosition.y, m_CameraPosition.z, 1.0f), // Camera position
 			DirectX::XMVectorSet(0.0f, 0.0f, 0.0f, 1.0f),  // Look-at target
@@ -28,7 +29,7 @@ namespace DX12Engine
 
 	void Renderer::InitFrame(D3D12_VIEWPORT viewport, D3D12_RECT scissorRect)
 	{
-		m_RenderContext->ResetCommandAllocatorAndList(m_CommandList);
+		m_RenderContext->ResetCommandAllocatorAndList(m_CommandList.Get());
 
 		m_CommandList->SetGraphicsRootSignature(m_RenderContext->GetRootSignature().Get());
 		m_CommandList->RSSetViewports(1, &viewport);
@@ -65,11 +66,10 @@ namespace DX12Engine
 		auto barrier = m_RenderContext->TransitionRenderTarget(false);
 		m_CommandList->ResourceBarrier(1, &barrier);
 
-		m_CommandList->Close();
-		m_RenderContext->ExecuteCommandList(m_CommandList);
+		UINT fenceVal = m_QueueManager->GetGraphicsQueue()->ExecuteCommandList(m_CommandList.Get());
 
 		m_RenderContext->PresentFrame();
-		m_RenderContext->UpdateFence();
+		m_QueueManager->WaitForFenceCPUBlocking(fenceVal);
 	}
 
 	bool Renderer::PollWindow()
@@ -116,6 +116,6 @@ namespace DX12Engine
 	void Renderer::UpdateMVPMatrix(RenderObject* renderObject)
 	{
 		renderObject->UpdateConstantBufferData(renderObject->m_ModelMatrix * m_ViewMatrix * m_ProjectionMatrix);
-		m_RenderContext->SetConstantBuffer(renderObject->m_ConstantBufferRes, renderObject->m_ConstantBufferData);
+		m_RenderContext->SetConstantBuffer(renderObject->m_ConstantBufferRes.Get(), renderObject->m_ConstantBufferData);
 	}
 }
