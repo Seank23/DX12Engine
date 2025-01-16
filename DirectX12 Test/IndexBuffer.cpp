@@ -2,43 +2,19 @@
 
 namespace DX12Engine
 {
-    IndexBuffer::IndexBuffer()
+    IndexBuffer::IndexBuffer(ID3D12Resource* resource, D3D12_RESOURCE_STATES usageState, DXGI_FORMAT format, UINT bufferSize)
+		: GPUResource(resource, usageState)
     {
+		m_GPUAddress = resource->GetGPUVirtualAddress();
+		m_IndexBufferView.BufferLocation = m_GPUAddress;
+		m_IndexBufferView.Format = format;
+		m_IndexBufferView.SizeInBytes = bufferSize;
     }
 
     IndexBuffer::~IndexBuffer()
     {
-		m_IndexBuffer.Reset();
 		m_IndexBufferView.BufferLocation = 0;
 		m_IndexBufferView.Format = (DXGI_FORMAT)NULL;
 		m_IndexBufferView.SizeInBytes = 0;
     }
-
-    void IndexBuffer::SetData(Microsoft::WRL::ComPtr<ID3D12Device> device, std::vector<UINT>& indices)
-	{
-        const UINT indexBufferSize = sizeof(UINT) * indices.size();
-
-        // Create the index buffer resource in the GPU's default heap
-        auto heapProperties = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD);
-        auto resourceDesc = CD3DX12_RESOURCE_DESC::Buffer(indexBufferSize);
-        device->CreateCommittedResource(
-            &heapProperties,
-            D3D12_HEAP_FLAG_NONE,
-            &resourceDesc,
-            D3D12_RESOURCE_STATE_GENERIC_READ,
-            nullptr,
-            IID_PPV_ARGS(&m_IndexBuffer));
-
-        // Copy the indices to the index buffer
-        void* indexDataBegin = nullptr;
-        CD3DX12_RANGE readRange(0, 0); // We do not intend to read from this resource on the CPU
-        m_IndexBuffer->Map(0, &readRange, &indexDataBegin);
-        memcpy(indexDataBegin, &indices[0], indexBufferSize);
-        m_IndexBuffer->Unmap(0, nullptr);
-
-        // Initialize the index buffer view
-        m_IndexBufferView.BufferLocation = m_IndexBuffer->GetGPUVirtualAddress();
-        m_IndexBufferView.Format = DXGI_FORMAT_R32_UINT;
-        m_IndexBufferView.SizeInBytes = indexBufferSize;
-	}
 }

@@ -93,27 +93,4 @@ namespace DX12Engine
 		m_CommandAllocator->Reset();
 		commandList->Reset(m_CommandAllocator.Get(), m_PipelineState.Get());
 	}
-
-	void RenderDevice::CreateConstantBuffer(Microsoft::WRL::ComPtr<ID3D12Resource>& outConstantBufferRes)
-	{
-		D3D12_HEAP_PROPERTIES heapProperties = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD);
-		D3D12_RESOURCE_DESC bufferDesc = CD3DX12_RESOURCE_DESC::Buffer(sizeof(ConstantBuffer));
-		m_Device->CreateCommittedResource(
-			&heapProperties,
-			D3D12_HEAP_FLAG_NONE,
-			&bufferDesc,
-			D3D12_RESOURCE_STATE_GENERIC_READ,
-			nullptr,
-			IID_PPV_ARGS(&outConstantBufferRes)
-		);
-	}
-
-	void RenderDevice::SetConstantBuffer(ID3D12Resource* constantBufferRes, ConstantBuffer constantBufferData)
-	{
-		// Map and initialize the constant buffer
-		UINT* mappedData;
-		constantBufferRes->Map(0, nullptr, reinterpret_cast<void**>(&mappedData));
-		memcpy(mappedData, &constantBufferData, sizeof(ConstantBuffer));
-		constantBufferRes->Unmap(0, nullptr);
-	}
 }

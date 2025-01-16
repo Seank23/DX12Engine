@@ -24,9 +24,6 @@ namespace DX12Engine
 
 		void ResetCommandAllocatorAndList(ID3D12GraphicsCommandList* commandList);
 
-		void CreateConstantBuffer(Microsoft::WRL::ComPtr<ID3D12Resource>& outConstantBufferRes);
-		void SetConstantBuffer(ID3D12Resource* constantBufferRes, ConstantBuffer constantBufferData);
-
 		Microsoft::WRL::ComPtr<ID3D12Device> GetDevice() const { return m_Device; }
 		Microsoft::WRL::ComPtr<ID3D12RootSignature> GetRootSignature() const { return m_RootSignature; }
 		Microsoft::WRL::ComPtr<ID3D12PipelineState> GetPipelineState() const { return m_PipelineState; }

@@ -19,8 +19,8 @@ int main()
 	DX12Engine::ModelLoader modelLoader;
 	DX12Engine::Mesh mesh = modelLoader.LoadObj(inputfile);
 
-	DX12Engine::RenderObject cube1(context, mesh);
-	DX12Engine::RenderObject cube2(context, mesh);
+	DX12Engine::RenderObject cube1(mesh);
+	DX12Engine::RenderObject cube2(mesh);
 	cube1.SetModelMatrix(DirectX::XMMatrixTranslation(0.5f, 0.5f, 0.5f));
 	cube2.SetModelMatrix(DirectX::XMMatrixTranslation(0.0f, -0.5f, -0.5f));
 	float count = 0.0f;

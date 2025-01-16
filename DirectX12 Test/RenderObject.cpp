@@ -1,18 +1,19 @@
 #include "RenderObject.h"
+#include "ResourceManager.h"
+#include "ConstantBufferData.h"
 
 namespace DX12Engine
 {
-	RenderObject::RenderObject(std::shared_ptr<RenderContext> context, Mesh mesh)
-		: m_RenderContext(context), m_Mesh(mesh), m_ModelMatrix(DirectX::XMMatrixIdentity()), m_ConstantBufferRes(nullptr)
+	RenderObject::RenderObject(Mesh mesh)
+		: m_Mesh(mesh), m_ModelMatrix(DirectX::XMMatrixIdentity()), m_ConstantBufferData()
 	{
-		m_VertexBuffer.SetData(context->GetDevice(), mesh.Vertices);
-		m_IndexBuffer.SetData(context->GetDevice(), mesh.Indices);
-		context->CreateConstantBuffer(m_ConstantBufferRes);
+		m_VertexBuffer = ResourceManager::GetInstance().CreateVertexBuffer(mesh.Vertices);
+		m_IndexBuffer = ResourceManager::GetInstance().CreateIndexBuffer(mesh.Indices);
+		m_ConstantBuffer = ResourceManager::GetInstance().CreateConstantBuffer(sizeof(m_ConstantBufferData));
 	}
 
 	RenderObject::~RenderObject()
 	{
-		m_ConstantBufferRes.Reset();
 		m_ConstantBufferData.Reset();
 		m_Mesh.Reset();
 		m_ModelMatrix = DirectX::XMMatrixIdentity();
@@ -21,5 +22,6 @@ namespace DX12Engine
 	void RenderObject::UpdateConstantBufferData(DirectX::XMMATRIX wvpMatrix)
 	{
 		m_ConstantBufferData.WVPMatrix = wvpMatrix;
+		m_ConstantBuffer->Update(&m_ConstantBufferData, sizeof(m_ConstantBufferData));
 	}
 }

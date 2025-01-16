@@ -4,6 +4,7 @@
 #include "VertexBuffer.h"
 #include "IndexBuffer.h"
 #include "ConstantBuffer.h"
+#include "ConstantBufferData.h"
 
 namespace DX12Engine
 {
@@ -12,7 +13,7 @@ namespace DX12Engine
 	public:
 		friend class Renderer;
 
-		RenderObject(std::shared_ptr<RenderContext> context, Mesh mesh);
+		RenderObject(Mesh mesh);
 		~RenderObject();
 
 		void SetModelMatrix(DirectX::XMMATRIX modelMatrix) { m_ModelMatrix = modelMatrix; }	
@@ -20,12 +21,11 @@ namespace DX12Engine
 	private:
 		void UpdateConstantBufferData(DirectX::XMMATRIX wvpMatrix);
 
-		std::shared_ptr<RenderContext> m_RenderContext;
 		Mesh m_Mesh;
-		VertexBuffer m_VertexBuffer;
-		IndexBuffer m_IndexBuffer;
-		ConstantBuffer m_ConstantBufferData;
-		Microsoft::WRL::ComPtr<ID3D12Resource> m_ConstantBufferRes;
+		std::unique_ptr<VertexBuffer> m_VertexBuffer;
+		std::unique_ptr<IndexBuffer> m_IndexBuffer;
+		std::unique_ptr<ConstantBuffer> m_ConstantBuffer;
+		ConstantBufferData m_ConstantBufferData;
 		DirectX::XMMATRIX m_ModelMatrix;
 	};
 }

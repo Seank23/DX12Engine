@@ -1,4 +1,5 @@
 #include "RenderContext.h"
+#include "ResourceManager.h"
 
 namespace DX12Engine
 {
@@ -16,10 +17,16 @@ namespace DX12Engine
 		m_RenderWindow->CreateSwapChain(m_QueueManager->GetGraphicsQueue()->GetCommandQueue().Get());
 		m_RenderWindow->CreateRTVHeap(m_RenderDevice->GetDevice().Get());
 		m_RenderWindow->CreateDepthStencilBuffer(m_RenderDevice->GetDevice().Get());
+
+		ResourceManager::GetInstance().Init(m_RenderDevice->GetDevice());
 	}
 
 	RenderContext::~RenderContext()
 	{
+		ResourceManager::Shutdown();
+		m_QueueManager.reset();
+		m_RenderDevice.reset();
+		m_RenderWindow.reset();
 	}
 
 	void RenderContext::CreatePipeline(Shader* vertexShader, Shader* pixelShader)

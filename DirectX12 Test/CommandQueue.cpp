@@ -26,12 +26,8 @@ namespace DX12Engine
 	CommandQueue::~CommandQueue()
 	{
 		CloseHandle(m_FenceEvent);
-
-		m_Fence->Release();
-		m_Fence = nullptr;
-
-		m_CommandQueue->Release();
-		m_CommandQueue = nullptr;
+		m_Fence.Reset();
+		m_CommandQueue.Reset();
 	}
 
 	bool CommandQueue::IsFenceComplete(UINT fenceValue)

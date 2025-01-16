@@ -27,8 +27,6 @@ namespace DX12Engine
 		void						InitCommandList(Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList>& outCommandList) const { m_RenderDevice->InitCommandList(outCommandList); }
 		void						ResetCommandAllocatorAndList(ID3D12GraphicsCommandList* commandList) const { m_RenderDevice->ResetCommandAllocatorAndList(commandList); }
 		void						PresentFrame() const { m_RenderWindow->PresentFrame(); }
-		void						CreateConstantBuffer(Microsoft::WRL::ComPtr<ID3D12Resource>& outConstantBufferRes) const { m_RenderDevice->CreateConstantBuffer(outConstantBufferRes); }
-		void						SetConstantBuffer(ID3D12Resource* constantBufferRes, ConstantBuffer constantBufferData) const { m_RenderDevice->SetConstantBuffer(constantBufferRes, constantBufferData); }
 
 	private:
 		std::unique_ptr<RenderWindow> m_RenderWindow;

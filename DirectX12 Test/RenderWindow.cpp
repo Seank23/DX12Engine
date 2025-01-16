@@ -13,7 +13,8 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 namespace DX12Engine
 {
 	RenderWindow::RenderWindow()
-		: m_WindowHandle(nullptr), m_WindowInstance(nullptr), m_SwapChain(nullptr), m_RTVHeap(nullptr), m_DepthStencilBuffer(nullptr)
+		: m_WindowHandle(nullptr), m_WindowInstance(nullptr), m_SwapChain(nullptr), m_RTVHeap(nullptr), m_DepthStencilBuffer(nullptr),
+		m_FrameIndex(0), m_RTVDescriptorSize(0), m_DSVDescriptorSize(0), m_WindowSize(DirectX::XMFLOAT2(0, 0))
 	{
 	}
 
@@ -21,12 +22,12 @@ namespace DX12Engine
 	{
 		m_WindowHandle = nullptr;
 		m_WindowInstance = nullptr;
-		m_SwapChain.Reset();
-		m_RTVHeap.Reset();
+		m_DepthStencilBuffer.Reset();
+		m_DSVHeap.Reset();
 		for (auto& rt : m_RenderTargets)
 			rt.Reset();
-		m_DSVHeap.Reset();
-		m_DepthStencilBuffer.Reset();
+		m_RTVHeap.Reset();
+		m_SwapChain.Reset();
 		m_FrameIndex = 0;
 		m_RTVDescriptorSize = 0;
 		m_DSVDescriptorSize = 0;

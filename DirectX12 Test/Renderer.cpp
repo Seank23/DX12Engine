@@ -52,10 +52,10 @@ namespace DX12Engine
 
 	void Renderer::Render(RenderObject* renderObject)
 	{
-		auto vertexBufferView = renderObject->m_VertexBuffer.GetVertexBufferView();
-		auto indexBufferView = renderObject->m_IndexBuffer.GetIndexBufferView();
+		auto vertexBufferView = renderObject->m_VertexBuffer->GetVertexBufferView();
+		auto indexBufferView = renderObject->m_IndexBuffer->GetIndexBufferView();
 		UpdateMVPMatrix(renderObject);
-		m_CommandList->SetGraphicsRootConstantBufferView(0, renderObject->m_ConstantBufferRes->GetGPUVirtualAddress());
+		m_CommandList->SetGraphicsRootConstantBufferView(0, renderObject->m_ConstantBuffer->GetGPUVirtualAddress());
 		m_CommandList->IASetVertexBuffers(0, 1, &vertexBufferView);
 		m_CommandList->IASetIndexBuffer(&indexBufferView);
 		m_CommandList->DrawIndexedInstanced(indexBufferView.SizeInBytes / 4, 1, 0, 0, 0);
@@ -116,6 +116,5 @@ namespace DX12Engine
 	void Renderer::UpdateMVPMatrix(RenderObject* renderObject)
 	{
 		renderObject->UpdateConstantBufferData(renderObject->m_ModelMatrix * m_ViewMatrix * m_ProjectionMatrix);
-		m_RenderContext->SetConstantBuffer(renderObject->m_ConstantBufferRes.Get(), renderObject->m_ConstantBufferData);
 	}
 }
