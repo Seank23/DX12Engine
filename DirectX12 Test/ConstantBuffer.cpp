@@ -3,11 +3,12 @@
 
 namespace DX12Engine
 {
-	ConstantBuffer::ConstantBuffer(ID3D12Resource* resource, D3D12_RESOURCE_STATES usageState, UINT bufferSize)
+	ConstantBuffer::ConstantBuffer(ID3D12Resource* resource, D3D12_RESOURCE_STATES usageState, UINT bufferSize, DescriptorHeapHandle cbvHandle)
 		: GPUResource(resource, usageState)
 	{
 		m_GPUAddress = resource->GetGPUVirtualAddress();
 		m_BufferSize = bufferSize;
+		m_CBVHandle = cbvHandle;
 
 		m_MappedBuffer = nullptr;
 		m_Resource->Map(0, nullptr, reinterpret_cast<void**>(&m_MappedBuffer));

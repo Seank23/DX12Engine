@@ -1,20 +1,21 @@
 #pragma once
 #include "GPUResource.h"
+#include "DescriptorHeapHandle.h"
 
 namespace DX12Engine
 {
-	class ConstantBuffer : GPUResource
+	class ConstantBuffer : public GPUResource
 	{
 	public:
-		ConstantBuffer(ID3D12Resource* resource, D3D12_RESOURCE_STATES usageState, UINT bufferSize);
-		~ConstantBuffer();
+		ConstantBuffer(ID3D12Resource* resource, D3D12_RESOURCE_STATES usageState, UINT bufferSize, DescriptorHeapHandle cbvHandle);
+		~ConstantBuffer() override;
 
 		void Update(void* data, UINT size);
-
-		D3D12_GPU_VIRTUAL_ADDRESS GetGPUVirtualAddress() { return GetGPUAddress(); }
+		DescriptorHeapHandle GetConstantBufferViewHandle() const { return m_CBVHandle; }	
 
 	private:
 		void* m_MappedBuffer;
 		UINT m_BufferSize;
+		DescriptorHeapHandle m_CBVHandle;
 	};
 }	

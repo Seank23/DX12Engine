@@ -1,5 +1,6 @@
 #include "RenderContext.h"
 #include "ResourceManager.h"
+#include "DescriptorHeapManager.h"
 
 namespace DX12Engine
 {
@@ -19,11 +20,13 @@ namespace DX12Engine
 		m_RenderWindow->CreateDepthStencilBuffer(m_RenderDevice->GetDevice().Get());
 
 		ResourceManager::GetInstance().Init(m_RenderDevice->GetDevice());
+		DescriptorHeapManager::GetInstance().Init(m_RenderDevice->GetDevice());
 	}
 
 	RenderContext::~RenderContext()
 	{
 		ResourceManager::Shutdown();
+		DescriptorHeapManager::Shutdown();
 		m_QueueManager.reset();
 		m_RenderDevice.reset();
 		m_RenderWindow.reset();

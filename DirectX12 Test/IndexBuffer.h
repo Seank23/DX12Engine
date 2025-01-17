@@ -4,7 +4,7 @@
 
 namespace DX12Engine
 {
-	class IndexBuffer : GPUResource
+	class IndexBuffer : public GPUResource
 	{
 	public:
 		IndexBuffer(ID3D12Resource* resource, D3D12_RESOURCE_STATES usageState, DXGI_FORMAT format, UINT bufferSize);

@@ -1,4 +1,6 @@
 #include "Renderer.h"
+#include "DescriptorHeapHandle.h"
+#include "DescriptorHeapManager.h"
 
 namespace DX12Engine
 {
@@ -55,7 +57,7 @@ namespace DX12Engine
 		auto vertexBufferView = renderObject->m_VertexBuffer->GetVertexBufferView();
 		auto indexBufferView = renderObject->m_IndexBuffer->GetIndexBufferView();
 		UpdateMVPMatrix(renderObject);
-		m_CommandList->SetGraphicsRootConstantBufferView(0, renderObject->m_ConstantBuffer->GetGPUVirtualAddress());
+		m_CommandList->SetGraphicsRootConstantBufferView(0, renderObject->m_ConstantBuffer->GetGPUAddress());
 		m_CommandList->IASetVertexBuffers(0, 1, &vertexBufferView);
 		m_CommandList->IASetIndexBuffer(&indexBufferView);
 		m_CommandList->DrawIndexedInstanced(indexBufferView.SizeInBytes / 4, 1, 0, 0, 0);

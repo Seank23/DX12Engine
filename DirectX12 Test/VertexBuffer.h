@@ -4,7 +4,7 @@
 
 namespace DX12Engine
 {
-	class VertexBuffer : GPUResource
+	class VertexBuffer : public GPUResource
 	{
 	public:
 		VertexBuffer(ID3D12Resource* resource, D3D12_RESOURCE_STATES usageState, UINT vertexStride, UINT bufferSize);
