@@ -8,10 +8,10 @@
 #include <d3dcompiler.h>
 #include <memory>
 
-#include "VertexBuffer.h"
-#include "IndexBuffer.h"
-#include "ConstantBuffer.h"
-#include "Mesh.h"
+#include "../Buffers/VertexBuffer.h"
+#include "../Buffers/IndexBuffer.h"
+#include "../Buffers/ConstantBuffer.h"
+#include "../Resources/Mesh.h"
 
 namespace DX12Engine
 {

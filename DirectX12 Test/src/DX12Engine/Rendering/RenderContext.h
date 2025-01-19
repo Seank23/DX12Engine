@@ -1,7 +1,8 @@
 #pragma once
 #include "RenderDevice.h"
 #include "RenderWindow.h"
-#include "CommandQueueManager.h"
+#include "../Queues/CommandQueueManager.h"
+#include "../Resources/Shader.h"
 
 namespace DX12Engine
 {

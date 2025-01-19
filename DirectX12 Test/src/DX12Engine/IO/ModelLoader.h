@@ -1,5 +1,5 @@
 #pragma once
-#include "Mesh.h"
+#include "../Resources/Mesh.h"
 #include <string>
 
 namespace DX12Engine

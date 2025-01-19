@@ -1,6 +1,6 @@
 #include "Renderer.h"
-#include "DescriptorHeapHandle.h"
-#include "DescriptorHeapManager.h"
+#include "../Heaps/DescriptorHeapHandle.h"
+#include "../Heaps/DescriptorHeapManager.h"
 
 namespace DX12Engine
 {

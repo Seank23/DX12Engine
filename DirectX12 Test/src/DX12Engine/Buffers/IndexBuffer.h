@@ -1,6 +1,6 @@
 #pragma once
 #include "d3dx12.h"
-#include "GPUResource.h"
+#include "../Resources/GPUResource.h"
 
 namespace DX12Engine
 {

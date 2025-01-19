@@ -1,9 +1,9 @@
-#include "RenderContext.h"
-#include "Renderer.h"
-#include "Shader.h"
-#include "ModelLoader.h"
-#include "Mesh.h"
-#include "RenderObject.h"
+#include "DX12Engine/Rendering/RenderContext.h"
+#include "DX12Engine/Rendering/Renderer.h"
+#include "DX12Engine/Resources/Shader.h"
+#include "DX12Engine/IO/ModelLoader.h"
+#include "DX12Engine/Resources/Mesh.h"
+#include "DX12Engine/Rendering/RenderObject.h"
 
 int main() 
 {

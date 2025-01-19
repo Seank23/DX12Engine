@@ -1,6 +1,6 @@
 #include "RenderObject.h"
-#include "ResourceManager.h"
-#include "ConstantBufferData.h"
+#include "../Resources/ResourceManager.h"
+#include "../Buffers/ConstantBufferData.h"
 
 namespace DX12Engine
 {

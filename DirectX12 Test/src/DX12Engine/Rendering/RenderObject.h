@@ -1,10 +1,10 @@
 #pragma once
 #include "RenderContext.h"
-#include "Mesh.h"
-#include "VertexBuffer.h"
-#include "IndexBuffer.h"
-#include "ConstantBuffer.h"
-#include "ConstantBufferData.h"
+#include "../Resources/Mesh.h"
+#include "../Buffers/VertexBuffer.h"
+#include "../Buffers/IndexBuffer.h"
+#include "../Buffers/ConstantBuffer.h"
+#include "../Buffers/ConstantBufferData.h"
 
 namespace DX12Engine
 {

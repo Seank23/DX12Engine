@@ -7,8 +7,8 @@
 #include <d3dcompiler.h>
 #include "d3dx12.h"
 
-#include "Shader.h"
-#include "ConstantBuffer.h"
+#include "../Resources/Shader.h"
+#include "../Buffers/ConstantBuffer.h"
 
 namespace DX12Engine
 {

@@ -1,6 +1,6 @@
 #include "RenderContext.h"
-#include "ResourceManager.h"
-#include "DescriptorHeapManager.h"
+#include "../Resources/ResourceManager.h"
+#include "../Heaps/DescriptorHeapManager.h"
 
 namespace DX12Engine
 {

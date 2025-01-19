@@ -104,7 +104,8 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>E:\Projects\source\repos\DirectX12 Test\vendor\DirectX-Headers-main\include\directx;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>E:\Projects\source\repos\DirectX12 Test\vendor\tinyobjloader-release;E:\Projects\source\repos\DirectX12 Test\vendor\DirectX-Headers-main\include\directx;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <LanguageStandard>stdcpp20</LanguageStandard>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -129,12 +130,26 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="Main.cpp" />
-    <ClCompile Include="RenderDevice.cpp" />
-    <ClCompile Include="Renderer.cpp" />
-    <ClCompile Include="RenderWindow.cpp" />
-    <ClCompile Include="Shader.cpp" />
-    <ClCompile Include="VertexBuffer.cpp" />
+    <ClCompile Include="src\DX12Engine\Queues\CommandQueueManager.cpp" />
+    <ClCompile Include="src\DX12Engine\Buffers\ConstantBuffer.cpp" />
+    <ClCompile Include="src\DX12Engine\Heaps\DescriptorHeap.cpp" />
+    <ClCompile Include="src\DX12Engine\Heaps\DescriptorHeapManager.cpp" />
+    <ClCompile Include="src\DX12Engine\Utils\EngineUtils.h" />
+    <ClCompile Include="src\DX12Engine\Resources\GPUResource.cpp" />
+    <ClCompile Include="src\DX12Engine\Buffers\IndexBuffer.cpp" />
+    <ClCompile Include="src\Main.cpp" />
+    <ClCompile Include="src\DX12Engine\IO\ModelLoader.cpp" />
+    <ClCompile Include="src\DX12Engine\Rendering\RenderContext.cpp" />
+    <ClCompile Include="src\DX12Engine\Rendering\RenderDevice.cpp" />
+    <ClCompile Include="src\DX12Engine\Rendering\Renderer.cpp" />
+    <ClCompile Include="src\DX12Engine\Rendering\RenderObject.cpp" />
+    <ClCompile Include="src\DX12Engine\Queues\CommandQueue.cpp" />
+    <ClCompile Include="src\DX12Engine\Heaps\RenderPassDescriptorHeap.cpp" />
+    <ClCompile Include="src\DX12Engine\Rendering\RenderWindow.cpp" />
+    <ClCompile Include="src\DX12Engine\Resources\ResourceManager.cpp" />
+    <ClCompile Include="src\DX12Engine\Resources\Shader.cpp" />
+    <ClCompile Include="src\DX12Engine\Heaps\StagingDescriptorHeap.cpp" />
+    <ClCompile Include="src\DX12Engine\Buffers\VertexBuffer.cpp" />
   </ItemGroup>
   <ItemGroup>
     <FxCompile Include="PixelShader.hlsl">
@@ -151,11 +166,27 @@
     </FxCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="RenderDevice.h" />
-    <ClInclude Include="Renderer.h" />
-    <ClInclude Include="RenderWindow.h" />
-    <ClInclude Include="Shader.h" />
-    <ClInclude Include="VertexBuffer.h" />
+    <ClInclude Include="src\DX12Engine\Queues\CommandQueueManager.h" />
+    <ClInclude Include="src\DX12Engine\Buffers\ConstantBuffer.h" />
+    <ClInclude Include="src\DX12Engine\Buffers\ConstantBufferData.h" />
+    <ClInclude Include="src\DX12Engine\Heaps\DescriptorHeap.h" />
+    <ClInclude Include="src\DX12Engine\Heaps\DescriptorHeapHandle.h" />
+    <ClInclude Include="src\DX12Engine\Heaps\DescriptorHeapManager.h" />
+    <ClInclude Include="src\DX12Engine\Resources\GPUResource.h" />
+    <ClInclude Include="src\DX12Engine\Buffers\IndexBuffer.h" />
+    <ClInclude Include="src\DX12Engine\Resources\Mesh.h" />
+    <ClInclude Include="src\DX12Engine\IO\ModelLoader.h" />
+    <ClInclude Include="src\DX12Engine\Rendering\RenderContext.h" />
+    <ClInclude Include="src\DX12Engine\Rendering\RenderDevice.h" />
+    <ClInclude Include="src\DX12Engine\Rendering\Renderer.h" />
+    <ClInclude Include="src\DX12Engine\Rendering\RenderObject.h" />
+    <ClInclude Include="src\DX12Engine\Queues\CommandQueue.h" />
+    <ClInclude Include="src\DX12Engine\Heaps\RenderPassDescriptorHeap.h" />
+    <ClInclude Include="src\DX12Engine\Rendering\RenderWindow.h" />
+    <ClInclude Include="src\DX12Engine\Resources\ResourceManager.h" />
+    <ClInclude Include="src\DX12Engine\Resources\Shader.h" />
+    <ClInclude Include="src\DX12Engine\Heaps\StagingDescriptorHeap.h" />
+    <ClInclude Include="src\DX12Engine\Buffers\VertexBuffer.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

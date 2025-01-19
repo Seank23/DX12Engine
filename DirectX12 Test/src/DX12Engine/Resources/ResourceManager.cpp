@@ -1,6 +1,6 @@
 #include "ResourceManager.h"
-#include "DescriptorHeapManager.h"
-#include "EngineUtils.h"
+#include "../Heaps/DescriptorHeapManager.h"
+#include "../Utils/EngineUtils.h"
 
 namespace DX12Engine
 {
