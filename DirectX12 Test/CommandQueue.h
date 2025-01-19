@@ -28,6 +28,8 @@ namespace DX12Engine
         UINT ExecuteCommandList(ID3D12CommandList* commandList);
 
     private:
+        void FlushQueue();
+
 		Microsoft::WRL::ComPtr<ID3D12CommandQueue> m_CommandQueue;
 		Microsoft::WRL::ComPtr<ID3D12Fence> m_Fence;
 		UINT64 m_NextFenceValue;

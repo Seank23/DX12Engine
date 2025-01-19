@@ -25,6 +25,7 @@ namespace DX12Engine
 
 	CommandQueue::~CommandQueue()
 	{
+		FlushQueue();
 		CloseHandle(m_FenceEvent);
 		m_Fence.Reset();
 		m_CommandQueue.Reset();
@@ -77,5 +78,16 @@ namespace DX12Engine
 		std::lock_guard<std::mutex> lockGuard(m_EventMutex);
 		m_CommandQueue->Signal(m_Fence.Get(), m_NextFenceValue);
 		return m_NextFenceValue++;
+	}
+
+	void CommandQueue::FlushQueue()
+	{
+		const UINT64 fenceSignalValue = ++m_NextFenceValue;
+		EngineUtils::ThrowIfFailed(m_CommandQueue->Signal(m_Fence.Get(), fenceSignalValue));
+
+		if (m_Fence->GetCompletedValue() < fenceSignalValue) {
+			EngineUtils::ThrowIfFailed(m_Fence->SetEventOnCompletion(fenceSignalValue, m_FenceEvent));
+			WaitForSingleObject(m_FenceEvent, INFINITE);
+		}
 	}
 }
