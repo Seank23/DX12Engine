@@ -24,5 +24,11 @@ namespace DX12Engine
 				throw std::runtime_error("Assertion failed.");
 			}
 		}
+
+		static UINT AlignUINT(UINT value, UINT placement)
+		{
+			UINT alignmentCount = ceil((float)value / placement);
+			return alignmentCount * placement;
+		}
 	};
 }

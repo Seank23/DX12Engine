@@ -4,6 +4,8 @@
 #include "DX12Engine/IO/ModelLoader.h"
 #include "DX12Engine/Resources/Mesh.h"
 #include "DX12Engine/Rendering/RenderObject.h"
+#include "DX12Engine/IO/TextureLoader.h"
+#include "DX12Engine/Resources/Texture.h"
 
 int main() 
 {
@@ -18,6 +20,10 @@ int main()
 	std::string inputfile = "E:\\Projects\\source\\repos\\DirectX12 Test\\cube.obj";
 	DX12Engine::ModelLoader modelLoader;
 	DX12Engine::Mesh mesh = modelLoader.LoadObj(inputfile);
+
+	DX12Engine::TextureLoader textureLoader;
+	std::unique_ptr<DX12Engine::Texture> texture = textureLoader.LoadWIC(L"E:\\Projects\\source\\repos\\DirectX12 Test\\TCom_Wall_Stone3_2x2_512_albedo.tiff");
+	renderer.UploadTexture(texture.get());
 
 	DX12Engine::RenderObject cube1(mesh);
 	DX12Engine::RenderObject cube2(mesh);

@@ -1,6 +1,7 @@
 #include "ResourceManager.h"
 #include "../Heaps/DescriptorHeapManager.h"
 #include "../Utils/EngineUtils.h"
+#include "../Utils/Constants.h"
 
 namespace DX12Engine
 {
@@ -88,8 +89,7 @@ namespace DX12Engine
 	std::unique_ptr<ConstantBuffer> ResourceManager::CreateConstantBuffer(UINT bufferSize)
 	{
 		ID3D12Resource* constantBufferResource = nullptr;
-		UINT alignmentCount = ceil((float)bufferSize / D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT);
-		UINT alignedSize = alignmentCount * D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT;
+		UINT alignedSize = EngineUtils::AlignUINT(bufferSize, D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT);
 
 		D3D12_RESOURCE_DESC constantBufferDesc;
 		constantBufferDesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
@@ -129,5 +129,108 @@ namespace DX12Engine
 		std::unique_ptr<ConstantBuffer> constantBuffer = std::make_unique<ConstantBuffer>(constantBufferResource, D3D12_RESOURCE_STATE_GENERIC_READ, alignedSize, constantBufferHeapHandle);
 		constantBuffer->SetIsReady(true);
 		return constantBuffer;
+	}
+
+	std::unique_ptr<Texture> ResourceManager::CreateTexture(const DirectX::ScratchImage* imageData)
+	{
+		const DirectX::TexMetadata& textureMetadata = imageData->GetMetadata();
+		bool is3DTexture = textureMetadata.dimension == DirectX::TEX_DIMENSION_TEXTURE3D;
+		D3D12_RESOURCE_DESC textureDesc{};
+		textureDesc.Format = textureMetadata.format;
+		textureDesc.Width = textureMetadata.width;
+		textureDesc.Height = textureMetadata.height;
+		textureDesc.Flags = D3D12_RESOURCE_FLAG_NONE;
+		textureDesc.DepthOrArraySize = is3DTexture ? textureMetadata.depth : textureMetadata.arraySize;
+		textureDesc.MipLevels = textureMetadata.mipLevels;
+		textureDesc.SampleDesc.Count = 1;
+		textureDesc.SampleDesc.Quality = 0;
+		textureDesc.Dimension = is3DTexture ? D3D12_RESOURCE_DIMENSION_TEXTURE3D : D3D12_RESOURCE_DIMENSION_TEXTURE2D;
+		textureDesc.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
+		textureDesc.Alignment = 0;
+
+		D3D12_HEAP_PROPERTIES defaultProperties;
+		defaultProperties.Type = D3D12_HEAP_TYPE_DEFAULT;
+		defaultProperties.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
+		defaultProperties.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
+		defaultProperties.CreationNodeMask = 0;
+		defaultProperties.VisibleNodeMask = 0;
+
+		ID3D12Resource* newTextureResource = NULL;
+		EngineUtils::ThrowIfFailed(m_Device->CreateCommittedResource(&defaultProperties, D3D12_HEAP_FLAG_NONE, &textureDesc,
+			D3D12_RESOURCE_STATE_COPY_DEST, NULL, IID_PPV_ARGS(&newTextureResource)));
+
+		D3D12_SHADER_RESOURCE_VIEW_DESC shaderResourceViewDesc = {};
+		if (textureMetadata.IsCubemap())
+		{
+			EngineUtils::Assert(textureMetadata.arraySize);
+
+			shaderResourceViewDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURECUBE;
+			shaderResourceViewDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+			shaderResourceViewDesc.TextureCube.MostDetailedMip = 0;
+			shaderResourceViewDesc.TextureCube.MipLevels = (UINT)textureMetadata.mipLevels;
+			shaderResourceViewDesc.TextureCube.ResourceMinLODClamp = 0.0f;
+		}
+
+		DescriptorHeapHandle srvHandle = DescriptorHeapManager::GetInstance().GetNewSRVDescriptorHeapHandle();
+		m_Device->CreateShaderResourceView(newTextureResource, textureMetadata.IsCubemap() ? &shaderResourceViewDesc : NULL, srvHandle.GetCPUHandle());
+
+		UINT64 textureMemorySize = 0;
+		UINT numRows[MAX_TEXTURE_SUBRESOURCE_COUNT];
+		UINT64 rowSizesInBytes[MAX_TEXTURE_SUBRESOURCE_COUNT];
+		D3D12_PLACED_SUBRESOURCE_FOOTPRINT layouts[MAX_TEXTURE_SUBRESOURCE_COUNT];
+		const UINT64 numSubResources = textureMetadata.mipLevels * textureMetadata.arraySize;
+
+		m_Device->GetCopyableFootprints(&textureDesc, 0, (UINT)numSubResources, 0, layouts, numRows, rowSizesInBytes, &textureMemorySize);
+		UINT alignedSize = EngineUtils::AlignUINT(textureMemorySize, D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT);
+
+		D3D12_HEAP_PROPERTIES uploadHeapProperties;
+		uploadHeapProperties.Type = D3D12_HEAP_TYPE_UPLOAD;
+		uploadHeapProperties.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
+		uploadHeapProperties.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
+		uploadHeapProperties.CreationNodeMask = 0;
+		uploadHeapProperties.VisibleNodeMask = 0;
+
+		ID3D12Resource* textureUploadResource = NULL;
+		auto resourceDesc = CD3DX12_RESOURCE_DESC::Buffer(alignedSize);
+		m_Device->CreateCommittedResource(
+			&uploadHeapProperties,
+			D3D12_HEAP_FLAG_NONE,
+			&resourceDesc,
+			D3D12_RESOURCE_STATE_GENERIC_READ,
+			nullptr,
+			IID_PPV_ARGS(&textureUploadResource));
+
+		UINT8* textureDataBegin = nullptr;
+		CD3DX12_RANGE readRange(0, 0); // We do not intend to read from this resource on the CPU
+		textureUploadResource->Map(0, &readRange, reinterpret_cast<void**>(&textureDataBegin));
+
+		for (UINT64 arrayIndex = 0; arrayIndex < textureMetadata.arraySize; arrayIndex++)
+		{
+			for (UINT64 mipIndex = 0; mipIndex < textureMetadata.mipLevels; mipIndex++)
+			{
+				const UINT64 subResourceIndex = mipIndex + (arrayIndex * textureMetadata.mipLevels);
+
+				const D3D12_PLACED_SUBRESOURCE_FOOTPRINT& subResourceLayout = layouts[subResourceIndex];
+				const UINT64 subResourceHeight = numRows[subResourceIndex];
+				const UINT64 subResourcePitch = EngineUtils::AlignUINT(subResourceLayout.Footprint.RowPitch, D3D12_TEXTURE_DATA_PITCH_ALIGNMENT);
+				const UINT64 subResourceDepth = subResourceLayout.Footprint.Depth;
+				UINT8* destinationSubResourceMemory = textureDataBegin + subResourceLayout.Offset;
+
+				for (UINT64 sliceIndex = 0; sliceIndex < subResourceDepth; sliceIndex++)
+				{
+					const DirectX::Image* subImage = imageData->GetImage(mipIndex, arrayIndex, sliceIndex);
+					const UINT8* sourceSubResourceMemory = subImage->pixels;
+
+					for (UINT64 height = 0; height < subResourceHeight; height++)
+					{
+						memcpy(destinationSubResourceMemory, sourceSubResourceMemory, min(subResourcePitch, subImage->rowPitch));
+						destinationSubResourceMemory += subResourcePitch;
+						sourceSubResourceMemory += subImage->rowPitch;
+					}
+				}
+			}
+		}
+		textureUploadResource->Unmap(0, nullptr);
+		return std::make_unique<Texture>(newTextureResource, textureUploadResource, D3D12_RESOURCE_STATE_COPY_DEST, textureMetadata, layouts);
 	}
 }

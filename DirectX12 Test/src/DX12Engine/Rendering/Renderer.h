@@ -1,6 +1,7 @@
 #pragma once
 #include "RenderContext.h"
 #include "RenderObject.h"
+#include "../Resources/Texture.h"
 
 namespace DX12Engine
 {
@@ -18,6 +19,8 @@ namespace DX12Engine
 
 		D3D12_VIEWPORT GetDefaultViewport();
 		D3D12_RECT GetDefaultScissorRect();
+
+		void UploadTexture(Texture* texture);
 
 	private:
 		void UpdateMVPMatrix(RenderObject* renderObject);

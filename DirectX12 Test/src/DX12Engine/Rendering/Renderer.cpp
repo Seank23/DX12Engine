@@ -115,6 +115,27 @@ namespace DX12Engine
 		return scissorRect;
 	}
 
+	void Renderer::UploadTexture(Texture* texture)
+	{
+		DirectX::TexMetadata metadata = texture->GetMetadata();
+		UINT64 numSubResources = metadata.mipLevels * metadata.arraySize;
+		for (UINT64 subResourceIndex = 0; subResourceIndex < numSubResources; subResourceIndex++)
+		{
+			D3D12_TEXTURE_COPY_LOCATION destination = {};
+			destination.pResource = texture->m_MainResource;
+			destination.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
+			destination.SubresourceIndex = (UINT)subResourceIndex;
+
+			D3D12_TEXTURE_COPY_LOCATION source = {};
+			source.pResource = texture->m_UploadResource;
+			source.Type = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT;
+			source.PlacedFootprint = texture->m_SubResourceLayouts[subResourceIndex];
+			source.PlacedFootprint.Offset += 0;
+
+			m_CommandList->CopyTextureRegion(&destination, 0, 0, 0, &source, NULL);
+		}
+	}
+
 	void Renderer::UpdateMVPMatrix(RenderObject* renderObject)
 	{
 		renderObject->UpdateConstantBufferData(renderObject->m_ModelMatrix * m_ViewMatrix * m_ProjectionMatrix);
