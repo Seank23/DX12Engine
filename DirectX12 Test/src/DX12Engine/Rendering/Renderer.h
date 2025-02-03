@@ -2,6 +2,7 @@
 #include "RenderContext.h"
 #include "RenderObject.h"
 #include "../Resources/Texture.h"
+#include "../Heaps/RenderPassDescriptorHeap.h"
 
 namespace DX12Engine
 {
@@ -33,6 +34,8 @@ namespace DX12Engine
 		DirectX::XMMATRIX m_ProjectionMatrix;
 
 		DirectX::XMFLOAT3 m_CameraPosition;
+
+		RenderPassDescriptorHeap* m_RenderHeap;
 	};
 }
 

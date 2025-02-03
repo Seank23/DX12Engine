@@ -22,6 +22,7 @@ namespace DX12Engine
 		);
 
 		context->InitCommandList(m_CommandList);
+		m_RenderHeap = DescriptorHeapManager::GetInstance().GetRenderPassHeap();
 	}
 
 	Renderer::~Renderer()
@@ -50,6 +51,10 @@ namespace DX12Engine
 
 		m_CommandList->SetPipelineState(m_RenderContext->GetPipelineState().Get());
 		m_CommandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+
+		auto srvHeap = m_RenderHeap->GetHeap();
+		m_CommandList->SetDescriptorHeaps(1, &srvHeap);
+		m_CommandList->SetGraphicsRootDescriptorTable(1, srvHeap->GetGPUDescriptorHandleForHeapStart());
 	}
 
 	void Renderer::Render(RenderObject* renderObject)
@@ -117,23 +122,16 @@ namespace DX12Engine
 
 	void Renderer::UploadTexture(Texture* texture)
 	{
-		DirectX::TexMetadata metadata = texture->GetMetadata();
-		UINT64 numSubResources = metadata.mipLevels * metadata.arraySize;
-		for (UINT64 subResourceIndex = 0; subResourceIndex < numSubResources; subResourceIndex++)
-		{
-			D3D12_TEXTURE_COPY_LOCATION destination = {};
-			destination.pResource = texture->m_MainResource;
-			destination.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
-			destination.SubresourceIndex = (UINT)subResourceIndex;
+		UpdateSubresources(m_CommandList.Get(), texture->m_MainResource, texture->m_UploadResource, 0, 0, 1, &texture->m_Data);
+		auto barrier = CD3DX12_RESOURCE_BARRIER::Transition(texture->m_MainResource,
+			D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+		m_CommandList->ResourceBarrier(1, &barrier);
 
-			D3D12_TEXTURE_COPY_LOCATION source = {};
-			source.pResource = texture->m_UploadResource;
-			source.Type = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT;
-			source.PlacedFootprint = texture->m_SubResourceLayouts[subResourceIndex];
-			source.PlacedFootprint.Offset += 0;
+		DescriptorHeapHandle renderBlockStart  = m_RenderHeap->GetHeapHandleBlock(1);
+		m_RenderContext->GetDevice()->CopyDescriptorsSimple(1, renderBlockStart.GetCPUHandle(), texture->GetSRVHandle().GetCPUHandle(), D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 
-			m_CommandList->CopyTextureRegion(&destination, 0, 0, 0, &source, NULL);
-		}
+		texture->SetUsageState(D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+		texture->SetIsReady(true);
 	}
 
 	void Renderer::UpdateMVPMatrix(RenderObject* renderObject)

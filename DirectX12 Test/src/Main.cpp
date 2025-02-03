@@ -22,7 +22,7 @@ int main()
 	DX12Engine::Mesh mesh = modelLoader.LoadObj(inputfile);
 
 	DX12Engine::TextureLoader textureLoader;
-	std::unique_ptr<DX12Engine::Texture> texture = textureLoader.LoadWIC(L"E:\\Projects\\source\\repos\\DirectX12 Test\\TCom_Wall_Stone3_2x2_512_albedo.tiff");
+	std::unique_ptr<DX12Engine::Texture> texture = textureLoader.LoadWIC(L"E:\\Projects\\source\\repos\\DirectX12 Test\\minecraft_block_uv2.jpg");
 	renderer.UploadTexture(texture.get());
 
 	DX12Engine::RenderObject cube1(mesh);

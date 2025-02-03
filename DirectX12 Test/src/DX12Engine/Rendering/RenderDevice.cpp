@@ -38,17 +38,34 @@ namespace DX12Engine
     {
         m_Device->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&m_CommandAllocator));
         m_Device->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, m_CommandAllocator.Get(), nullptr, IID_PPV_ARGS(&outCommandList));
-		outCommandList->Close();
+		//outCommandList->Close();
     }
 
 	void RenderDevice::CreatePipelineState(Shader* vertexShader, Shader* pixelShader)
 	{
-		CD3DX12_ROOT_PARAMETER rootParameters[1];
+		CD3DX12_ROOT_PARAMETER rootParameters[2];
 		rootParameters[0].InitAsConstantBufferView(0); // Bind to register b0
+
+		D3D12_DESCRIPTOR_RANGE srvRange = {};
+		srvRange.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
+		srvRange.NumDescriptors = 1;
+		srvRange.BaseShaderRegister = 0;
+		srvRange.RegisterSpace = 0;
+		srvRange.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
+
+		rootParameters[1].InitAsDescriptorTable(1, &srvRange);
+
+		D3D12_STATIC_SAMPLER_DESC staticSamplerDesc = {};
+		staticSamplerDesc.Filter = D3D12_FILTER_MIN_MAG_MIP_LINEAR;
+		staticSamplerDesc.AddressU = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
+		staticSamplerDesc.AddressV = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
+		staticSamplerDesc.AddressW = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
+		staticSamplerDesc.ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
+		staticSamplerDesc.ShaderRegister = 0;  // s0
 
 		// Root signature description
 		CD3DX12_ROOT_SIGNATURE_DESC rootSignatureDesc;
-		rootSignatureDesc.Init(_countof(rootParameters), rootParameters, 0, nullptr, D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
+		rootSignatureDesc.Init(_countof(rootParameters), rootParameters, 1, &staticSamplerDesc, D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
 
 		Microsoft::WRL::ComPtr<ID3DBlob> signature;
 		Microsoft::WRL::ComPtr<ID3DBlob> error;

@@ -104,13 +104,13 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>E:\Projects\source\repos\DirectX12 Test\vendor\tinyobjloader-release;E:\Projects\source\repos\DirectX12 Test\vendor\DirectX-Headers-main\include\directx;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>E:\Projects\source\repos\DirectX12 Test\vendor\DirectXTex-main\DirectXTex;E:\Projects\source\repos\DirectX12 Test\vendor\tinyobjloader-release;E:\Projects\source\repos\DirectX12 Test\vendor\DirectX-Headers-main\include\directx;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp20</LanguageStandard>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>d3d12.lib;dxgi.lib;D3DCompiler.lib;$(CoreLibraryDependencies);%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>D3D12.lib;d3d12.lib;dxgi.lib;dxguid.lib;D3DCompiler.lib;$(CoreLibraryDependencies);E:\Projects\source\repos\DirectX12 Test\vendor\DirectXTex-main\DirectXTex\Bin\Desktop_2022\x64\Debug\DirectXTex.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
@@ -150,6 +150,8 @@
     <ClCompile Include="src\DX12Engine\Resources\Shader.cpp" />
     <ClCompile Include="src\DX12Engine\Heaps\StagingDescriptorHeap.cpp" />
     <ClCompile Include="src\DX12Engine\Buffers\VertexBuffer.cpp" />
+    <ClCompile Include="src\DX12Engine\IO\TextureLoader.cpp" />
+    <ClCompile Include="src\DX12Engine\Resources\Texture.cpp" />
   </ItemGroup>
   <ItemGroup>
     <FxCompile Include="PixelShader.hlsl">
@@ -187,6 +189,9 @@
     <ClInclude Include="src\DX12Engine\Resources\Shader.h" />
     <ClInclude Include="src\DX12Engine\Heaps\StagingDescriptorHeap.h" />
     <ClInclude Include="src\DX12Engine\Buffers\VertexBuffer.h" />
+    <ClInclude Include="src\DX12Engine\IO\TextureLoader.h" />
+    <ClInclude Include="src\DX12Engine\Resources\Texture.h" />
+    <ClInclude Include="src\DX12Engine\Utils\Constants.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
