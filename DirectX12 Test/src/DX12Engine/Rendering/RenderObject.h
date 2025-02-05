@@ -5,6 +5,7 @@
 #include "../Buffers/IndexBuffer.h"
 #include "../Buffers/ConstantBuffer.h"
 #include "../Buffers/ConstantBufferData.h"
+#include "../Resources/Texture.h"
 
 namespace DX12Engine
 {
@@ -17,6 +18,7 @@ namespace DX12Engine
 		~RenderObject();
 
 		void SetModelMatrix(DirectX::XMMATRIX modelMatrix) { m_ModelMatrix = modelMatrix; }	
+		void SetTexture(Texture* texture) { m_Texture = texture; }
 
 	private:
 		void UpdateConstantBufferData(DirectX::XMMATRIX wvpMatrix);
@@ -27,5 +29,6 @@ namespace DX12Engine
 		std::unique_ptr<ConstantBuffer> m_ConstantBuffer;
 		ConstantBufferData m_ConstantBufferData;
 		DirectX::XMMATRIX m_ModelMatrix;
+		Texture* m_Texture;
 	};
 }

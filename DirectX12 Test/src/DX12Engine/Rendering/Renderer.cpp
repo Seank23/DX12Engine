@@ -5,7 +5,7 @@
 namespace DX12Engine
 {
 	Renderer::Renderer(std::shared_ptr<RenderContext> context)
-		: m_CameraPosition({ 0.0f, 0.0f, -3.0f }), m_RenderContext(context)
+		: m_CameraPosition({ 0.0f, 0.0f, -3.0f }), m_RenderContext(context), m_RenderHeap(DescriptorHeapManager::GetInstance().GetRenderPassHeap())
 	{
 		m_QueueManager = context->GetQueueManager();
 		m_ViewMatrix = DirectX::XMMatrixLookAtLH(
@@ -22,7 +22,6 @@ namespace DX12Engine
 		);
 
 		context->InitCommandList(m_CommandList);
-		m_RenderHeap = DescriptorHeapManager::GetInstance().GetRenderPassHeap();
 	}
 
 	Renderer::~Renderer()
@@ -52,9 +51,8 @@ namespace DX12Engine
 		m_CommandList->SetPipelineState(m_RenderContext->GetPipelineState().Get());
 		m_CommandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
-		auto srvHeap = m_RenderHeap->GetHeap();
+		auto srvHeap = m_RenderHeap.GetHeap();
 		m_CommandList->SetDescriptorHeaps(1, &srvHeap);
-		m_CommandList->SetGraphicsRootDescriptorTable(1, srvHeap->GetGPUDescriptorHandleForHeapStart());
 	}
 
 	void Renderer::Render(RenderObject* renderObject)
@@ -62,6 +60,8 @@ namespace DX12Engine
 		auto vertexBufferView = renderObject->m_VertexBuffer->GetVertexBufferView();
 		auto indexBufferView = renderObject->m_IndexBuffer->GetIndexBufferView();
 		UpdateMVPMatrix(renderObject);
+		auto handle = renderObject->m_Texture->GetDescriptor()->GetGPUHandle();
+		m_CommandList->SetGraphicsRootDescriptorTable(1, handle);
 		m_CommandList->SetGraphicsRootConstantBufferView(0, renderObject->m_ConstantBuffer->GetGPUAddress());
 		m_CommandList->IASetVertexBuffers(0, 1, &vertexBufferView);
 		m_CommandList->IASetIndexBuffer(&indexBufferView);
@@ -127,8 +127,9 @@ namespace DX12Engine
 			D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
 		m_CommandList->ResourceBarrier(1, &barrier);
 
-		DescriptorHeapHandle renderBlockStart  = m_RenderHeap->GetHeapHandleBlock(1);
-		m_RenderContext->GetDevice()->CopyDescriptorsSimple(1, renderBlockStart.GetCPUHandle(), texture->GetSRVHandle().GetCPUHandle(), D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+		DescriptorHeapHandle renderBlockStart = m_RenderHeap.GetHeapHandleBlock(1);
+		m_RenderContext->GetDevice()->CopyDescriptorsSimple(1, renderBlockStart.GetCPUHandle(), texture->GetDescriptor()->GetCPUHandle(), D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+		texture->GetDescriptor()->SetGPUHandle(renderBlockStart.GetGPUHandle());
 
 		texture->SetUsageState(D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
 		texture->SetIsReady(true);

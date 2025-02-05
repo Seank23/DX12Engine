@@ -10,16 +10,13 @@ namespace DX12Engine
 	public:
 		friend class Renderer;
 
-		Texture(ID3D12Resource* mainResource, ID3D12Resource* uploadResource, D3D12_RESOURCE_STATES usageState, D3D12_SUBRESOURCE_DATA data, DescriptorHeapHandle srvHandle);
+		Texture(ID3D12Resource* mainResource, ID3D12Resource* uploadResource, D3D12_RESOURCE_STATES usageState, D3D12_SUBRESOURCE_DATA data, DescriptorHeapHandle descriptor);
 		~Texture();
-
-		DescriptorHeapHandle GetSRVHandle() { return m_SRVHandle; }
 
 	private:
 		ID3D12Resource* m_MainResource;
 		ID3D12Resource* m_UploadResource;
 		D3D12_SUBRESOURCE_DATA m_Data;
-		DescriptorHeapHandle m_SRVHandle;
 	};
 }
 

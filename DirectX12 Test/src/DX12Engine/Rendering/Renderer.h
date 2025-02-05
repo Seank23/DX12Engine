@@ -35,7 +35,7 @@ namespace DX12Engine
 
 		DirectX::XMFLOAT3 m_CameraPosition;
 
-		RenderPassDescriptorHeap* m_RenderHeap;
+		RenderPassDescriptorHeap& m_RenderHeap;
 	};
 }
 

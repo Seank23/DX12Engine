@@ -22,13 +22,13 @@ namespace DX12Engine
 		DescriptorHeapHandle GetNewSRVDescriptorHeapHandle() { return m_StagingHeap->GetNewHeapHandle(); }
 		DescriptorHeapHandle GetRenderHeapHandleBlock(UINT count) { return m_RenderPassHeap->GetHeapHandleBlock(count); }
 
-		StagingDescriptorHeap* GetStagingHeap() { return m_StagingHeap; }
-		RenderPassDescriptorHeap* GetRenderPassHeap() { return m_RenderPassHeap; }
+		StagingDescriptorHeap& GetStagingHeap() { return *m_StagingHeap; }
+		RenderPassDescriptorHeap& GetRenderPassHeap() { return *m_RenderPassHeap; }
 
 	private:
 		Microsoft::WRL::ComPtr<ID3D12Device> m_Device;
-		StagingDescriptorHeap* m_StagingHeap;
-		RenderPassDescriptorHeap* m_RenderPassHeap;
+		std::unique_ptr<StagingDescriptorHeap> m_StagingHeap;
+		std::unique_ptr<RenderPassDescriptorHeap> m_RenderPassHeap;
 	};
 }
 
