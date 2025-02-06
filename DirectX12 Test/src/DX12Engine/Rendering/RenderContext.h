@@ -2,6 +2,7 @@
 #include "RenderDevice.h"
 #include "RenderWindow.h"
 #include "../Queues/CommandQueueManager.h"
+#include "../Heaps/DescriptorHeapManager.h"
 #include "../Resources/Shader.h"
 
 namespace DX12Engine
@@ -21,7 +22,8 @@ namespace DX12Engine
 		CD3DX12_CPU_DESCRIPTOR_HANDLE				GetRTVHandle() const { return m_RenderWindow->GetRTVHandle(); }
 		D3D12_CPU_DESCRIPTOR_HANDLE					GetDSVHandle() const { return m_RenderWindow->GetDSVHandle(); }
 		Microsoft::WRL::ComPtr<ID3D12PipelineState> GetPipelineState() const { return m_RenderDevice->GetPipelineState(); }
-		CommandQueueManager*						GetQueueManager() const { return m_QueueManager.get(); }
+		CommandQueueManager&						GetQueueManager() const { return *m_QueueManager; }
+		DescriptorHeapManager&						GetHeapManager() const { return *m_HeapManager; }
 
 		CD3DX12_RESOURCE_BARRIER	TransitionRenderTarget(bool forward) const { return m_RenderWindow->TransitionRenderTarget(forward); }
 		bool						ProcessWindowMessages() const { return m_RenderWindow->ProcessWindowMessages(); }
@@ -33,6 +35,7 @@ namespace DX12Engine
 		std::unique_ptr<RenderWindow> m_RenderWindow;
 		std::unique_ptr<RenderDevice> m_RenderDevice;
 		std::unique_ptr<CommandQueueManager> m_QueueManager;
+		std::unique_ptr<DescriptorHeapManager> m_HeapManager;
 
 		DirectX::XMFLOAT2 m_WindowSize;
 	};

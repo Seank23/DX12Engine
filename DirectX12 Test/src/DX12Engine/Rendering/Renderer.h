@@ -27,7 +27,7 @@ namespace DX12Engine
 		void UpdateMVPMatrix(RenderObject* renderObject);
 
 		std::shared_ptr<RenderContext> m_RenderContext;
-		CommandQueueManager* m_QueueManager;
+		CommandQueueManager& m_QueueManager;
 		Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList> m_CommandList;
 
 		DirectX::XMMATRIX m_ViewMatrix;

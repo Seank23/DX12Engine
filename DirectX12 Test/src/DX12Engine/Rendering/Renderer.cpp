@@ -5,9 +5,8 @@
 namespace DX12Engine
 {
 	Renderer::Renderer(std::shared_ptr<RenderContext> context)
-		: m_CameraPosition({ 0.0f, 0.0f, -3.0f }), m_RenderContext(context), m_RenderHeap(DescriptorHeapManager::GetInstance().GetRenderPassHeap())
+		: m_CameraPosition({ 0.0f, 0.0f, -3.0f }), m_RenderContext(context), m_RenderHeap(context->GetHeapManager().GetRenderPassHeap()), m_QueueManager(context->GetQueueManager())
 	{
-		m_QueueManager = context->GetQueueManager();
 		m_ViewMatrix = DirectX::XMMatrixLookAtLH(
 			DirectX::XMVectorSet(m_CameraPosition.x, m_CameraPosition.y, m_CameraPosition.z, 1.0f), // Camera position
 			DirectX::XMVectorSet(0.0f, 0.0f, 0.0f, 1.0f),  // Look-at target
@@ -73,10 +72,10 @@ namespace DX12Engine
 		auto barrier = m_RenderContext->TransitionRenderTarget(false);
 		m_CommandList->ResourceBarrier(1, &barrier);
 
-		UINT fenceVal = m_QueueManager->GetGraphicsQueue()->ExecuteCommandList(m_CommandList.Get());
+		UINT fenceVal = m_QueueManager.GetGraphicsQueue().ExecuteCommandList(m_CommandList.Get());
 
 		m_RenderContext->PresentFrame();
-		m_QueueManager->WaitForFenceCPUBlocking(fenceVal);
+		m_QueueManager.WaitForFenceCPUBlocking(fenceVal);
 	}
 
 	bool Renderer::PollWindow()

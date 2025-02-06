@@ -10,9 +10,9 @@ namespace DX12Engine
 		CommandQueueManager(ID3D12Device* device);
 		~CommandQueueManager();
 
-		CommandQueue* GetGraphicsQueue() { return m_GraphicsQueue.get(); }
-		CommandQueue* GetComputeQueue() { return m_ComputeQueue.get(); }
-		CommandQueue* GetCopyQueue() { return m_CopyQueue.get(); }
+		CommandQueue& GetGraphicsQueue() const { return *m_GraphicsQueue; }
+		CommandQueue& GetComputeQueue() { return *m_ComputeQueue; }
+		CommandQueue& GetCopyQueue() { return *m_CopyQueue; }
 
 		CommandQueue* GetQueue(D3D12_COMMAND_LIST_TYPE commandType);
 

@@ -14,6 +14,8 @@
 #include "../Buffers/ConstantBuffer.h"
 #include "../Resources/Mesh.h"
 #include "../Resources/Texture.h"
+#include "../Heaps/DescriptorHeapManager.h"
+#include "../Rendering/RenderContext.h"
 
 namespace DX12Engine
 {
@@ -21,7 +23,7 @@ namespace DX12Engine
 	{
     public:
 		static ResourceManager& GetInstance();
-		void Init(Microsoft::WRL::ComPtr<ID3D12Device> device);
+		void Init(RenderContext* context);
 		static void Shutdown();
 		
 		ResourceManager(const ResourceManager&) = delete;
@@ -32,13 +34,14 @@ namespace DX12Engine
 		~ResourceManager();
 
 	public:
-		std::unique_ptr<VertexBuffer> CreateVertexBuffer(std::vector<Vertex>& vertices);
-		std::unique_ptr<IndexBuffer> CreateIndexBuffer(std::vector<UINT>& indices);
-		std::unique_ptr<ConstantBuffer> CreateConstantBuffer(UINT bufferSize);
+		std::unique_ptr<VertexBuffer> CreateVertexBuffer(const std::vector<Vertex>& vertices);
+		std::unique_ptr<IndexBuffer> CreateIndexBuffer(const std::vector<UINT>& indices);
+		std::unique_ptr<ConstantBuffer> CreateConstantBuffer(const UINT bufferSize);
 		std::unique_ptr<Texture> CreateTexture(const DirectX::ScratchImage* imageData);
 
 	private:
 		Microsoft::WRL::ComPtr<ID3D12Device> m_Device;
+		DescriptorHeapManager* m_HeapManager;
 	};
 }
 

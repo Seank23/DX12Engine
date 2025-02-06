@@ -28,12 +28,13 @@ namespace DX12Engine
 		s_Instance = nullptr;
 	}
 
-	void ResourceManager::Init(Microsoft::WRL::ComPtr<ID3D12Device> device)
+	void ResourceManager::Init(RenderContext* context)
 	{
-		m_Device = device;
+		m_Device = context->GetDevice();
+		m_HeapManager = &(context->GetHeapManager());
 	}
 
-	std::unique_ptr<VertexBuffer> ResourceManager::CreateVertexBuffer(std::vector<Vertex>& vertices)
+	std::unique_ptr<VertexBuffer> ResourceManager::CreateVertexBuffer(const std::vector<Vertex>& vertices)
 	{
 		const UINT vertexBufferSize = sizeof(Vertex) * vertices.size();
 
@@ -60,7 +61,7 @@ namespace DX12Engine
 		return std::make_unique<VertexBuffer>(vertexBufferResource, D3D12_RESOURCE_STATE_GENERIC_READ, sizeof(Vertex), vertexBufferSize);
 	}
 
-	std::unique_ptr<IndexBuffer> ResourceManager::CreateIndexBuffer(std::vector<UINT>& indices)
+	std::unique_ptr<IndexBuffer> ResourceManager::CreateIndexBuffer(const std::vector<UINT>& indices)
 	{
 		const UINT indexBufferSize = sizeof(UINT) * indices.size();
 
@@ -86,7 +87,7 @@ namespace DX12Engine
 		return std::make_unique<IndexBuffer>(indexBufferResource, D3D12_RESOURCE_STATE_GENERIC_READ, DXGI_FORMAT_R32_UINT, indexBufferSize);
 	}
 
-	std::unique_ptr<ConstantBuffer> ResourceManager::CreateConstantBuffer(UINT bufferSize)
+	std::unique_ptr<ConstantBuffer> ResourceManager::CreateConstantBuffer(const UINT bufferSize)
 	{
 		ID3D12Resource* constantBufferResource = nullptr;
 		UINT alignedSize = EngineUtils::AlignUINT(bufferSize, D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT);
@@ -124,7 +125,7 @@ namespace DX12Engine
 		constantBufferViewDesc.BufferLocation = constantBufferResource->GetGPUVirtualAddress();
 		constantBufferViewDesc.SizeInBytes = alignedSize;
 
-		DescriptorHeapHandle constantBufferHeapHandle = DescriptorHeapManager::GetInstance().GetNewSRVDescriptorHeapHandle();
+		DescriptorHeapHandle constantBufferHeapHandle = m_HeapManager->GetNewSRVDescriptorHeapHandle();
 		m_Device->CreateConstantBufferView(&constantBufferViewDesc, constantBufferHeapHandle.GetCPUHandle());
 		std::unique_ptr<ConstantBuffer> constantBuffer = std::make_unique<ConstantBuffer>(constantBufferResource, D3D12_RESOURCE_STATE_GENERIC_READ, alignedSize, constantBufferHeapHandle);
 		constantBuffer->SetIsReady(true);
@@ -195,7 +196,7 @@ namespace DX12Engine
 		srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
 		srvDesc.Texture2D.MipLevels = 1;
 
-		DescriptorHeapHandle srvHandle = DescriptorHeapManager::GetInstance().GetNewSRVDescriptorHeapHandle();
+		DescriptorHeapHandle srvHandle = m_HeapManager->GetNewSRVDescriptorHeapHandle();
 		m_Device->CreateShaderResourceView(textureResource, &srvDesc, srvHandle.GetCPUHandle());
 
 		return std::make_unique<Texture>(textureResource, textureUploadResource, D3D12_RESOURCE_STATE_COPY_DEST, textureData, srvHandle);

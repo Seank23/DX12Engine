@@ -1,6 +1,5 @@
 #include "RenderContext.h"
 #include "../Resources/ResourceManager.h"
-#include "../Heaps/DescriptorHeapManager.h"
 
 namespace DX12Engine
 {
@@ -14,19 +13,18 @@ namespace DX12Engine
 		m_RenderDevice->Init(windowHandle);
 
 		m_QueueManager = std::make_unique<CommandQueueManager>(m_RenderDevice->GetDevice().Get());
+		m_HeapManager = std::make_unique<DescriptorHeapManager>(m_RenderDevice->GetDevice());
 
-		m_RenderWindow->CreateSwapChain(m_QueueManager->GetGraphicsQueue()->GetCommandQueue().Get());
+		m_RenderWindow->CreateSwapChain(m_QueueManager->GetGraphicsQueue().GetCommandQueue().Get());
 		m_RenderWindow->CreateRTVHeap(m_RenderDevice->GetDevice().Get());
 		m_RenderWindow->CreateDepthStencilBuffer(m_RenderDevice->GetDevice().Get());
 
-		ResourceManager::GetInstance().Init(m_RenderDevice->GetDevice());
-		DescriptorHeapManager::GetInstance().Init(m_RenderDevice->GetDevice());
+		ResourceManager::GetInstance().Init(this);
 	}
 
 	RenderContext::~RenderContext()
 	{
 		ResourceManager::Shutdown();
-		DescriptorHeapManager::Shutdown();
 		m_QueueManager.reset();
 		m_RenderDevice.reset();
 		m_RenderWindow.reset();

@@ -2,33 +2,14 @@
 
 namespace DX12Engine
 {
-	static DescriptorHeapManager* s_Instance = nullptr;
-
-	DescriptorHeapManager::DescriptorHeapManager()
-	{
-	}
-
-	DescriptorHeapManager::~DescriptorHeapManager()
-	{
-	}
-
-	DescriptorHeapManager& DescriptorHeapManager::GetInstance()
-	{
-		if (!s_Instance)
-			s_Instance = new DescriptorHeapManager();
-		return *s_Instance;
-	}
-
-	void DescriptorHeapManager::Init(Microsoft::WRL::ComPtr<ID3D12Device> device)
+	DescriptorHeapManager::DescriptorHeapManager(Microsoft::WRL::ComPtr<ID3D12Device> device)
 	{
 		m_Device = device;
 		m_StagingHeap = std::make_unique<StagingDescriptorHeap>(device.Get(), D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, 16);
 		m_RenderPassHeap = std::make_unique<RenderPassDescriptorHeap>(device.Get(), D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, 16);
 	}
 
-	void DescriptorHeapManager::Shutdown()
+	DescriptorHeapManager::~DescriptorHeapManager()
 	{
-		delete s_Instance;
-		s_Instance = nullptr;
 	}
 }
