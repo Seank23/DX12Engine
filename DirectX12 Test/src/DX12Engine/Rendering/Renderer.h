@@ -21,14 +21,12 @@ namespace DX12Engine
 		D3D12_VIEWPORT GetDefaultViewport();
 		D3D12_RECT GetDefaultScissorRect();
 
-		void UploadTexture(Texture* texture);
-
 	private:
 		void UpdateMVPMatrix(RenderObject* renderObject);
 
 		std::shared_ptr<RenderContext> m_RenderContext;
 		CommandQueueManager& m_QueueManager;
-		Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList> m_CommandList;
+		ID3D12GraphicsCommandList* m_CommandList;
 
 		DirectX::XMMATRIX m_ViewMatrix;
 		DirectX::XMMATRIX m_ProjectionMatrix;

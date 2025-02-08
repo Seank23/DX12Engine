@@ -2,7 +2,7 @@
 
 namespace DX12Engine
 {
-	CommandQueueManager::CommandQueueManager(ID3D12Device* device)
+	CommandQueueManager::CommandQueueManager(RenderDevice* device)
 	{
 		m_GraphicsQueue = std::make_unique<CommandQueue>(device, D3D12_COMMAND_LIST_TYPE_DIRECT);
 		m_ComputeQueue = std::make_unique<CommandQueue>(device, D3D12_COMMAND_LIST_TYPE_COMPUTE);

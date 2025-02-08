@@ -6,6 +6,7 @@
 #include "DX12Engine/Rendering/RenderObject.h"
 #include "DX12Engine/IO/TextureLoader.h"
 #include "DX12Engine/Resources/Texture.h"
+#include "DX12Engine/Rendering/GPUUploader.h"
 
 int main() 
 {
@@ -24,8 +25,10 @@ int main()
 	DX12Engine::TextureLoader textureLoader;
 	std::unique_ptr<DX12Engine::Texture> textureMC = textureLoader.LoadWIC(L"E:\\Projects\\source\\repos\\DirectX12 Test\\minecraft_block_uv.png");
 	std::unique_ptr<DX12Engine::Texture> textureWall = textureLoader.LoadWIC(L"E:\\Projects\\source\\repos\\DirectX12 Test\\TCom_Wall_Stone3_2x2_512_albedo.tiff");
-	renderer.UploadTexture(textureMC.get());
-	renderer.UploadTexture(textureWall.get());
+
+	DX12Engine::GPUUploader uploader(context);
+	std::vector<DX12Engine::Texture*> textures = { textureMC.get(), textureWall.get() };
+	uploader.UploadTextureBatch(textures);
 
 	DX12Engine::RenderObject cube1(mesh);
 	DX12Engine::RenderObject cube2(mesh);

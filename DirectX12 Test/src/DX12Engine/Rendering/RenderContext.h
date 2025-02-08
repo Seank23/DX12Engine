@@ -27,8 +27,6 @@ namespace DX12Engine
 
 		CD3DX12_RESOURCE_BARRIER	TransitionRenderTarget(bool forward) const { return m_RenderWindow->TransitionRenderTarget(forward); }
 		bool						ProcessWindowMessages() const { return m_RenderWindow->ProcessWindowMessages(); }
-		void						InitCommandList(Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList>& outCommandList) const { m_RenderDevice->InitCommandList(outCommandList); }
-		void						ResetCommandAllocatorAndList(ID3D12GraphicsCommandList* commandList) const { m_RenderDevice->ResetCommandAllocatorAndList(commandList); }
 		void						PresentFrame() const { m_RenderWindow->PresentFrame(); }
 
 	private:

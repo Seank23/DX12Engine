@@ -19,10 +19,7 @@ namespace DX12Engine
 		~RenderDevice();
 
 		void Init(HWND hwnd);
-		void InitCommandList(Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList>& outCommandList);
 		void CreatePipelineState(Shader* vertexShader, Shader* pixelShader);
-
-		void ResetCommandAllocatorAndList(ID3D12GraphicsCommandList* commandList);
 
 		Microsoft::WRL::ComPtr<ID3D12Device> GetDevice() const { return m_Device; }
 		Microsoft::WRL::ComPtr<ID3D12RootSignature> GetRootSignature() const { return m_RootSignature; }
@@ -30,8 +27,6 @@ namespace DX12Engine
 
 	private:
 		Microsoft::WRL::ComPtr<ID3D12Device> m_Device;
-
-		Microsoft::WRL::ComPtr<ID3D12CommandAllocator> m_CommandAllocator;
 
 		Microsoft::WRL::ComPtr<ID3D12PipelineState> m_PipelineState;
 		Microsoft::WRL::ComPtr<ID3D12RootSignature> m_RootSignature;

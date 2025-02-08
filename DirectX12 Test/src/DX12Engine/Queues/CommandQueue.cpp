@@ -5,18 +5,24 @@
 
 namespace DX12Engine
 {
-	CommandQueue::CommandQueue(ID3D12Device* device, D3D12_COMMAND_LIST_TYPE commandType)
+	CommandQueue::CommandQueue(RenderDevice* device, D3D12_COMMAND_LIST_TYPE commandType)
 		: m_QueueType(commandType), m_CommandQueue(nullptr), m_Fence(nullptr)
 	{
+		m_RenderDevice = device;
 		m_NextFenceValue = ((uint64_t)m_QueueType << 56) + 1;
 		m_LastCompletedFenceValue = ((uint64_t)m_QueueType << 56);
 
 		D3D12_COMMAND_QUEUE_DESC queueDesc = {};
 		queueDesc.Type = m_QueueType;
 		queueDesc.NodeMask = 0;
-		EngineUtils::ThrowIfFailed(device->CreateCommandQueue(&queueDesc, IID_PPV_ARGS(&m_CommandQueue)));
+		EngineUtils::ThrowIfFailed(device->GetDevice()->CreateCommandQueue(&queueDesc, IID_PPV_ARGS(&m_CommandQueue)));
 
-		EngineUtils::ThrowIfFailed(device->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&m_Fence)));
+		EngineUtils::ThrowIfFailed(device->GetDevice()->CreateCommandAllocator(commandType, IID_PPV_ARGS(&m_CommandAllocator)));
+		EngineUtils::ThrowIfFailed(device->GetDevice()->CreateCommandList(0, commandType, m_CommandAllocator.Get(), nullptr, IID_PPV_ARGS(&m_CommandList)));
+		m_CommandList->Close();
+		ResetCommandAllocatorAndList();
+		
+		EngineUtils::ThrowIfFailed(device->GetDevice()->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&m_Fence)));
 		m_Fence->Signal(m_LastCompletedFenceValue);
 
 		m_FenceEvent = CreateEventEx(nullptr, FALSE, FALSE, EVENT_ALL_ACCESS);
@@ -29,6 +35,7 @@ namespace DX12Engine
 		CloseHandle(m_FenceEvent);
 		m_Fence.Reset();
 		m_CommandQueue.Reset();
+		m_CommandList.Reset();
 	}
 
 	bool CommandQueue::IsFenceComplete(UINT fenceValue)
@@ -70,14 +77,21 @@ namespace DX12Engine
 		return m_LastCompletedFenceValue;
 	}
 
-	UINT CommandQueue::ExecuteCommandList(ID3D12CommandList* commandList)
+	UINT CommandQueue::ExecuteCommandList()
 	{
-		EngineUtils::ThrowIfFailed(((ID3D12GraphicsCommandList*)commandList)->Close());
+		EngineUtils::ThrowIfFailed(m_CommandList->Close());
+		auto commandList = (ID3D12CommandList*)m_CommandList.Get();
 		m_CommandQueue->ExecuteCommandLists(1, &commandList);
 
 		std::lock_guard<std::mutex> lockGuard(m_EventMutex);
 		m_CommandQueue->Signal(m_Fence.Get(), m_NextFenceValue);
 		return m_NextFenceValue++;
+	}
+
+	void CommandQueue::ResetCommandAllocatorAndList()
+	{
+		m_CommandAllocator->Reset();
+		m_CommandList->Reset(m_CommandAllocator.Get(), m_RenderDevice->GetPipelineState().Get());
 	}
 
 	void CommandQueue::FlushQueue()

@@ -12,7 +12,7 @@ namespace DX12Engine
 		m_RenderDevice = std::make_unique<RenderDevice>();
 		m_RenderDevice->Init(windowHandle);
 
-		m_QueueManager = std::make_unique<CommandQueueManager>(m_RenderDevice->GetDevice().Get());
+		m_QueueManager = std::make_unique<CommandQueueManager>(m_RenderDevice.get());
 		m_HeapManager = std::make_unique<DescriptorHeapManager>(m_RenderDevice->GetDevice());
 
 		m_RenderWindow->CreateSwapChain(m_QueueManager->GetGraphicsQueue().GetCommandQueue().Get());

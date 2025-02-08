@@ -13,7 +13,6 @@ namespace DX12Engine
 	RenderDevice::~RenderDevice()
 	{
 		m_Device.Reset();
-		m_CommandAllocator.Reset();
 		m_PipelineState.Reset();
 		m_RootSignature.Reset();
 	}
@@ -33,13 +32,6 @@ namespace DX12Engine
             exit(-1);
         }
 	}
-
-	void RenderDevice::InitCommandList(Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList>& outCommandList)
-    {
-        m_Device->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&m_CommandAllocator));
-        m_Device->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, m_CommandAllocator.Get(), nullptr, IID_PPV_ARGS(&outCommandList));
-		//outCommandList->Close();
-    }
 
 	void RenderDevice::CreatePipelineState(Shader* vertexShader, Shader* pixelShader)
 	{
@@ -103,11 +95,5 @@ namespace DX12Engine
 		psoDesc.DSVFormat = DXGI_FORMAT_D24_UNORM_S8_UINT; // Match depth-stencil buffer format
 		
 		m_Device->CreateGraphicsPipelineState(&psoDesc, IID_PPV_ARGS(&m_PipelineState));
-	}
-
-	void RenderDevice::ResetCommandAllocatorAndList(ID3D12GraphicsCommandList* commandList)
-	{
-		m_CommandAllocator->Reset();
-		commandList->Reset(m_CommandAllocator.Get(), m_PipelineState.Get());
 	}
 }

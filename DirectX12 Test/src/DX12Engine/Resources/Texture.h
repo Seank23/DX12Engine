@@ -8,7 +8,7 @@ namespace DX12Engine
 	class Texture : public GPUResource
 	{
 	public:
-		friend class Renderer;
+		friend class GPUUploader;
 
 		Texture(ID3D12Resource* mainResource, ID3D12Resource* uploadResource, D3D12_RESOURCE_STATES usageState, D3D12_SUBRESOURCE_DATA data, DescriptorHeapHandle descriptor);
 		~Texture();

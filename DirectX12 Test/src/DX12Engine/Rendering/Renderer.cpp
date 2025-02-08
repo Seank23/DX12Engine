@@ -20,17 +20,16 @@ namespace DX12Engine
 			100.0f               // Far plane
 		);
 
-		context->InitCommandList(m_CommandList);
+		m_CommandList = m_QueueManager.GetGraphicsQueue().GetCommandList();
 	}
 
 	Renderer::~Renderer()
 	{
-		m_CommandList.Reset();
 	}
 
 	void Renderer::InitFrame(D3D12_VIEWPORT viewport, D3D12_RECT scissorRect)
 	{
-		m_RenderContext->ResetCommandAllocatorAndList(m_CommandList.Get());
+		m_QueueManager.GetGraphicsQueue().ResetCommandAllocatorAndList();
 
 		m_CommandList->SetGraphicsRootSignature(m_RenderContext->GetRootSignature().Get());
 		m_CommandList->RSSetViewports(1, &viewport);
@@ -72,7 +71,7 @@ namespace DX12Engine
 		auto barrier = m_RenderContext->TransitionRenderTarget(false);
 		m_CommandList->ResourceBarrier(1, &barrier);
 
-		UINT fenceVal = m_QueueManager.GetGraphicsQueue().ExecuteCommandList(m_CommandList.Get());
+		UINT fenceVal = m_QueueManager.GetGraphicsQueue().ExecuteCommandList();
 
 		m_RenderContext->PresentFrame();
 		m_QueueManager.WaitForFenceCPUBlocking(fenceVal);
@@ -117,21 +116,6 @@ namespace DX12Engine
 		scissorRect.right = static_cast<LONG>(windowSize.x);
 		scissorRect.bottom = static_cast<LONG>(windowSize.y);
 		return scissorRect;
-	}
-
-	void Renderer::UploadTexture(Texture* texture)
-	{
-		UpdateSubresources(m_CommandList.Get(), texture->m_MainResource, texture->m_UploadResource, 0, 0, 1, &texture->m_Data);
-		auto barrier = CD3DX12_RESOURCE_BARRIER::Transition(texture->m_MainResource,
-			D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
-		m_CommandList->ResourceBarrier(1, &barrier);
-
-		DescriptorHeapHandle renderBlockStart = m_RenderHeap.GetHeapHandleBlock(1);
-		m_RenderContext->GetDevice()->CopyDescriptorsSimple(1, renderBlockStart.GetCPUHandle(), texture->GetDescriptor()->GetCPUHandle(), D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
-		texture->GetDescriptor()->SetGPUHandle(renderBlockStart.GetGPUHandle());
-
-		texture->SetUsageState(D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
-		texture->SetIsReady(true);
 	}
 
 	void Renderer::UpdateMVPMatrix(RenderObject* renderObject)
