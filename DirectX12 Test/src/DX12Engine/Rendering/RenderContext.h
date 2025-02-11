@@ -4,6 +4,7 @@
 #include "../Queues/CommandQueueManager.h"
 #include "../Heaps/DescriptorHeapManager.h"
 #include "../Resources/Shader.h"
+#include "../Rendering/GPUUploader.h"
 
 namespace DX12Engine
 {
@@ -24,6 +25,7 @@ namespace DX12Engine
 		Microsoft::WRL::ComPtr<ID3D12PipelineState> GetPipelineState() const { return m_RenderDevice->GetPipelineState(); }
 		CommandQueueManager&						GetQueueManager() const { return *m_QueueManager; }
 		DescriptorHeapManager&						GetHeapManager() const { return *m_HeapManager; }
+		GPUUploader&								GetUploader() const { return *m_Uploader; }
 
 		CD3DX12_RESOURCE_BARRIER	TransitionRenderTarget(bool forward) const { return m_RenderWindow->TransitionRenderTarget(forward); }
 		bool						ProcessWindowMessages() const { return m_RenderWindow->ProcessWindowMessages(); }
@@ -34,6 +36,7 @@ namespace DX12Engine
 		std::unique_ptr<RenderDevice> m_RenderDevice;
 		std::unique_ptr<CommandQueueManager> m_QueueManager;
 		std::unique_ptr<DescriptorHeapManager> m_HeapManager;
+		std::unique_ptr<GPUUploader> m_Uploader;
 
 		DirectX::XMFLOAT2 m_WindowSize;
 	};

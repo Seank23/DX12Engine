@@ -2,6 +2,7 @@
 #include "../Heaps/DescriptorHeapManager.h"
 #include "../Utils/EngineUtils.h"
 #include "../Utils/Constants.h"
+#include "UploadResourceWrapper.h"
 
 namespace DX12Engine
 {
@@ -28,10 +29,11 @@ namespace DX12Engine
 		s_Instance = nullptr;
 	}
 
-	void ResourceManager::Init(RenderContext* context)
+	void ResourceManager::Init(RenderContext& context)
 	{
-		m_Device = context->GetDevice();
-		m_HeapManager = &(context->GetHeapManager());
+		m_Device = context.GetDevice();
+		m_HeapManager = &(context.GetHeapManager());
+		m_GPUUploader = &(context.GetUploader());
 	}
 
 	std::unique_ptr<VertexBuffer> ResourceManager::CreateVertexBuffer(const std::vector<Vertex>& vertices)
@@ -39,26 +41,43 @@ namespace DX12Engine
 		const UINT vertexBufferSize = sizeof(Vertex) * vertices.size();
 
 		ID3D12Resource* vertexBufferResource = nullptr;
-
-		// Create the vertex buffer resource in the GPU's default heap
-		auto heapProperties = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD);
-		auto resourceDesc = CD3DX12_RESOURCE_DESC::Buffer(vertexBufferSize);
+		auto mainHeapProps = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);
+		auto mainResourceDesc = CD3DX12_RESOURCE_DESC::Buffer(vertexBufferSize);
 		EngineUtils::ThrowIfFailed(m_Device->CreateCommittedResource(
-			&heapProperties,
+			&mainHeapProps,
 			D3D12_HEAP_FLAG_NONE,
-			&resourceDesc,
-			D3D12_RESOURCE_STATE_GENERIC_READ,
+			&mainResourceDesc,
+			D3D12_RESOURCE_STATE_COPY_DEST,
 			nullptr,
 			IID_PPV_ARGS(&vertexBufferResource)));
 
-		// Copy the triangle vertices to the vertex buffer
-		UINT8* vertexDataBegin = nullptr;
-		CD3DX12_RANGE readRange(0, 0); // We do not intend to read from this resource on the CPU
-		vertexBufferResource->Map(0, &readRange, reinterpret_cast<void**>(&vertexDataBegin));
-		memcpy(vertexDataBegin, &vertices[0], vertexBufferSize);
-		vertexBufferResource->Unmap(0, nullptr);
+		ID3D12Resource* uploadResource = nullptr;
+		auto uploadHeapProps = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD);
+		auto uploadResourceDesc = CD3DX12_RESOURCE_DESC::Buffer(vertexBufferSize);
+		EngineUtils::ThrowIfFailed(m_Device->CreateCommittedResource(
+			&uploadHeapProps,
+			D3D12_HEAP_FLAG_NONE,
+			&uploadResourceDesc,
+			D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER,
+			nullptr,
+			IID_PPV_ARGS(&uploadResource)));
 
-		return std::make_unique<VertexBuffer>(vertexBufferResource, D3D12_RESOURCE_STATE_GENERIC_READ, sizeof(Vertex), vertexBufferSize);
+		auto vertexBuffer = std::make_unique<VertexBuffer>(vertexBufferResource, D3D12_RESOURCE_STATE_COPY_DEST, sizeof(Vertex), vertexBufferSize);
+
+		D3D12_SUBRESOURCE_DATA vertexData = {};
+		vertexData.pData = &vertices[0];
+		vertexData.RowPitch = vertexBufferSize;
+		vertexData.SlicePitch = vertexData.RowPitch;
+
+		UploadResourceWrapper uploadResourceWrapper;
+		uploadResourceWrapper.GPUResource = vertexBuffer.get();
+		uploadResourceWrapper.UploadResource = uploadResource;
+		uploadResourceWrapper.UploadState = D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER;
+		uploadResourceWrapper.Data = vertexData;
+
+		m_GPUUploader->UploadResource(uploadResourceWrapper);
+
+		return vertexBuffer;
 	}
 
 	std::unique_ptr<IndexBuffer> ResourceManager::CreateIndexBuffer(const std::vector<UINT>& indices)
@@ -66,25 +85,43 @@ namespace DX12Engine
 		const UINT indexBufferSize = sizeof(UINT) * indices.size();
 
 		ID3D12Resource* indexBufferResource = nullptr;
-
-		// Create the index buffer resource in the GPU's default heap
-		auto heapProperties = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD);
-		auto resourceDesc = CD3DX12_RESOURCE_DESC::Buffer(indexBufferSize);
+		auto mainHeapProps = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);
+		auto mainResourceDesc = CD3DX12_RESOURCE_DESC::Buffer(indexBufferSize);
 		EngineUtils::ThrowIfFailed(m_Device->CreateCommittedResource(
-			&heapProperties,
+			&mainHeapProps,
 			D3D12_HEAP_FLAG_NONE,
-			&resourceDesc,
-			D3D12_RESOURCE_STATE_GENERIC_READ,
+			&mainResourceDesc,
+			D3D12_RESOURCE_STATE_COPY_DEST,
 			nullptr,
 			IID_PPV_ARGS(&indexBufferResource)));
 
-		// Copy the indices to the index buffer
-		void* indexDataBegin = nullptr;
-		CD3DX12_RANGE readRange(0, 0); // We do not intend to read from this resource on the CPU
-		indexBufferResource->Map(0, &readRange, &indexDataBegin);
-		memcpy(indexDataBegin, &indices[0], indexBufferSize);
-		indexBufferResource->Unmap(0, nullptr);
-		return std::make_unique<IndexBuffer>(indexBufferResource, D3D12_RESOURCE_STATE_GENERIC_READ, DXGI_FORMAT_R32_UINT, indexBufferSize);
+		ID3D12Resource* uploadResource = nullptr;
+		auto uploadHeapProps = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD);
+		auto uploadResourceDesc = CD3DX12_RESOURCE_DESC::Buffer(indexBufferSize);
+		EngineUtils::ThrowIfFailed(m_Device->CreateCommittedResource(
+			&uploadHeapProps,
+			D3D12_HEAP_FLAG_NONE,
+			&uploadResourceDesc,
+			D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER,
+			nullptr,
+			IID_PPV_ARGS(&uploadResource)));
+
+		auto indexBuffer = std::make_unique<IndexBuffer>(indexBufferResource, D3D12_RESOURCE_STATE_COPY_DEST, DXGI_FORMAT_R32_UINT, indexBufferSize);
+
+		D3D12_SUBRESOURCE_DATA indexData = {};
+		indexData.pData = &indices[0];
+		indexData.RowPitch = indexBufferSize;
+		indexData.SlicePitch = indexData.RowPitch;
+
+		UploadResourceWrapper uploadResourceWrapper;
+		uploadResourceWrapper.GPUResource = indexBuffer.get();
+		uploadResourceWrapper.UploadResource = uploadResource;
+		uploadResourceWrapper.UploadState = D3D12_RESOURCE_STATE_INDEX_BUFFER;
+		uploadResourceWrapper.Data = indexData;
+
+		m_GPUUploader->UploadResource(uploadResourceWrapper);
+
+		return indexBuffer;
 	}
 
 	std::unique_ptr<ConstantBuffer> ResourceManager::CreateConstantBuffer(const UINT bufferSize)

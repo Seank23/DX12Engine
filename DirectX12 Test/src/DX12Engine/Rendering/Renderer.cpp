@@ -29,7 +29,8 @@ namespace DX12Engine
 
 	void Renderer::InitFrame(D3D12_VIEWPORT viewport, D3D12_RECT scissorRect)
 	{
-		m_QueueManager.GetGraphicsQueue().ResetCommandAllocatorAndList();
+		if (!m_RenderContext->GetUploader().UploadAllPending()) // Upload any pending resources
+			m_QueueManager.GetGraphicsQueue().ResetCommandAllocatorAndList();
 
 		m_CommandList->SetGraphicsRootSignature(m_RenderContext->GetRootSignature().Get());
 		m_CommandList->RSSetViewports(1, &viewport);

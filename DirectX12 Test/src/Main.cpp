@@ -26,7 +26,7 @@ int main()
 	std::unique_ptr<DX12Engine::Texture> textureMC = textureLoader.LoadWIC(L"E:\\Projects\\source\\repos\\DirectX12 Test\\minecraft_block_uv.png");
 	std::unique_ptr<DX12Engine::Texture> textureWall = textureLoader.LoadWIC(L"E:\\Projects\\source\\repos\\DirectX12 Test\\TCom_Wall_Stone3_2x2_512_albedo.tiff");
 
-	DX12Engine::GPUUploader uploader(context);
+	DX12Engine::GPUUploader uploader = context->GetUploader();
 	std::vector<DX12Engine::Texture*> textures = { textureMC.get(), textureWall.get() };
 	uploader.UploadTextureBatch(textures);
 

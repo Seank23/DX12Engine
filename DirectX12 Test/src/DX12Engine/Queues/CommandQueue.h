@@ -29,6 +29,7 @@ namespace DX12Engine
         UINT ExecuteCommandList();
         ID3D12GraphicsCommandList* GetCommandList() { return m_CommandList.Get(); }
         void ResetCommandAllocatorAndList();
+        void ResetCommandList();
 
     private:
         void FlushQueue();

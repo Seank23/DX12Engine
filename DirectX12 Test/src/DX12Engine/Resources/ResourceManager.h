@@ -16,6 +16,7 @@
 #include "../Resources/Texture.h"
 #include "../Heaps/DescriptorHeapManager.h"
 #include "../Rendering/RenderContext.h"
+#include "../Rendering/GPUUploader.h"
 
 namespace DX12Engine
 {
@@ -23,7 +24,7 @@ namespace DX12Engine
 	{
     public:
 		static ResourceManager& GetInstance();
-		void Init(RenderContext* context);
+		void Init(RenderContext& context);
 		static void Shutdown();
 		
 		ResourceManager(const ResourceManager&) = delete;
@@ -42,6 +43,7 @@ namespace DX12Engine
 	private:
 		Microsoft::WRL::ComPtr<ID3D12Device> m_Device;
 		DescriptorHeapManager* m_HeapManager;
+		GPUUploader* m_GPUUploader;
 	};
 }
 

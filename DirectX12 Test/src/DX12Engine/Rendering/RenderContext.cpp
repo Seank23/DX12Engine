@@ -14,12 +14,13 @@ namespace DX12Engine
 
 		m_QueueManager = std::make_unique<CommandQueueManager>(m_RenderDevice.get());
 		m_HeapManager = std::make_unique<DescriptorHeapManager>(m_RenderDevice->GetDevice());
+		m_Uploader = std::make_unique<GPUUploader>(*this);
 
 		m_RenderWindow->CreateSwapChain(m_QueueManager->GetGraphicsQueue().GetCommandQueue().Get());
 		m_RenderWindow->CreateRTVHeap(m_RenderDevice->GetDevice().Get());
 		m_RenderWindow->CreateDepthStencilBuffer(m_RenderDevice->GetDevice().Get());
 
-		ResourceManager::GetInstance().Init(this);
+		ResourceManager::GetInstance().Init(*this);
 	}
 
 	RenderContext::~RenderContext()
@@ -28,6 +29,7 @@ namespace DX12Engine
 		m_QueueManager.reset();
 		m_RenderDevice.reset();
 		m_RenderWindow.reset();
+		m_Uploader.reset();
 	}
 
 	void RenderContext::CreatePipeline(Shader* vertexShader, Shader* pixelShader)

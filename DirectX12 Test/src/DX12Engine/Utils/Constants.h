@@ -1,4 +1,5 @@
 #pragma once
 
 #define MAX_TEXTURE_SUBRESOURCE_COUNT 8
+#define MAX_UPLOAD_BATCH_SIZE 64
 

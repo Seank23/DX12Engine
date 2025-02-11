@@ -94,6 +94,11 @@ namespace DX12Engine
 		m_CommandList->Reset(m_CommandAllocator.Get(), m_RenderDevice->GetPipelineState().Get());
 	}
 
+	void CommandQueue::ResetCommandList()
+	{
+		m_CommandList->Reset(m_CommandAllocator.Get(), m_RenderDevice->GetPipelineState().Get());
+	}
+
 	void CommandQueue::FlushQueue()
 	{
 		const UINT64 fenceSignalValue = ++m_NextFenceValue;
