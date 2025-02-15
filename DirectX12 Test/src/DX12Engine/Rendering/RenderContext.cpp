@@ -1,5 +1,7 @@
 #include "RenderContext.h"
 #include "../Resources/ResourceManager.h"
+#include "./PipelineStateCache.h"
+#include "./RootSignatureCache.h"
 
 namespace DX12Engine
 {
@@ -9,7 +11,10 @@ namespace DX12Engine
 		m_RenderWindow = std::make_unique<RenderWindow>();
 		HWND windowHandle = m_RenderWindow->Init(m_WindowSize);
 
-		m_RenderDevice = std::make_unique<RenderDevice>();
+		m_PipelineStateCache = std::make_unique<PipelineStateCache>();
+		m_RootSignatureCache = std::make_unique<RootSignatureCache>();
+
+		m_RenderDevice = std::make_unique<RenderDevice>(*m_PipelineStateCache.get(), *m_RootSignatureCache.get());
 		m_RenderDevice->Init(windowHandle);
 
 		m_QueueManager = std::make_unique<CommandQueueManager>(m_RenderDevice.get());

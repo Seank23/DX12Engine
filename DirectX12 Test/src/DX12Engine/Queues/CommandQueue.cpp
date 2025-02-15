@@ -2,6 +2,7 @@
 #include "CommandQueue.h"
 #include "../Utils/EngineUtils.h"
 #include <math.h>
+#include <iostream>
 
 namespace DX12Engine
 {
@@ -9,8 +10,8 @@ namespace DX12Engine
 		: m_QueueType(commandType), m_CommandQueue(nullptr), m_Fence(nullptr)
 	{
 		m_RenderDevice = device;
-		m_NextFenceValue = ((uint64_t)m_QueueType << 56) + 1;
-		m_LastCompletedFenceValue = ((uint64_t)m_QueueType << 56);
+		m_NextFenceValue = 1;
+		m_LastCompletedFenceValue = 0;
 
 		D3D12_COMMAND_QUEUE_DESC queueDesc = {};
 		queueDesc.Type = m_QueueType;
@@ -73,7 +74,12 @@ namespace DX12Engine
 
 	UINT CommandQueue::PollCurrentFenceValue()
 	{
-		m_LastCompletedFenceValue = std::max(m_LastCompletedFenceValue, m_Fence->GetCompletedValue());
+		UINT64 value = m_Fence->GetCompletedValue();
+		if (m_QueueType == D3D12_COMMAND_LIST_TYPE_DIRECT)
+			std::cout << "Polling fence value (graphics): " << value << std::endl;
+		else if (m_QueueType == D3D12_COMMAND_LIST_TYPE_COPY)
+			std::cout << "Polling fence value (copy): " << value << std::endl;
+		m_LastCompletedFenceValue = std::max(m_LastCompletedFenceValue, value);
 		return m_LastCompletedFenceValue;
 	}
 

@@ -8,6 +8,9 @@
 
 namespace DX12Engine
 {
+	class PipelineStateCache;
+	class RootSignatureCache;
+
 	class RenderContext
 	{
 	public:
@@ -26,6 +29,8 @@ namespace DX12Engine
 		CommandQueueManager&						GetQueueManager() const { return *m_QueueManager; }
 		DescriptorHeapManager&						GetHeapManager() const { return *m_HeapManager; }
 		GPUUploader&								GetUploader() const { return *m_Uploader; }
+		PipelineStateCache&							GetPipelineStateCache() const { return *m_PipelineStateCache; }
+		RootSignatureCache&							GetRootSignatureCache() const { return *m_RootSignatureCache; }
 
 		CD3DX12_RESOURCE_BARRIER	TransitionRenderTarget(bool forward) const { return m_RenderWindow->TransitionRenderTarget(forward); }
 		bool						ProcessWindowMessages() const { return m_RenderWindow->ProcessWindowMessages(); }
@@ -37,6 +42,8 @@ namespace DX12Engine
 		std::unique_ptr<CommandQueueManager> m_QueueManager;
 		std::unique_ptr<DescriptorHeapManager> m_HeapManager;
 		std::unique_ptr<GPUUploader> m_Uploader;
+		std::unique_ptr<PipelineStateCache> m_PipelineStateCache;
+		std::unique_ptr<RootSignatureCache> m_RootSignatureCache;
 
 		DirectX::XMFLOAT2 m_WindowSize;
 	};
