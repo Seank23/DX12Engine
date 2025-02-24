@@ -1,16 +1,15 @@
 #include "RenderDevice.h"
 #include <stdexcept>
-#include "./PipelineStateCache.h"
 #include "./PipelineStateBuilder.h"
-#include "./RootSignatureCache.h"
 #include "./RootSignatureBuilder.h"
+#include "../Resources/ResourceManager.h"
 
 #define _DEBUG 1
 
 namespace DX12Engine
 {
-	RenderDevice::RenderDevice(PipelineStateCache& pipelineStateCache, RootSignatureCache& rootSignatureCache)
-		: m_Device(nullptr), m_PipelineStateCache(pipelineStateCache), m_RootSignatureCache(rootSignatureCache)
+	RenderDevice::RenderDevice()
+		: m_Device(nullptr)
 	{
 	}
 
@@ -40,26 +39,14 @@ namespace DX12Engine
 	void RenderDevice::CreatePipelineState(Shader* vertexShader, Shader* pixelShader)
 	{
 		RootSignatureBuilder rootSigBuilder;
-		D3D12_ROOT_SIGNATURE_DESC rootDesc = rootSigBuilder
-			.AddConstantBuffer(0)
-			.AddDescriptorTable(1, D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 0)
-			.AddSampler(0, D3D12_FILTER_MIN_MAG_MIP_LINEAR)
-			.Build();
-		m_RootSignature = m_RootSignatureCache.GetOrCreateRootSignature(m_Device.Get(), rootDesc);
+		m_RootSignature = ResourceManager::GetInstance().CreateRootSignature(rootSigBuilder.ConfigureFromDefault().Build());
 
 		PipelineStateBuilder psoBuilder;
-		D3D12_GRAPHICS_PIPELINE_STATE_DESC psoDesc = psoBuilder
-			.AddInputLayout()
+		D3D12_GRAPHICS_PIPELINE_STATE_DESC psoDesc = psoBuilder.ConfigureFromDefault()
 			.SetRootSignature(m_RootSignature.Get())
-			.SetVertexShader(vertexShader->GetShader()->GetBufferPointer(), vertexShader->GetShader()->GetBufferSize())
-			.SetPixelShader(pixelShader->GetShader()->GetBufferPointer(), pixelShader->GetShader()->GetBufferSize())
-			.SetBlendState(CD3DX12_BLEND_DESC(D3D12_DEFAULT))
-			.SetRasterizerState(CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT))
-			.SetDepthStencilState(CD3DX12_DEPTH_STENCIL_DESC(D3D12_DEFAULT))
-			.SetPrimitiveTopologyType(D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE)
-			.SetRenderTargetFormats(DXGI_FORMAT_R8G8B8A8_UNORM, DXGI_FORMAT_D24_UNORM_S8_UINT)
-			.SetSampleDesc(UINT_MAX, 1, 0)
+			.SetVertexShader(vertexShader)
+			.SetPixelShader(pixelShader)
 			.Build();
-		m_PipelineState = m_PipelineStateCache.GetOrCreatePSO(m_Device.Get(), psoDesc);
+		m_PipelineState = ResourceManager::GetInstance().CreatePipelineState(psoDesc);
 	}
 }

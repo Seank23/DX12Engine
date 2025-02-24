@@ -9,8 +9,13 @@ namespace DX12Engine
     class PipelineStateCache
     {
     public:
+		PipelineStateCache(ID3D12Device* device)
+			: m_Device(device)
+		{}
+		~PipelineStateCache() = default;
+
         // Retrieve or create a PSO
-        Microsoft::WRL::ComPtr<ID3D12PipelineState> GetOrCreatePSO(ID3D12Device* device, const D3D12_GRAPHICS_PIPELINE_STATE_DESC& desc)
+        Microsoft::WRL::ComPtr<ID3D12PipelineState> GetOrCreatePSO(const D3D12_GRAPHICS_PIPELINE_STATE_DESC& desc)
         {
             size_t hash = HashPSO(desc);
 
@@ -21,7 +26,7 @@ namespace DX12Engine
 
             // Create new PSO
             Microsoft::WRL::ComPtr<ID3D12PipelineState> pso;
-			auto hr = device->CreateGraphicsPipelineState(&desc, IID_PPV_ARGS(&pso));
+			auto hr = m_Device->CreateGraphicsPipelineState(&desc, IID_PPV_ARGS(&pso));
             if (FAILED(hr))
                 throw std::runtime_error("Failed to create pipeline state");
 
@@ -32,6 +37,7 @@ namespace DX12Engine
 
     private:
         std::unordered_map<size_t, Microsoft::WRL::ComPtr<ID3D12PipelineState>> m_Cache;
+        ID3D12Device* m_Device;
 
         // Simple hashing function for PSO description
         size_t HashPSO(const D3D12_GRAPHICS_PIPELINE_STATE_DESC& desc)

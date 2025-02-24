@@ -34,6 +34,8 @@ namespace DX12Engine
 		m_Device = context.GetDevice();
 		m_HeapManager = &(context.GetHeapManager());
 		m_GPUUploader = &(context.GetUploader());
+		m_PipelineStateCache = std::make_unique<PipelineStateCache>(m_Device.Get());
+		m_RootSignatureCache = std::make_unique<RootSignatureCache>(m_Device.Get());
 	}
 
 	std::unique_ptr<VertexBuffer> ResourceManager::CreateVertexBuffer(const std::vector<Vertex>& vertices)
@@ -237,5 +239,15 @@ namespace DX12Engine
 		m_Device->CreateShaderResourceView(textureResource, &srvDesc, srvHandle.GetCPUHandle());
 
 		return std::make_unique<Texture>(textureResource, textureUploadResource, D3D12_RESOURCE_STATE_COPY_DEST, textureData, srvHandle);
+	}
+
+	Microsoft::WRL::ComPtr<ID3D12PipelineState> ResourceManager::CreatePipelineState(const D3D12_GRAPHICS_PIPELINE_STATE_DESC& desc)
+	{
+		return m_PipelineStateCache->GetOrCreatePSO(desc);
+	}
+
+	Microsoft::WRL::ComPtr<ID3D12RootSignature> ResourceManager::CreateRootSignature(const D3D12_ROOT_SIGNATURE_DESC& desc)
+	{
+		return m_RootSignatureCache->GetOrCreateRootSignature(desc);
 	}
 }

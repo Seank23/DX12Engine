@@ -12,13 +12,10 @@
 
 namespace DX12Engine
 {
-	class PipelineStateCache;
-	class RootSignatureCache;
-
 	class RenderDevice
 	{
 	public:
-		RenderDevice(PipelineStateCache& pipelineStateCache, RootSignatureCache& rootSignatureCache);
+		RenderDevice();
 		~RenderDevice();
 
 		void Init(HWND hwnd);
@@ -33,8 +30,5 @@ namespace DX12Engine
 
 		Microsoft::WRL::ComPtr<ID3D12PipelineState> m_PipelineState;
 		Microsoft::WRL::ComPtr<ID3D12RootSignature> m_RootSignature;
-
-		PipelineStateCache& m_PipelineStateCache;
-		RootSignatureCache& m_RootSignatureCache;
 	};
 }

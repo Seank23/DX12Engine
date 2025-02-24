@@ -75,10 +75,6 @@ namespace DX12Engine
 	UINT CommandQueue::PollCurrentFenceValue()
 	{
 		UINT64 value = m_Fence->GetCompletedValue();
-		if (m_QueueType == D3D12_COMMAND_LIST_TYPE_DIRECT)
-			std::cout << "Polling fence value (graphics): " << value << std::endl;
-		else if (m_QueueType == D3D12_COMMAND_LIST_TYPE_COPY)
-			std::cout << "Polling fence value (copy): " << value << std::endl;
 		m_LastCompletedFenceValue = std::max(m_LastCompletedFenceValue, value);
 		return m_LastCompletedFenceValue;
 	}

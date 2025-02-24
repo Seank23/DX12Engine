@@ -4,11 +4,20 @@
 #include "../Buffers/VertexBuffer.h"
 #include "../Buffers/IndexBuffer.h"
 #include "../Buffers/ConstantBuffer.h"
-#include "../Buffers/ConstantBufferData.h"
-#include "../Resources/Texture.h"
+#include "../Resources/Material.h"
 
 namespace DX12Engine
 {
+	struct RenderObjectData
+	{
+		DirectX::XMMATRIX WVPMatrix;
+
+		void Reset()
+		{
+			WVPMatrix = DirectX::XMMatrixIdentity();
+		}
+	};
+
 	class RenderObject
 	{
 	public:
@@ -18,7 +27,9 @@ namespace DX12Engine
 		~RenderObject();
 
 		void SetModelMatrix(DirectX::XMMATRIX modelMatrix) { m_ModelMatrix = modelMatrix; }	
-		void SetTexture(Texture* texture) { m_Texture = texture; }
+		void SetMaterial(std::shared_ptr<Material> material) { m_Material = material; }
+
+		D3D12_GPU_VIRTUAL_ADDRESS GetCBVAddress() { return m_ConstantBuffer->GetGPUAddress(); }
 
 	private:
 		void UpdateConstantBufferData(DirectX::XMMATRIX wvpMatrix);
@@ -27,8 +38,8 @@ namespace DX12Engine
 		std::unique_ptr<VertexBuffer> m_VertexBuffer;
 		std::unique_ptr<IndexBuffer> m_IndexBuffer;
 		std::unique_ptr<ConstantBuffer> m_ConstantBuffer;
-		ConstantBufferData m_ConstantBufferData;
+		RenderObjectData m_RenderObjectData;
 		DirectX::XMMATRIX m_ModelMatrix;
-		Texture* m_Texture;
+		std::shared_ptr<Material> m_Material;
 	};
 }

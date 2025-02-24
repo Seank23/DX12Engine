@@ -9,8 +9,13 @@ namespace DX12Engine
     class RootSignatureCache 
     {
     public:
+		RootSignatureCache(ID3D12Device* device)
+			: m_Device(device)
+		{}
+		~RootSignatureCache() = default;
+
         // Retrieve or create a root signature
-        Microsoft::WRL::ComPtr<ID3D12RootSignature> GetOrCreateRootSignature(ID3D12Device* device, const D3D12_ROOT_SIGNATURE_DESC& desc)
+        Microsoft::WRL::ComPtr<ID3D12RootSignature> GetOrCreateRootSignature(const D3D12_ROOT_SIGNATURE_DESC& desc)
         {
             size_t hash = HashRootSignature(desc);
 
@@ -31,7 +36,7 @@ namespace DX12Engine
 
             // Create the root signature
             Microsoft::WRL::ComPtr<ID3D12RootSignature> rootSignature;
-            if (FAILED(device->CreateRootSignature(0, signatureBlob->GetBufferPointer(), signatureBlob->GetBufferSize(), IID_PPV_ARGS(&rootSignature)))) 
+            if (FAILED(m_Device->CreateRootSignature(0, signatureBlob->GetBufferPointer(), signatureBlob->GetBufferSize(), IID_PPV_ARGS(&rootSignature)))) 
             {
                 throw std::runtime_error("Failed to create root signature");
             }
@@ -43,6 +48,7 @@ namespace DX12Engine
 
     private:
         std::unordered_map<size_t, Microsoft::WRL::ComPtr<ID3D12RootSignature>> m_Cache;
+        ID3D12Device* m_Device;
 
         // Simple hash function for the root signature
         size_t HashRootSignature(const D3D12_ROOT_SIGNATURE_DESC& desc) 

@@ -7,6 +7,9 @@
 #include "DX12Engine/IO/TextureLoader.h"
 #include "DX12Engine/Resources/Texture.h"
 #include "DX12Engine/Rendering/GPUUploader.h"
+#include "DX12Engine/Resources/Material.h"
+#include "DX12Engine/Rendering/PipelineStateBuilder.h"
+#include "DX12Engine/Rendering/RootSignatureBuilder.h"
 
 int main() 
 {
@@ -23,17 +26,41 @@ int main()
 	DX12Engine::Mesh mesh = modelLoader.LoadObj(inputfile);
 
 	DX12Engine::TextureLoader textureLoader;
-	std::unique_ptr<DX12Engine::Texture> textureMC = textureLoader.LoadWIC(L"E:\\Projects\\source\\repos\\DirectX12 Test\\minecraft_block_uv.png");
-	std::unique_ptr<DX12Engine::Texture> textureWall = textureLoader.LoadWIC(L"E:\\Projects\\source\\repos\\DirectX12 Test\\TCom_Wall_Stone3_2x2_512_albedo.tiff");
+	std::shared_ptr<DX12Engine::Texture> textureMC = textureLoader.LoadWIC(L"E:\\Projects\\source\\repos\\DirectX12 Test\\minecraft_block_uv.png");
+	std::shared_ptr<DX12Engine::Texture> textureWall = textureLoader.LoadWIC(L"E:\\Projects\\source\\repos\\DirectX12 Test\\TCom_Wall_Stone3_2x2_512_albedo.tiff");
 
 	DX12Engine::GPUUploader uploader = context->GetUploader();
 	std::vector<DX12Engine::Texture*> textures = { textureMC.get(), textureWall.get() };
 	uploader.UploadTextureBatch(textures);
 
+	std::shared_ptr<DX12Engine::Material> material1 = std::make_shared<DX12Engine::Material>();
+	material1->SetColor({ 0.1f, 0.2f, 1.0f, 1.0f });
+	material1->SetTexture(textureMC);
+	DX12Engine::RootSignatureBuilder rootSigBuilder1;
+	rootSigBuilder1 = rootSigBuilder1.ConfigureFromDefault();
+	DX12Engine::PipelineStateBuilder pipelineStateBuilder1;
+	pipelineStateBuilder1 = pipelineStateBuilder1
+		.ConfigureFromDefault()
+		.SetVertexShader(&vertexShader)
+		.SetPixelShader(&pixelShader);
+	material1->SetPipelineState(pipelineStateBuilder1, rootSigBuilder1);
+
+	std::shared_ptr<DX12Engine::Material> material2 = std::make_shared<DX12Engine::Material>();
+	material2->SetColor({ 1.0f, 0.2f, 0.1f, 1.0f });
+	material2->SetTexture(textureWall);
+	DX12Engine::RootSignatureBuilder rootSigBuilder2;
+	rootSigBuilder2 = rootSigBuilder2.ConfigureFromDefault();
+	DX12Engine::PipelineStateBuilder pipelineStateBuilder2;
+	pipelineStateBuilder2 = pipelineStateBuilder2
+		.ConfigureFromDefault()
+		.SetVertexShader(&vertexShader)
+		.SetPixelShader(&pixelShader);
+	material2->SetPipelineState(pipelineStateBuilder2, rootSigBuilder2);
+
 	DX12Engine::RenderObject cube1(mesh);
 	DX12Engine::RenderObject cube2(mesh);
-	cube1.SetTexture(textureMC.get());
-	cube2.SetTexture(textureWall.get());
+	cube1.SetMaterial(material1);
+	cube2.SetMaterial(material2);
 	cube1.SetModelMatrix(DirectX::XMMatrixTranslation(0.5f, 0.5f, 0.5f));
 	cube2.SetModelMatrix(DirectX::XMMatrixTranslation(0.0f, -0.5f, -0.5f));
 	float count = 0.0f;

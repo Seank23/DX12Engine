@@ -17,6 +17,8 @@
 #include "../Heaps/DescriptorHeapManager.h"
 #include "../Rendering/RenderContext.h"
 #include "../Rendering/GPUUploader.h"
+#include "../Rendering/PipelineStateCache.h"
+#include "../Rendering/RootSignatureCache.h"
 
 namespace DX12Engine
 {
@@ -40,10 +42,15 @@ namespace DX12Engine
 		std::unique_ptr<ConstantBuffer> CreateConstantBuffer(const UINT bufferSize);
 		std::unique_ptr<Texture> CreateTexture(const DirectX::ScratchImage* imageData);
 
+		Microsoft::WRL::ComPtr<ID3D12PipelineState> CreatePipelineState(const D3D12_GRAPHICS_PIPELINE_STATE_DESC& desc);
+		Microsoft::WRL::ComPtr<ID3D12RootSignature> CreateRootSignature(const D3D12_ROOT_SIGNATURE_DESC& desc);
+
 	private:
 		Microsoft::WRL::ComPtr<ID3D12Device> m_Device;
 		DescriptorHeapManager* m_HeapManager;
 		GPUUploader* m_GPUUploader;
+		std::unique_ptr<PipelineStateCache> m_PipelineStateCache;
+		std::unique_ptr<RootSignatureCache> m_RootSignatureCache;
 	};
 }
 

@@ -1,5 +1,6 @@
 #pragma once
 #include <d3d12.h>
+#include "../Resources/Shader.h"
 
 namespace DX12Engine
 {
@@ -9,6 +10,21 @@ namespace DX12Engine
         PipelineStateBuilder() 
         {
             ZeroMemory(&psoDesc, sizeof(D3D12_GRAPHICS_PIPELINE_STATE_DESC));
+            inputElementDescs[0] = { "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 };
+            inputElementDescs[1] = { "COLOR", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, 12, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 };
+            inputElementDescs[2] = { "NORMAL", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 28, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 };
+            inputElementDescs[3] = { "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, 40, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 };
+        }
+
+        PipelineStateBuilder& ConfigureFromDefault()
+        {
+            return AddInputLayout()
+                .SetBlendState(CD3DX12_BLEND_DESC(D3D12_DEFAULT))
+                .SetRasterizerState(CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT))
+                .SetDepthStencilState(CD3DX12_DEPTH_STENCIL_DESC(D3D12_DEFAULT))
+                .SetPrimitiveTopologyType(D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE)
+                .SetRenderTargetFormats(DXGI_FORMAT_R8G8B8A8_UNORM, DXGI_FORMAT_D24_UNORM_S8_UINT)
+                .SetSampleDesc(UINT_MAX, 1, 0);
         }
 
         PipelineStateBuilder& SetRootSignature(ID3D12RootSignature* rootSig) 
@@ -17,15 +33,15 @@ namespace DX12Engine
             return *this;
         }
 
-        PipelineStateBuilder& SetVertexShader(const void* shaderBytecode, SIZE_T bytecodeLength) 
+        PipelineStateBuilder& SetVertexShader(Shader* vertexShader) 
         {
-            psoDesc.VS = { shaderBytecode, bytecodeLength };
+            psoDesc.VS = { vertexShader->GetShader()->GetBufferPointer(), vertexShader->GetShader()->GetBufferSize() };
             return *this;
         }
 
-        PipelineStateBuilder& SetPixelShader(const void* shaderBytecode, SIZE_T bytecodeLength) 
+        PipelineStateBuilder& SetPixelShader(Shader* pixelShader) 
         {
-            psoDesc.PS = { shaderBytecode, bytecodeLength };
+            psoDesc.PS = { pixelShader->GetShader()->GetBufferPointer(), pixelShader->GetShader()->GetBufferSize() };
             return *this;
         }
 
@@ -55,8 +71,8 @@ namespace DX12Engine
 
         PipelineStateBuilder& AddInputLayout(D3D12_INPUT_ELEMENT_DESC* inputLayout = nullptr, UINT count = 4)
         {
-			if (inputLayout == nullptr)
-                psoDesc.InputLayout = { inputElementDescs, count };
+            if (inputLayout == nullptr)
+                psoDesc.InputLayout = { inputElementDescs, count};
             else
 				psoDesc.InputLayout = { inputLayout, count };
             return *this;

@@ -6,12 +6,24 @@ struct PSInput
     float2 texCoord : TEXCOORD;
 };
 
-Texture2D gTexture : register(t0); // Texture bound at register t0
-SamplerState gSampler : register(s0); // Sampler bound at register s0
+cbuffer MaterialData : register(b1)
+{
+    float4 baseColor;
+    int hasTexture;
+};
+
+Texture2D gTexture : register(t0);
+SamplerState gSampler : register(s0);
 
 
 float4 main(PSInput input) : SV_TARGET
 {
-    //return float4(input.texCoord, 0.5f, 1.0f); // Output the interpolated vertex color
-    return gTexture.Sample(gSampler, input.texCoord);
+    //return float4(input.texCoord, 0.5f, 1.0f);
+    //return gTexture.Sample(gSampler, input.texCoord);
+    float4 color = baseColor;
+    if (hasTexture)
+    {
+        color *= gTexture.Sample(gSampler, input.texCoord);
+    }
+    return color;
 }

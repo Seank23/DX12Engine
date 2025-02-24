@@ -3,13 +3,24 @@
 
 namespace DX12Engine
 {
-    class RootSignatureBuilder {
+    class RootSignatureBuilder 
+    {
     public:
-        RootSignatureBuilder() {
+        RootSignatureBuilder() 
+        {
             ZeroMemory(&m_RootSignatureDesc, sizeof(D3D12_ROOT_SIGNATURE_DESC));
         }
 
-        RootSignatureBuilder& AddDescriptorTable(UINT numDescriptors, D3D12_DESCRIPTOR_RANGE_TYPE type, UINT baseShaderRegister, UINT space = 0) {
+        RootSignatureBuilder& ConfigureFromDefault()
+		{
+            return AddConstantBuffer(0)
+                .AddConstantBuffer(1)
+                .AddDescriptorTable(1, D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 0)
+                .AddSampler(0, D3D12_FILTER_MIN_MAG_MIP_LINEAR);
+		}
+
+        RootSignatureBuilder& AddDescriptorTable(UINT numDescriptors, D3D12_DESCRIPTOR_RANGE_TYPE type, UINT baseShaderRegister, UINT space = 0) 
+        {
             D3D12_DESCRIPTOR_RANGE range = {};
             range.RangeType = type;
             range.NumDescriptors = numDescriptors;
@@ -30,7 +41,8 @@ namespace DX12Engine
             return *this;
         }
 
-        RootSignatureBuilder& AddConstantBuffer(UINT shaderRegister, UINT space = 0, D3D12_SHADER_VISIBILITY visibility = D3D12_SHADER_VISIBILITY_ALL) {
+        RootSignatureBuilder& AddConstantBuffer(UINT shaderRegister, UINT space = 0, D3D12_SHADER_VISIBILITY visibility = D3D12_SHADER_VISIBILITY_ALL) 
+        {
             D3D12_ROOT_PARAMETER param = {};
             param.ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
             param.Descriptor.ShaderRegister = shaderRegister;
@@ -41,7 +53,8 @@ namespace DX12Engine
             return *this;
         }
 
-        RootSignatureBuilder& AddSampler(UINT shaderRegister, D3D12_FILTER filter) {
+        RootSignatureBuilder& AddSampler(UINT shaderRegister, D3D12_FILTER filter) 
+        {
             D3D12_STATIC_SAMPLER_DESC staticSamplerDesc = {};
             staticSamplerDesc.Filter = filter;
             staticSamplerDesc.AddressU = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
@@ -53,7 +66,8 @@ namespace DX12Engine
             return *this;
         }
 
-        D3D12_ROOT_SIGNATURE_DESC Build() {
+        D3D12_ROOT_SIGNATURE_DESC Build() 
+        {
             m_RootSignatureDesc.NumParameters = static_cast<UINT>(m_Parameters.size());
             m_RootSignatureDesc.pParameters = m_Parameters.data();
             m_RootSignatureDesc.NumStaticSamplers = static_cast<UINT>(m_StaticSamplers.size());

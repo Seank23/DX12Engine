@@ -56,14 +56,19 @@ namespace DX12Engine
 
 	void Renderer::Render(RenderObject* renderObject)
 	{
+		// Object binding
+		UpdateMVPMatrix(renderObject);
+		m_CommandList->SetGraphicsRootConstantBufferView(0, renderObject->GetCBVAddress());
+		// Material binding
+		m_CommandList->SetGraphicsRootConstantBufferView(1, renderObject->m_Material->GetCBVAddress());
+		m_CommandList->SetGraphicsRootDescriptorTable(2, renderObject->m_Material->GetTextureHandle());
+		m_CommandList->SetPipelineState(renderObject->m_Material->GetPipelineState().Get());
+		// Mesh binding
 		auto vertexBufferView = renderObject->m_VertexBuffer->GetVertexBufferView();
 		auto indexBufferView = renderObject->m_IndexBuffer->GetIndexBufferView();
-		UpdateMVPMatrix(renderObject);
-		auto handle = renderObject->m_Texture->GetDescriptor()->GetGPUHandle();
-		m_CommandList->SetGraphicsRootDescriptorTable(1, handle);
-		m_CommandList->SetGraphicsRootConstantBufferView(0, renderObject->m_ConstantBuffer->GetGPUAddress());
 		m_CommandList->IASetVertexBuffers(0, 1, &vertexBufferView);
 		m_CommandList->IASetIndexBuffer(&indexBufferView);
+		// Draw
 		m_CommandList->DrawIndexedInstanced(indexBufferView.SizeInBytes / 4, 1, 0, 0, 0);
 	}
 
