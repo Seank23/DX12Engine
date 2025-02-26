@@ -6,24 +6,23 @@
 
 namespace DX12Engine
 {
-	CommandQueue::CommandQueue(RenderDevice* device, D3D12_COMMAND_LIST_TYPE commandType)
+	CommandQueue::CommandQueue(ID3D12Device* device, D3D12_COMMAND_LIST_TYPE commandType)
 		: m_QueueType(commandType), m_CommandQueue(nullptr), m_Fence(nullptr)
 	{
-		m_RenderDevice = device;
 		m_NextFenceValue = 1;
 		m_LastCompletedFenceValue = 0;
 
 		D3D12_COMMAND_QUEUE_DESC queueDesc = {};
 		queueDesc.Type = m_QueueType;
 		queueDesc.NodeMask = 0;
-		EngineUtils::ThrowIfFailed(device->GetDevice()->CreateCommandQueue(&queueDesc, IID_PPV_ARGS(&m_CommandQueue)));
+		EngineUtils::ThrowIfFailed(device->CreateCommandQueue(&queueDesc, IID_PPV_ARGS(&m_CommandQueue)));
 
-		EngineUtils::ThrowIfFailed(device->GetDevice()->CreateCommandAllocator(commandType, IID_PPV_ARGS(&m_CommandAllocator)));
-		EngineUtils::ThrowIfFailed(device->GetDevice()->CreateCommandList(0, commandType, m_CommandAllocator.Get(), nullptr, IID_PPV_ARGS(&m_CommandList)));
+		EngineUtils::ThrowIfFailed(device->CreateCommandAllocator(commandType, IID_PPV_ARGS(&m_CommandAllocator)));
+		EngineUtils::ThrowIfFailed(device->CreateCommandList(0, commandType, m_CommandAllocator.Get(), nullptr, IID_PPV_ARGS(&m_CommandList)));
 		m_CommandList->Close();
 		ResetCommandAllocatorAndList();
 		
-		EngineUtils::ThrowIfFailed(device->GetDevice()->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&m_Fence)));
+		EngineUtils::ThrowIfFailed(device->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&m_Fence)));
 		m_Fence->Signal(m_LastCompletedFenceValue);
 
 		m_FenceEvent = CreateEventEx(nullptr, FALSE, FALSE, EVENT_ALL_ACCESS);

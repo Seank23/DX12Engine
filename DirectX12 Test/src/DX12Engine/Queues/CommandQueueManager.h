@@ -1,14 +1,13 @@
 #pragma once
 #include <d3d12.h>
 #include "CommandQueue.h"
-#include "../Rendering/RenderDevice.h" 
 
 namespace DX12Engine
 {
 	class CommandQueueManager
 	{
 	public:
-		CommandQueueManager(RenderDevice* device);
+		CommandQueueManager(ID3D12Device* device);
 		~CommandQueueManager();
 
 		CommandQueue& GetGraphicsQueue() const { return *m_GraphicsQueue; }
