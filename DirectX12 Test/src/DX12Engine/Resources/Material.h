@@ -24,13 +24,19 @@ namespace DX12Engine
 		void SetColor(DirectX::XMFLOAT4 color);
 
 		void SetTexture(std::shared_ptr<Texture> texture);
-		void SetPipelineState(PipelineStateBuilder& psBuilder, RootSignatureBuilder& rsBuilder);
+		void BuildPipelineState();
 
 		bool HasTexture() const { return m_Texture != nullptr; }
 
 		D3D12_GPU_DESCRIPTOR_HANDLE GetTextureHandle() { return m_Texture->GetDescriptor()->GetGPUHandle(); }
 		D3D12_GPU_VIRTUAL_ADDRESS GetCBVAddress() { return m_ConstantBuffer->GetGPUAddress(); }
 		Microsoft::WRL::ComPtr<ID3D12PipelineState> GetPipelineState() { return m_PipelineState; }
+		Microsoft::WRL::ComPtr<ID3D12RootSignature> GetRootSignature() { return m_RootSignature; }
+
+		void ConfigureFromDefault(Shader* vertexShader, Shader* pixelShader);
+
+		PipelineStateBuilder PipelineStateBuilder;
+		RootSignatureBuilder RootSignatureBuilder;
 
 	private:
 		void UpdateConstantBufferData();
@@ -39,5 +45,6 @@ namespace DX12Engine
 		std::shared_ptr<Texture> m_Texture;
 		std::unique_ptr<ConstantBuffer> m_ConstantBuffer;
 		Microsoft::WRL::ComPtr<ID3D12PipelineState> m_PipelineState;
+		Microsoft::WRL::ComPtr<ID3D12RootSignature> m_RootSignature;
 	};
 }

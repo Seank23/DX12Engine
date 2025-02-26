@@ -26,11 +26,18 @@ namespace DX12Engine
 		UpdateConstantBufferData();
 	}
 
-	void Material::SetPipelineState(PipelineStateBuilder& psBuilder, RootSignatureBuilder& rsBuilder)
+	void Material::BuildPipelineState()
 	{
-		auto rs = ResourceManager::GetInstance().CreateRootSignature(rsBuilder.Build());
-		psBuilder = psBuilder.SetRootSignature(rs.Get());
-		m_PipelineState = ResourceManager::GetInstance().CreatePipelineState(psBuilder.Build());
+		m_RootSignature = ResourceManager::GetInstance().CreateRootSignature(RootSignatureBuilder.Build());
+		PipelineStateBuilder = PipelineStateBuilder.SetRootSignature(m_RootSignature.Get());
+		m_PipelineState = ResourceManager::GetInstance().CreatePipelineState(PipelineStateBuilder.Build());
+	}
+
+	void Material::ConfigureFromDefault(Shader* vertexShader, Shader* pixelShader)
+	{
+		PipelineStateBuilder = PipelineStateBuilder.ConfigureFromDefault().SetVertexShader(vertexShader).SetPixelShader(pixelShader);
+		RootSignatureBuilder = RootSignatureBuilder.ConfigureFromDefault();
+		BuildPipelineState();
 	}
 
 	void Material::UpdateConstantBufferData()

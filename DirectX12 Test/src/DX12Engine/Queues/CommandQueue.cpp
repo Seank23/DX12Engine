@@ -93,12 +93,12 @@ namespace DX12Engine
 	void CommandQueue::ResetCommandAllocatorAndList()
 	{
 		m_CommandAllocator->Reset();
-		m_CommandList->Reset(m_CommandAllocator.Get(), m_RenderDevice->GetPipelineState().Get());
+		m_CommandList->Reset(m_CommandAllocator.Get(), nullptr);
 	}
 
 	void CommandQueue::ResetCommandList()
 	{
-		m_CommandList->Reset(m_CommandAllocator.Get(), m_RenderDevice->GetPipelineState().Get());
+		m_CommandList->Reset(m_CommandAllocator.Get(), nullptr);
 	}
 
 	void CommandQueue::FlushQueue()

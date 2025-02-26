@@ -32,7 +32,6 @@ namespace DX12Engine
 		if (!m_RenderContext->GetUploader().UploadAllPending()) // Upload any pending resources
 			m_QueueManager.GetGraphicsQueue().ResetCommandAllocatorAndList();
 
-		m_CommandList->SetGraphicsRootSignature(m_RenderContext->GetRootSignature().Get());
 		m_CommandList->RSSetViewports(1, &viewport);
 		m_CommandList->RSSetScissorRects(1, &scissorRect);
 
@@ -47,7 +46,6 @@ namespace DX12Engine
 		m_CommandList->ClearRenderTargetView(rtvHandle, clearColor, 0, nullptr);
 		m_CommandList->ClearDepthStencilView(dsvHandle, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
 
-		m_CommandList->SetPipelineState(m_RenderContext->GetPipelineState().Get());
 		m_CommandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
 		auto srvHeap = m_RenderHeap.GetHeap();
@@ -58,6 +56,7 @@ namespace DX12Engine
 	{
 		// Object binding
 		UpdateMVPMatrix(renderObject);
+		m_CommandList->SetGraphicsRootSignature(renderObject->m_Material->GetRootSignature().Get());
 		m_CommandList->SetGraphicsRootConstantBufferView(0, renderObject->GetCBVAddress());
 		// Material binding
 		m_CommandList->SetGraphicsRootConstantBufferView(1, renderObject->m_Material->GetCBVAddress());

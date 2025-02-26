@@ -1,7 +1,6 @@
 struct PSInput
 {
     float4 position : SV_POSITION;
-    float4 color : COLOR;
     float3 normal : NORMAL;
     float2 texCoord : TEXCOORD;
 };
@@ -18,8 +17,6 @@ SamplerState gSampler : register(s0);
 
 float4 main(PSInput input) : SV_TARGET
 {
-    //return float4(input.texCoord, 0.5f, 1.0f);
-    //return gTexture.Sample(gSampler, input.texCoord);
     float4 color = baseColor;
     if (hasTexture)
     {

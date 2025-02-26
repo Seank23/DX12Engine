@@ -16,8 +16,6 @@ namespace DX12Engine
 	RenderDevice::~RenderDevice()
 	{
 		m_Device.Reset();
-		m_PipelineState.Reset();
-		m_RootSignature.Reset();
 	}
 
 	void RenderDevice::Init(HWND hwnd)
@@ -34,19 +32,5 @@ namespace DX12Engine
             MessageBox(hwnd, L"Failed to create DirectX 12 device.", L"Error", MB_OK);
             exit(-1);
         }
-	}
-
-	void RenderDevice::CreatePipelineState(Shader* vertexShader, Shader* pixelShader)
-	{
-		RootSignatureBuilder rootSigBuilder;
-		m_RootSignature = ResourceManager::GetInstance().CreateRootSignature(rootSigBuilder.ConfigureFromDefault().Build());
-
-		PipelineStateBuilder psoBuilder;
-		D3D12_GRAPHICS_PIPELINE_STATE_DESC psoDesc = psoBuilder.ConfigureFromDefault()
-			.SetRootSignature(m_RootSignature.Get())
-			.SetVertexShader(vertexShader)
-			.SetPixelShader(pixelShader)
-			.Build();
-		m_PipelineState = ResourceManager::GetInstance().CreatePipelineState(psoDesc);
 	}
 }

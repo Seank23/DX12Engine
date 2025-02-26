@@ -33,9 +33,4 @@ namespace DX12Engine
 		m_RenderWindow.reset();
 		m_Uploader.reset();
 	}
-
-	void RenderContext::CreatePipeline(Shader* vertexShader, Shader* pixelShader)
-	{
-		m_RenderDevice->CreatePipelineState(vertexShader, pixelShader);
-	}
 }

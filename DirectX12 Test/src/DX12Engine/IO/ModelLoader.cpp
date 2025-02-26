@@ -83,15 +83,6 @@ namespace DX12Engine
                         };
                     }
 
-                    // Extract color
-                    DirectX::XMFLOAT4 color =
-                    {
-                        attrib.colors[3 * idx.vertex_index + 0],
-                        attrib.colors[3 * idx.vertex_index + 1],
-                        attrib.colors[3 * idx.vertex_index + 2],
-                        1.0f
-                    };
-
                     // Construct a unique key for this vertex
                     std::string key = std::to_string(idx.vertex_index) + "/" +
                         std::to_string(idx.normal_index) + "/" +
@@ -101,7 +92,7 @@ namespace DX12Engine
                     if (uniqueVertices.find(key) == uniqueVertices.end()) 
                     {
                         uniqueVertices[key] = static_cast<uint32_t>(mesh.Vertices.size());
-                        mesh.Vertices.push_back({ position, color, normal, texCoord });
+                        mesh.Vertices.push_back({ position, normal, texCoord });
                     }
                     // Add the index for this vertex
                     mesh.Indices.push_back(uniqueVertices[key]);

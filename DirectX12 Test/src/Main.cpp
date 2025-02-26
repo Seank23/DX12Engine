@@ -19,8 +19,6 @@ int main()
 	DX12Engine::Shader vertexShader("VertexShader.hlsl", "vertex");
 	DX12Engine::Shader pixelShader("PixelShader.hlsl", "pixel");
 
-	context->CreatePipeline(&vertexShader, &pixelShader);
-
 	std::string inputfile = "E:\\Projects\\source\\repos\\DirectX12 Test\\cube.obj";
 	DX12Engine::ModelLoader modelLoader;
 	DX12Engine::Mesh mesh = modelLoader.LoadObj(inputfile);
@@ -34,28 +32,14 @@ int main()
 	uploader.UploadTextureBatch(textures);
 
 	std::shared_ptr<DX12Engine::Material> material1 = std::make_shared<DX12Engine::Material>();
+	material1->ConfigureFromDefault(&vertexShader, &pixelShader);
 	material1->SetColor({ 0.1f, 0.2f, 1.0f, 1.0f });
 	material1->SetTexture(textureMC);
-	DX12Engine::RootSignatureBuilder rootSigBuilder1;
-	rootSigBuilder1 = rootSigBuilder1.ConfigureFromDefault();
-	DX12Engine::PipelineStateBuilder pipelineStateBuilder1;
-	pipelineStateBuilder1 = pipelineStateBuilder1
-		.ConfigureFromDefault()
-		.SetVertexShader(&vertexShader)
-		.SetPixelShader(&pixelShader);
-	material1->SetPipelineState(pipelineStateBuilder1, rootSigBuilder1);
 
 	std::shared_ptr<DX12Engine::Material> material2 = std::make_shared<DX12Engine::Material>();
-	material2->SetColor({ 1.0f, 0.2f, 0.1f, 1.0f });
+	material2->ConfigureFromDefault(&vertexShader, &pixelShader);
+	//material2->SetColor({ 1.0f, 0.2f, 0.1f, 1.0f });
 	material2->SetTexture(textureWall);
-	DX12Engine::RootSignatureBuilder rootSigBuilder2;
-	rootSigBuilder2 = rootSigBuilder2.ConfigureFromDefault();
-	DX12Engine::PipelineStateBuilder pipelineStateBuilder2;
-	pipelineStateBuilder2 = pipelineStateBuilder2
-		.ConfigureFromDefault()
-		.SetVertexShader(&vertexShader)
-		.SetPixelShader(&pixelShader);
-	material2->SetPipelineState(pipelineStateBuilder2, rootSigBuilder2);
 
 	DX12Engine::RenderObject cube1(mesh);
 	DX12Engine::RenderObject cube2(mesh);

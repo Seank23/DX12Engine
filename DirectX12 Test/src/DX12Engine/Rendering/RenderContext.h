@@ -17,15 +17,11 @@ namespace DX12Engine
 		RenderContext(int width, int height);
 		~RenderContext();
 
-		void CreatePipeline(Shader* vertexShader, Shader* pixelShader);
-
 		DirectX::XMFLOAT2							GetWindowSize() const { return m_WindowSize; }
 		HWND										GetWindowHandle() const { return m_RenderWindow->GetWindowHandle(); }
 		Microsoft::WRL::ComPtr<ID3D12Device>		GetDevice() const { return m_RenderDevice->GetDevice(); }
-		Microsoft::WRL::ComPtr<ID3D12RootSignature> GetRootSignature() const { return m_RenderDevice->GetRootSignature(); }
 		CD3DX12_CPU_DESCRIPTOR_HANDLE				GetRTVHandle() const { return m_RenderWindow->GetRTVHandle(); }
 		D3D12_CPU_DESCRIPTOR_HANDLE					GetDSVHandle() const { return m_RenderWindow->GetDSVHandle(); }
-		Microsoft::WRL::ComPtr<ID3D12PipelineState> GetPipelineState() const { return m_RenderDevice->GetPipelineState(); }
 		CommandQueueManager&						GetQueueManager() const { return *m_QueueManager; }
 		DescriptorHeapManager&						GetHeapManager() const { return *m_HeapManager; }
 		GPUUploader&								GetUploader() const { return *m_Uploader; }
