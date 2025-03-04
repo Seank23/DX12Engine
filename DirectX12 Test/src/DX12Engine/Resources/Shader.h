@@ -1,11 +1,7 @@
 #pragma once
-#include <d3d12.h>
-#include <dxgi1_4.h>
 #include <wrl.h>
-#include <windows.h>
-#include <DirectXMath.h>
-#include <d3dcompiler.h>
-#include "d3dx12.h"
+#include <dxcapi.h>
+#include <string>
 
 namespace DX12Engine
 {
@@ -15,10 +11,10 @@ namespace DX12Engine
 		Shader(std::string shaderPath, std::string shaderType);
 		~Shader();
 
-		const Microsoft::WRL::ComPtr<ID3DBlob> GetShader() { return m_Shader; }
+		const Microsoft::WRL::ComPtr<IDxcBlob> GetShader() { return m_Shader; }
 
 	private:
-		Microsoft::WRL::ComPtr<ID3DBlob> m_Shader;
+		Microsoft::WRL::ComPtr<IDxcBlob> m_Shader;
 	};
 }
 

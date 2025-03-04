@@ -22,7 +22,7 @@ namespace DX12Engine
 	void Material::SetTexture(std::shared_ptr<Texture> texture)
 	{
 		m_Texture = texture;
-		m_MaterialData.HasTexture = true;
+		m_MaterialData.HasTexture = 1;
 		UpdateConstantBufferData();
 	}
 

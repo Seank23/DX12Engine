@@ -12,7 +12,7 @@ namespace DX12Engine
 	struct MaterialData
 	{
 		DirectX::XMFLOAT4 BaseColor;
-		bool HasTexture = false;
+		int HasTexture = 0;
 	};
 
 	class Material

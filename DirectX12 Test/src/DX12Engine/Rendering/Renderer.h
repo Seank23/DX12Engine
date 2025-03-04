@@ -3,6 +3,7 @@
 #include "RenderObject.h"
 #include "../Resources/Texture.h"
 #include "../Heaps/RenderPassDescriptorHeap.h"
+#include "../Buffers/LightBuffer.h"
 
 namespace DX12Engine
 {
@@ -17,6 +18,7 @@ namespace DX12Engine
 		void PresentFrame();
 		bool PollWindow();
 		void UpdateCameraPosition(float x, float y, float z);
+		void SetLightBuffer(LightBuffer* lightBuffer) { m_LightBuffer = lightBuffer; }
 
 		D3D12_VIEWPORT GetDefaultViewport();
 		D3D12_RECT GetDefaultScissorRect();
@@ -34,6 +36,7 @@ namespace DX12Engine
 		DirectX::XMFLOAT3 m_CameraPosition;
 
 		RenderPassDescriptorHeap& m_RenderHeap;
+		LightBuffer* m_LightBuffer;
 	};
 }
 

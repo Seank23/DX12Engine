@@ -10,10 +10,12 @@ namespace DX12Engine
 {
 	struct RenderObjectData
 	{
+		DirectX::XMMATRIX ModelMatrix;
 		DirectX::XMMATRIX WVPMatrix;
 
 		void Reset()
 		{
+			ModelMatrix = DirectX::XMMatrixIdentity();
 			WVPMatrix = DirectX::XMMatrixIdentity();
 		}
 	};

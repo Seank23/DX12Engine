@@ -20,6 +20,7 @@ namespace DX12Engine
 
 	void RenderObject::UpdateConstantBufferData(DirectX::XMMATRIX wvpMatrix)
 	{
+		m_RenderObjectData.ModelMatrix = m_ModelMatrix;
 		m_RenderObjectData.WVPMatrix = wvpMatrix;
 		m_ConstantBuffer->Update(&m_RenderObjectData, sizeof(RenderObjectData));
 	}

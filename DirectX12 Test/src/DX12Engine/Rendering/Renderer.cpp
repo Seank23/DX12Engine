@@ -57,10 +57,12 @@ namespace DX12Engine
 		// Object binding
 		UpdateMVPMatrix(renderObject);
 		m_CommandList->SetGraphicsRootSignature(renderObject->m_Material->GetRootSignature().Get());
-		m_CommandList->SetGraphicsRootConstantBufferView(0, renderObject->GetCBVAddress());
+		m_CommandList->SetGraphicsRootConstantBufferView(0, m_LightBuffer->GetCBVAddress());
+		m_CommandList->SetGraphicsRootConstantBufferView(1, renderObject->GetCBVAddress());
 		// Material binding
-		m_CommandList->SetGraphicsRootConstantBufferView(1, renderObject->m_Material->GetCBVAddress());
-		m_CommandList->SetGraphicsRootDescriptorTable(2, renderObject->m_Material->GetTextureHandle());
+		m_CommandList->SetGraphicsRootConstantBufferView(2, renderObject->m_Material->GetCBVAddress());
+		if (renderObject->m_Material->HasTexture())
+			m_CommandList->SetGraphicsRootDescriptorTable(3, renderObject->m_Material->GetTextureHandle());
 		m_CommandList->SetPipelineState(renderObject->m_Material->GetPipelineState().Get());
 		// Mesh binding
 		auto vertexBufferView = renderObject->m_VertexBuffer->GetVertexBufferView();
@@ -125,6 +127,7 @@ namespace DX12Engine
 
 	void Renderer::UpdateMVPMatrix(RenderObject* renderObject)
 	{
+
 		renderObject->UpdateConstantBufferData(renderObject->m_ModelMatrix * m_ViewMatrix * m_ProjectionMatrix);
 	}
 }
