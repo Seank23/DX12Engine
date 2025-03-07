@@ -18,9 +18,6 @@
     <ClCompile Include="src\DX12Engine\Rendering\RenderWindow.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="src\DX12Engine\Rendering\RenderDevice.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="src\DX12Engine\Buffers\VertexBuffer.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -81,6 +78,15 @@
     <ClCompile Include="src\DX12Engine\Resources\Texture.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="src\DX12Engine\Rendering\GPUUploader.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="src\DX12Engine\Resources\Material.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="src\DX12Engine\Buffers\LightBuffer.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <FxCompile Include="VertexShader.hlsl" />
@@ -88,9 +94,6 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\DX12Engine\Rendering\RenderWindow.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="src\DX12Engine\Rendering\RenderDevice.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="src\DX12Engine\Buffers\VertexBuffer.h">
@@ -132,9 +135,6 @@
     <ClInclude Include="src\DX12Engine\Resources\ResourceManager.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="src\DX12Engine\Buffers\ConstantBufferData.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="src\DX12Engine\Heaps\DescriptorHeap.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -157,6 +157,30 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="src\DX12Engine\Utils\Constants.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\DX12Engine\Rendering\GPUUploader.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\DX12Engine\Resources\UploadResourceWrapper.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\DX12Engine\Rendering\PipelineStateCache.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\DX12Engine\Rendering\PipelineStateBuilder.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\DX12Engine\Rendering\RootSignatureCache.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\DX12Engine\Rendering\RootSignatureBuilder.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\DX12Engine\Resources\Material.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\DX12Engine\Buffers\LightBuffer.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

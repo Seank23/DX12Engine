@@ -8,12 +8,14 @@ struct PSInput
 
 struct Light
 {
+    int Type; // 0 = Directional, 1 = Point, 2 = Spot
     float3 Position;
     float Intensity;
     float3 Direction;
     float Range;
     float3 Color;
     float SpotAngle;
+    float3 Padding;
 };
 
 cbuffer LightBuffer : register(b0)
@@ -39,13 +41,32 @@ float3 ComputeLighting(float3 normal, float3 worldPos)
     for (int i = 0; i < LightCount; i++)
     {
         Light light = Lights[i];
+        float3 lightDir = 0;
+        float attenuation = 1.0;
         
-        float3 lightDir = normalize(light.Position - worldPos);
-        float diff = max(dot(normal, lightDir), 0.0);
-        
-        finalColor += light.Color * diff * light.Intensity;
+        if (light.Type == 0)
+        {
+            lightDir = normalize(-light.Direction);
+        }
+        else if (light.Type == 1)
+        {
+            float3 lightVector = light.Position - worldPos;
+            lightDir = normalize(lightVector);
+            float dist = length(lightVector);
+            attenuation = saturate(1.0 - (dist / light.Range));
+        }
+        else if (light.Type == 2)
+        {
+            float3 lightVector = light.Position - worldPos;
+            lightDir = normalize(lightVector);
+            float dist = length(lightVector);
+            float spotFactor = dot(normalize(light.Direction), -lightDir);
+            float spotAttenuation = smoothstep(light.SpotAngle, light.SpotAngle + 0.1, spotFactor);
+            attenuation = spotAttenuation * saturate(1.0 - (dist / light.Range));
+        }
+        float NdotL = max(dot(normal, lightDir), 0.0);  
+        finalColor += light.Color * light.Intensity * NdotL * attenuation;
     }
-
     return finalColor;
 }
 
@@ -56,8 +77,8 @@ float4 main(PSInput input) : SV_TARGET
     {
         color *= gTexture.Sample(gSampler, input.texCoord);
     }
-    float3 normal = normalize(input.normal);
-    float3 lighting = ComputeLighting(normal, input.worldPos);
+    float3 lighting = ComputeLighting(normalize(input.normal), input.worldPos);
     
-    return float4(lighting * color.xyz, 1.0f);
+    float3 finalColor = lighting * color.xyz;
+    return float4(finalColor, 1.0f);
 }

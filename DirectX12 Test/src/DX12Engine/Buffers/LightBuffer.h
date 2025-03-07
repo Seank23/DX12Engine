@@ -13,12 +13,14 @@ namespace DX12Engine
 
     struct Light 
     {
+        int Type = 0;       // 0 = Directional, 1 = Point, 2 = Spot
         DirectX::XMFLOAT3 Position = { 0.0f, 0.0f, 0.0f };
         float Intensity = 1.0f;              
         DirectX::XMFLOAT3 Direction = { 0.0f, -1.0f, 0.0f };
         float Range = 10.0f;
         DirectX::XMFLOAT3 Color = { 1.0f, 1.0f, 1.0f };
         float SpotAngle = 0.0f;              // Spot cone angle (for spotlights)
+        DirectX::XMFLOAT3 Padding = { 0.0f, 0.0f, 0.0f };
     };
 
     struct LightBufferData
@@ -37,10 +39,10 @@ namespace DX12Engine
 		void Update();
 		void AddLight(Light light);
         D3D12_GPU_VIRTUAL_ADDRESS GetCBVAddress() { return m_ConstantBuffer->GetGPUAddress(); }
-
-        LightBufferData Lights;
+        Light* GetLight(int index) { return &(Lights.Lights[index]); }
 
     private:
+        LightBufferData Lights;
 		std::unique_ptr<ConstantBuffer> m_ConstantBuffer;
 	};
 }

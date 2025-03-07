@@ -110,8 +110,11 @@
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>D3D12.lib;d3d12.lib;dxgi.lib;dxguid.lib;D3DCompiler.lib;$(CoreLibraryDependencies);E:\Projects\source\repos\DirectX12 Test\vendor\DirectXTex-main\DirectXTex\Bin\Desktop_2022\x64\Debug\DirectXTex.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>D3D12.lib;d3d12.lib;dxgi.lib;dxguid.lib;D3DCompiler.lib;dxcompiler.lib;$(CoreLibraryDependencies);E:\Projects\source\repos\DirectX12 Test\vendor\DirectXTex-main\DirectXTex\Bin\Desktop_2022\x64\Debug\DirectXTex.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
+    <FxCompile>
+      <ShaderModel>6.0</ShaderModel>
+    </FxCompile>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <ClCompile>
@@ -121,26 +124,30 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
+      <AdditionalIncludeDirectories>E:\Projects\source\repos\DirectX12 Test\vendor\DirectXTex-main\DirectXTex;E:\Projects\source\repos\DirectX12 Test\vendor\tinyobjloader-release;E:\Projects\source\repos\DirectX12 Test\vendor\DirectX-Headers-main\include\directx;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
+      <AdditionalDependencies>D3D12.lib;d3d12.lib;dxgi.lib;dxguid.lib;D3DCompiler.lib;dxcompiler.lib;$(CoreLibraryDependencies);E:\Projects\source\repos\DirectX12 Test\vendor\DirectXTex-main\DirectXTex\Bin\Desktop_2022\x64\Release\DirectXTex.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="src\DX12Engine\Buffers\LightBuffer.cpp" />
+    <ClCompile Include="src\DX12Engine\Rendering\GPUUploader.cpp" />
     <ClCompile Include="src\DX12Engine\Queues\CommandQueueManager.cpp" />
     <ClCompile Include="src\DX12Engine\Buffers\ConstantBuffer.cpp" />
     <ClCompile Include="src\DX12Engine\Heaps\DescriptorHeap.cpp" />
     <ClCompile Include="src\DX12Engine\Heaps\DescriptorHeapManager.cpp" />
+    <ClCompile Include="src\DX12Engine\Resources\Material.cpp" />
     <ClCompile Include="src\DX12Engine\Utils\EngineUtils.h" />
     <ClCompile Include="src\DX12Engine\Resources\GPUResource.cpp" />
     <ClCompile Include="src\DX12Engine\Buffers\IndexBuffer.cpp" />
     <ClCompile Include="src\Main.cpp" />
     <ClCompile Include="src\DX12Engine\IO\ModelLoader.cpp" />
     <ClCompile Include="src\DX12Engine\Rendering\RenderContext.cpp" />
-    <ClCompile Include="src\DX12Engine\Rendering\RenderDevice.cpp" />
     <ClCompile Include="src\DX12Engine\Rendering\Renderer.cpp" />
     <ClCompile Include="src\DX12Engine\Rendering\RenderObject.cpp" />
     <ClCompile Include="src\DX12Engine\Queues\CommandQueue.cpp" />
@@ -168,18 +175,23 @@
     </FxCompile>
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="src\DX12Engine\Rendering\GPUUploader.h" />
     <ClInclude Include="src\DX12Engine\Queues\CommandQueueManager.h" />
     <ClInclude Include="src\DX12Engine\Buffers\ConstantBuffer.h" />
-    <ClInclude Include="src\DX12Engine\Buffers\ConstantBufferData.h" />
     <ClInclude Include="src\DX12Engine\Heaps\DescriptorHeap.h" />
     <ClInclude Include="src\DX12Engine\Heaps\DescriptorHeapHandle.h" />
     <ClInclude Include="src\DX12Engine\Heaps\DescriptorHeapManager.h" />
+    <ClInclude Include="src\DX12Engine\Rendering\PipelineStateBuilder.h" />
+    <ClInclude Include="src\DX12Engine\Rendering\PipelineStateCache.h" />
+    <ClInclude Include="src\DX12Engine\Rendering\RootSignatureBuilder.h" />
+    <ClInclude Include="src\DX12Engine\Rendering\RootSignatureCache.h" />
     <ClInclude Include="src\DX12Engine\Resources\GPUResource.h" />
     <ClInclude Include="src\DX12Engine\Buffers\IndexBuffer.h" />
+    <ClInclude Include="src\DX12Engine\Buffers\LightBuffer.h" />
+    <ClInclude Include="src\DX12Engine\Resources\Material.h" />
     <ClInclude Include="src\DX12Engine\Resources\Mesh.h" />
     <ClInclude Include="src\DX12Engine\IO\ModelLoader.h" />
     <ClInclude Include="src\DX12Engine\Rendering\RenderContext.h" />
-    <ClInclude Include="src\DX12Engine\Rendering\RenderDevice.h" />
     <ClInclude Include="src\DX12Engine\Rendering\Renderer.h" />
     <ClInclude Include="src\DX12Engine\Rendering\RenderObject.h" />
     <ClInclude Include="src\DX12Engine\Queues\CommandQueue.h" />
@@ -192,6 +204,7 @@
     <ClInclude Include="src\DX12Engine\IO\TextureLoader.h" />
     <ClInclude Include="src\DX12Engine\Resources\Texture.h" />
     <ClInclude Include="src\DX12Engine\Utils\Constants.h" />
+    <ClInclude Include="src\DX12Engine\Resources\UploadResourceWrapper.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

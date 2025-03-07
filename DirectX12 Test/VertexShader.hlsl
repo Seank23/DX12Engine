@@ -1,9 +1,7 @@
-#pragma shader_model 5_0
-
 cbuffer ConstantBuffer : register(b1)
 {
-    float4x4 modelMatrix;
-    float4x4 wvpMatrix;
+    float4x4 ModelMatrix;
+    float4x4 WVPMatrix;
 };
 
 struct VSInput
@@ -24,9 +22,9 @@ struct PSInput
 PSInput main(VSInput input)
 {
     PSInput output;
-    float4 worldPos = mul(float4(input.position, 1.0f), modelMatrix);
+    float4 worldPos = mul(ModelMatrix, float4(input.position, 1.0f));
     output.worldPos = worldPos.xyz;
-    output.position = mul(wvpMatrix, float4(input.position, 1.0f));
+    output.position = mul(WVPMatrix, float4(input.position, 1.0f));
     output.normal = input.normal;
     output.texCoord = input.texCoord;
     return output;
