@@ -4,7 +4,7 @@
 #include "../Buffers/VertexBuffer.h"
 #include "../Buffers/IndexBuffer.h"
 #include "../Buffers/ConstantBuffer.h"
-#include "../Resources/Material.h"
+#include "../Resources/Materials/Material.h"
 
 namespace DX12Engine
 {
@@ -12,6 +12,8 @@ namespace DX12Engine
 	{
 		DirectX::XMMATRIX ModelMatrix;
 		DirectX::XMMATRIX WVPMatrix;
+		DirectX::XMFLOAT3 CameraPosition;
+		float Padding;
 
 		void Reset()
 		{
@@ -34,7 +36,7 @@ namespace DX12Engine
 		D3D12_GPU_VIRTUAL_ADDRESS GetCBVAddress() { return m_ConstantBuffer->GetGPUAddress(); }
 
 	private:
-		void UpdateConstantBufferData(DirectX::XMMATRIX wvpMatrix);
+		void UpdateConstantBufferData(DirectX::XMMATRIX wvpMatrix, DirectX::XMFLOAT3 cameraPosition);
 
 		Mesh m_Mesh;
 		std::unique_ptr<VertexBuffer> m_VertexBuffer;

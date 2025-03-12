@@ -18,10 +18,11 @@ namespace DX12Engine
 		m_ModelMatrix = DirectX::XMMatrixIdentity();
 	}
 
-	void RenderObject::UpdateConstantBufferData(DirectX::XMMATRIX wvpMatrix)
+	void RenderObject::UpdateConstantBufferData(DirectX::XMMATRIX wvpMatrix, DirectX::XMFLOAT3 cameraPosition)
 	{
 		m_RenderObjectData.ModelMatrix = m_ModelMatrix;
 		m_RenderObjectData.WVPMatrix = wvpMatrix;
+		m_RenderObjectData.CameraPosition = cameraPosition;
 		m_ConstantBuffer->Update(&m_RenderObjectData, sizeof(RenderObjectData));
 	}
 }

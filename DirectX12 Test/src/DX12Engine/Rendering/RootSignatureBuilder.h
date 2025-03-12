@@ -11,12 +11,12 @@ namespace DX12Engine
             ZeroMemory(&m_RootSignatureDesc, sizeof(D3D12_ROOT_SIGNATURE_DESC));
         }
 
-        RootSignatureBuilder& ConfigureFromDefault()
+        RootSignatureBuilder& ConfigureFromDefault(int numTextures = 1)
 		{
             return AddConstantBuffer(0)
                 .AddConstantBuffer(1)
 				.AddConstantBuffer(2)
-                .AddDescriptorTable(1, D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 0)
+                .AddDescriptorTable(numTextures, D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 0)
                 .AddSampler(0, D3D12_FILTER_MIN_MAG_MIP_LINEAR);
 		}
 

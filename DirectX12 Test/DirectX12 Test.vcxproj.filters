@@ -81,16 +81,24 @@
     <ClCompile Include="src\DX12Engine\Rendering\GPUUploader.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="src\DX12Engine\Resources\Material.cpp">
+    <ClCompile Include="src\DX12Engine\Resources\Materials\Material.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="src\DX12Engine\Buffers\LightBuffer.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="src\DX12Engine\Resources\Materials\BasicMaterial.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="src\DX12Engine\Resources\Materials\PBRMaterial.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <FxCompile Include="VertexShader.hlsl" />
-    <FxCompile Include="PixelShader.hlsl" />
+    <FxCompile Include="src\DX12Engine\Shaders\BasicLighting_VS.hlsl" />
+    <FxCompile Include="src\DX12Engine\Shaders\BasicLighting_PS.hlsl" />
+    <FxCompile Include="src\DX12Engine\Shaders\PBRLighting_VS.hlsl" />
+    <FxCompile Include="src\DX12Engine\Shaders\PBRLighting_PS.hlsl" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\DX12Engine\Rendering\RenderWindow.h">
@@ -177,10 +185,19 @@
     <ClInclude Include="src\DX12Engine\Rendering\RootSignatureBuilder.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="src\DX12Engine\Resources\Material.h">
+    <ClInclude Include="src\DX12Engine\Resources\Materials\Material.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="src\DX12Engine\Buffers\LightBuffer.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\DX12Engine\Resources\Materials\BasicMaterial.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\DX12Engine\Resources\Materials\MaterialData.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\DX12Engine\Resources\Materials\PBRMaterial.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

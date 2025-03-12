@@ -13,6 +13,8 @@ namespace DX12Engine
 		Texture(ID3D12Resource* mainResource, ID3D12Resource* uploadResource, D3D12_RESOURCE_STATES usageState, D3D12_SUBRESOURCE_DATA data, DescriptorHeapHandle descriptor);
 		~Texture();
 
+		D3D12_GPU_DESCRIPTOR_HANDLE GetGPUHandle() { return GetDescriptor()->GetGPUHandle(); }
+
 	private:
 		ID3D12Resource* m_MainResource;
 		ID3D12Resource* m_UploadResource;

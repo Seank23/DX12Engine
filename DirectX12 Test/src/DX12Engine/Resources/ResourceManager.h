@@ -45,12 +45,15 @@ namespace DX12Engine
 		Microsoft::WRL::ComPtr<ID3D12PipelineState> CreatePipelineState(const D3D12_GRAPHICS_PIPELINE_STATE_DESC& desc);
 		Microsoft::WRL::ComPtr<ID3D12RootSignature> CreateRootSignature(const D3D12_ROOT_SIGNATURE_DESC& desc);
 
+		Shader* GetShader(const std::string& name) { return m_Shaders[name].get(); }
+
 	private:
 		Microsoft::WRL::ComPtr<ID3D12Device> m_Device;
 		DescriptorHeapManager* m_HeapManager;
 		GPUUploader* m_GPUUploader;
 		std::unique_ptr<PipelineStateCache> m_PipelineStateCache;
 		std::unique_ptr<RootSignatureCache> m_RootSignatureCache;
+		std::unordered_map<std::string, std::unique_ptr<Shader>> m_Shaders;
 	};
 }
 

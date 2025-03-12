@@ -5,7 +5,7 @@
 namespace DX12Engine
 {
 	Renderer::Renderer(std::shared_ptr<RenderContext> context)
-		: m_CameraPosition({ 0.0f, 0.0f, -3.0f }), m_RenderContext(context), m_RenderHeap(context->GetHeapManager().GetRenderPassHeap()), m_QueueManager(context->GetQueueManager())
+		: m_CameraPosition({ 0.0f, 0.0f, -4.0f }), m_RenderContext(context), m_RenderHeap(context->GetHeapManager().GetRenderPassHeap()), m_QueueManager(context->GetQueueManager())
 	{
 		m_ViewMatrix = DirectX::XMMatrixLookAtLH(
 			DirectX::XMVectorSet(m_CameraPosition.x, m_CameraPosition.y, m_CameraPosition.z, 1.0f), // Camera position
@@ -60,10 +60,8 @@ namespace DX12Engine
 		m_CommandList->SetGraphicsRootConstantBufferView(0, m_LightBuffer->GetCBVAddress());
 		m_CommandList->SetGraphicsRootConstantBufferView(1, renderObject->GetCBVAddress());
 		// Material binding
-		m_CommandList->SetGraphicsRootConstantBufferView(2, renderObject->m_Material->GetCBVAddress());
-		if (renderObject->m_Material->HasTexture())
-			m_CommandList->SetGraphicsRootDescriptorTable(3, renderObject->m_Material->GetTextureHandle());
-		m_CommandList->SetPipelineState(renderObject->m_Material->GetPipelineState().Get());
+		int startIndex = 2;
+		renderObject->m_Material->Bind(m_CommandList, &startIndex);
 		// Mesh binding
 		auto vertexBufferView = renderObject->m_VertexBuffer->GetVertexBufferView();
 		auto indexBufferView = renderObject->m_IndexBuffer->GetIndexBufferView();
@@ -127,7 +125,6 @@ namespace DX12Engine
 
 	void Renderer::UpdateMVPMatrix(RenderObject* renderObject)
 	{
-
-		renderObject->UpdateConstantBufferData(renderObject->m_ModelMatrix * m_ViewMatrix * m_ProjectionMatrix);
+		renderObject->UpdateConstantBufferData(renderObject->m_ModelMatrix * m_ViewMatrix * m_ProjectionMatrix, m_CameraPosition);
 	}
 }

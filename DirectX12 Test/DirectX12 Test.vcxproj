@@ -135,13 +135,15 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="src\DX12Engine\Resources\Materials\PBRMaterial.cpp" />
+    <ClCompile Include="src\DX12Engine\Resources\Materials\BasicMaterial.cpp" />
     <ClCompile Include="src\DX12Engine\Buffers\LightBuffer.cpp" />
     <ClCompile Include="src\DX12Engine\Rendering\GPUUploader.cpp" />
     <ClCompile Include="src\DX12Engine\Queues\CommandQueueManager.cpp" />
     <ClCompile Include="src\DX12Engine\Buffers\ConstantBuffer.cpp" />
     <ClCompile Include="src\DX12Engine\Heaps\DescriptorHeap.cpp" />
     <ClCompile Include="src\DX12Engine\Heaps\DescriptorHeapManager.cpp" />
-    <ClCompile Include="src\DX12Engine\Resources\Material.cpp" />
+    <ClCompile Include="src\DX12Engine\Resources\Materials\Material.cpp" />
     <ClCompile Include="src\DX12Engine\Utils\EngineUtils.h" />
     <ClCompile Include="src\DX12Engine\Resources\GPUResource.cpp" />
     <ClCompile Include="src\DX12Engine\Buffers\IndexBuffer.cpp" />
@@ -161,13 +163,25 @@
     <ClCompile Include="src\DX12Engine\Resources\Texture.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <FxCompile Include="PixelShader.hlsl">
+    <FxCompile Include="src\DX12Engine\Shaders\BasicLighting_PS.hlsl">
       <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Pixel</ShaderType>
       <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Pixel</ShaderType>
       <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">Pixel</ShaderType>
       <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Pixel</ShaderType>
     </FxCompile>
-    <FxCompile Include="VertexShader.hlsl">
+    <FxCompile Include="src\DX12Engine\Shaders\BasicLighting_VS.hlsl">
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Vertex</ShaderType>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Vertex</ShaderType>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">Vertex</ShaderType>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Vertex</ShaderType>
+    </FxCompile>
+    <FxCompile Include="src\DX12Engine\Shaders\PBRLighting_PS.hlsl">
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Pixel</ShaderType>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Pixel</ShaderType>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">Pixel</ShaderType>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Pixel</ShaderType>
+    </FxCompile>
+    <FxCompile Include="src\DX12Engine\Shaders\PBRLighting_VS.hlsl">
       <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Vertex</ShaderType>
       <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Vertex</ShaderType>
       <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">Vertex</ShaderType>
@@ -175,6 +189,8 @@
     </FxCompile>
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="src\DX12Engine\Resources\Materials\PBRMaterial.h" />
+    <ClInclude Include="src\DX12Engine\Resources\Materials\BasicMaterial.h" />
     <ClInclude Include="src\DX12Engine\Rendering\GPUUploader.h" />
     <ClInclude Include="src\DX12Engine\Queues\CommandQueueManager.h" />
     <ClInclude Include="src\DX12Engine\Buffers\ConstantBuffer.h" />
@@ -188,7 +204,8 @@
     <ClInclude Include="src\DX12Engine\Resources\GPUResource.h" />
     <ClInclude Include="src\DX12Engine\Buffers\IndexBuffer.h" />
     <ClInclude Include="src\DX12Engine\Buffers\LightBuffer.h" />
-    <ClInclude Include="src\DX12Engine\Resources\Material.h" />
+    <ClInclude Include="src\DX12Engine\Resources\Materials\Material.h" />
+    <ClInclude Include="src\DX12Engine\Resources\Materials\MaterialData.h" />
     <ClInclude Include="src\DX12Engine\Resources\Mesh.h" />
     <ClInclude Include="src\DX12Engine\IO\ModelLoader.h" />
     <ClInclude Include="src\DX12Engine\Rendering\RenderContext.h" />
