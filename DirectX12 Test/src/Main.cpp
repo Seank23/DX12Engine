@@ -21,7 +21,7 @@ int main()
 
 	DX12Engine::ModelLoader modelLoader;
 	DX12Engine::Mesh mesh = modelLoader.LoadObj("E:\\Projects\\source\\repos\\DirectX12 Test\\cube2.obj");
-	DX12Engine::Mesh mesh2 = modelLoader.LoadObj("E:\\Projects\\source\\repos\\DirectX12 Test\\sphere.obj");
+	DX12Engine::Mesh mesh2 = modelLoader.LoadObj("E:\\Projects\\source\\repos\\DirectX12 Test\\cylinder.obj");
 
 	DX12Engine::TextureLoader textureLoader;
 	std::shared_ptr<DX12Engine::Texture> textureMC = textureLoader.LoadWIC(L"E:\\Projects\\source\\repos\\DirectX12 Test\\minecraft_block_uv.png");
@@ -40,7 +40,8 @@ int main()
 	uploader.UploadTextureBatch(textures);
 
 	std::shared_ptr<DX12Engine::BasicMaterial> basicMaterial = std::make_shared<DX12Engine::BasicMaterial>();
-	basicMaterial->SetTexture(textureMC);
+	basicMaterial->SetTexture(stoneAlbedo);
+
 
 	std::shared_ptr<DX12Engine::PBRMaterial> pbrMaterial = std::make_shared<DX12Engine::PBRMaterial>();
 	pbrMaterial->SetAlbedoMap(stoneAlbedo);
@@ -50,9 +51,9 @@ int main()
 	pbrMaterial->SetAOMap(stoneAO);
 
 	DX12Engine::RenderObject cube1(mesh);
-	DX12Engine::RenderObject cube2(mesh2);
+	DX12Engine::RenderObject cube2(mesh);
 	cube1.SetMaterial(pbrMaterial);
-	cube2.SetMaterial(pbrMaterial);
+	cube2.SetMaterial(basicMaterial);
 	cube1.SetModelMatrix(DirectX::XMMatrixTranslation(-1.5f, 0.0f, 0.0f));
 	cube2.SetModelMatrix(DirectX::XMMatrixTranslation(1.5f, 0.0f, 0.0f));
 	float count = 0.0f;
@@ -61,7 +62,7 @@ int main()
 	DX12Engine::Light pointLight;
 	pointLight.Type = (int)DX12Engine::LightType::Point;
 	pointLight.Position = { 0.0f, 2.0f, 0.0f };
-	pointLight.Intensity = 10.0f;
+	pointLight.Intensity = 8.0f;
 	pointLight.Range = 10.0f;
 	pointLight.Color = { 1.0f, 1.0f, 1.0f };
 	lightBuffer.AddLight(pointLight);
@@ -71,14 +72,14 @@ int main()
 	spotLight1.Intensity = 1.0f;
 	spotLight1.Color = { 0.0f, 0.0f, 1.0f };
 	spotLight1.SpotAngle = cos(DirectX::XMConvertToRadians(-60.0f));
-	//lightBuffer.AddLight(spotLight1);
+	lightBuffer.AddLight(spotLight1);
 	DX12Engine::Light spotLight2;
 	spotLight2.Type = (int)DX12Engine::LightType::Spot;
 	spotLight2.Position = { 2.0f, 2.5f, -2.0f };
 	spotLight2.Intensity = 1.0f;
 	spotLight2.Color = { 1.0f, 0.0f, 0.0f };
 	spotLight2.SpotAngle = cos(DirectX::XMConvertToRadians(60.0f));
-	//lightBuffer.AddLight(spotLight2);
+	lightBuffer.AddLight(spotLight2);
 	renderer.SetLightBuffer(&lightBuffer);
 
 	while (renderer.PollWindow())

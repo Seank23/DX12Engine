@@ -17,7 +17,7 @@ namespace DX12Engine
                 .AddConstantBuffer(1)
 				.AddConstantBuffer(2)
                 .AddDescriptorTable(numTextures, D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 0)
-                .AddSampler(0, D3D12_FILTER_MIN_MAG_MIP_LINEAR);
+                .AddSampler(0, D3D12_FILTER_ANISOTROPIC);
 		}
 
         RootSignatureBuilder& AddDescriptorTable(UINT numDescriptors, D3D12_DESCRIPTOR_RANGE_TYPE type, UINT baseShaderRegister, UINT space = 0) 
@@ -58,6 +58,7 @@ namespace DX12Engine
         {
             D3D12_STATIC_SAMPLER_DESC staticSamplerDesc = {};
             staticSamplerDesc.Filter = filter;
+            staticSamplerDesc.MaxAnisotropy = 16;
             staticSamplerDesc.AddressU = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
             staticSamplerDesc.AddressV = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
             staticSamplerDesc.AddressW = D3D12_TEXTURE_ADDRESS_MODE_WRAP;

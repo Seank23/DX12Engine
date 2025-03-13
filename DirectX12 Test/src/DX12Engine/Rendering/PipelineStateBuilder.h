@@ -12,7 +12,8 @@ namespace DX12Engine
             ZeroMemory(&psoDesc, sizeof(D3D12_GRAPHICS_PIPELINE_STATE_DESC));
             inputElementDescs[0] = { "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 };
             inputElementDescs[1] = { "NORMAL", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 12, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 };
-            inputElementDescs[2] = { "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, 24, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 };
+            inputElementDescs[3] = { "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, 24, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 };
+            inputElementDescs[3] = { "TANGENT", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 36, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 };
         }
 
         PipelineStateBuilder& ConfigureFromDefault()
@@ -68,7 +69,7 @@ namespace DX12Engine
             return *this;
         }
 
-        PipelineStateBuilder& AddInputLayout(D3D12_INPUT_ELEMENT_DESC* inputLayout = nullptr, UINT count = 3)
+        PipelineStateBuilder& AddInputLayout(D3D12_INPUT_ELEMENT_DESC* inputLayout = nullptr, UINT count = 4)
         {
             if (inputLayout == nullptr)
                 psoDesc.InputLayout = { inputElementDescs, count};
@@ -100,10 +101,11 @@ namespace DX12Engine
 
     private:
         D3D12_GRAPHICS_PIPELINE_STATE_DESC psoDesc;
-        D3D12_INPUT_ELEMENT_DESC inputElementDescs[3] = {
+        D3D12_INPUT_ELEMENT_DESC inputElementDescs[4] = {
             { "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
             { "NORMAL", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 12, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
             { "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, 24, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+            { "TANGENT", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 36, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
         };
     };
 

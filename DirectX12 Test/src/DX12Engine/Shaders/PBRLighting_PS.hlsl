@@ -5,6 +5,8 @@ struct PSInput
     float3 worldPos : POSITION1;
     float3 normal : NORMAL;
     float2 texCoord : TEXCOORD;
+    float3 tangent : TANGENT;
+    float3 bitangent : BITANGENT;
 };
 
 struct Light
@@ -62,7 +64,7 @@ float GeometrySchlickGGX(float NdotV, float NdotL, float roughness)
     return (NdotV / (NdotV * (1.0 - k) + k)) * (NdotL / (NdotL * (1.0 - k) + k));
 }
 
-float3 PBRLighting(float3 albedo, float metallic, float roughness, float3 N, float3 V, float3 L, float3 lightColor)
+float3 PBRLighting(float3 albedo, float metallic, float roughness, float3 N, float3 V, float3 L, Light light)
 {
     float3 H = normalize(V + L);
     float NdotV = max(dot(N, V), 0.0);
@@ -79,10 +81,10 @@ float3 PBRLighting(float3 albedo, float metallic, float roughness, float3 N, flo
     float denominator = 4.0 * NdotV * NdotL + 0.001;
     float3 specular = numerator / denominator;
     
-    float3 radiance = lightColor * NdotL;
+    float3 radiance = light.Color * NdotL * light.Intensity;
     float3 kD = (1.0 - F) * (1.0 - metallic);
     
-    float3 color = kD * albedo / 3.14159 + specular;
+    float3 color = (kD * albedo / 3.14159) + specular;
     return color * radiance;
 }
 
@@ -93,7 +95,11 @@ float4 main(PSInput input) : SV_TARGET
     float3 albedo = albedoMap.Sample(samp, input.texCoord).rgb;
     float metallic = metallicMap.Sample(samp, input.texCoord).r;
     float roughness = roughnessMap.Sample(samp, input.texCoord).r;
-    float3 N = normalMap.Sample(samp, input.texCoord).rgb;
+    //float3 textureNormal = normalMap.Sample(samp, input.texCoord).rgb * 2.0 - 1.0;
+    float noise = frac(sin(dot(input.texCoord, float2(12.9898, 78.233))) * 43758.5453);
+    float3 textureNormal = normalMap.Sample(samp, input.texCoord + noise * 0.001).rgb * 2.0 - 1.0;
+    float3x3 TBN = float3x3(normalize(input.tangent), normalize(input.bitangent), normalize(input.normal));
+    float3 worldNormal = normalize(mul(textureNormal, TBN));
     
     float3 finalColor = float3(0, 0, 0);
     
@@ -101,7 +107,7 @@ float4 main(PSInput input) : SV_TARGET
     {
         float3 L = normalize(Lights[i].Position - input.worldPos);
         float3 lightColor = Lights[i].Color;
-        finalColor += PBRLighting(albedo, metallic, roughness, N, V, L, lightColor);
+        finalColor += PBRLighting(albedo, metallic, roughness, worldNormal, V, L, Lights[i]);
     }
 
     return float4(finalColor, 1.0);

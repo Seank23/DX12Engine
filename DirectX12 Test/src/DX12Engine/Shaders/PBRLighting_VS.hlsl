@@ -10,6 +10,7 @@ struct VSInput
     float3 position : POSITION;
     float3 normal : NORMAL;
     float2 texCoord : TEXCOORD;
+    float3 tangent : TANGENT;
 };
 
 struct PSInput
@@ -19,6 +20,8 @@ struct PSInput
     float3 worldPos : POSITION1;
     float3 normal : NORMAL;
     float2 texCoord : TEXCOORD;
+    float3 tangent : TANGENT;
+    float3 bitangent : BITANGENT;
 };
 
 PSInput main(VSInput input)
@@ -29,6 +32,9 @@ PSInput main(VSInput input)
     output.worldPos = worldPos.xyz;
     output.position = mul(WVPMatrix, float4(input.position, 1.0f));
     output.normal = input.normal;
+    float4 tangent = normalize(mul(ModelMatrix, float4(input.tangent, 1.0)));
+    output.tangent = tangent.xyz;
+    output.bitangent = cross(output.tangent, output.normal);
     output.texCoord = input.texCoord;
     return output;
 }
