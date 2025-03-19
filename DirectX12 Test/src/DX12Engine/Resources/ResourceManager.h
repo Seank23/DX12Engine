@@ -3,6 +3,7 @@
 #include <d3d12.h>
 #include <dxgi1_4.h>
 #include <wrl.h>
+#define NOMINMAX
 #include <windows.h>
 #include <DirectXMath.h>
 #include <d3dcompiler.h>
@@ -19,6 +20,7 @@
 #include "../Rendering/GPUUploader.h"
 #include "../Rendering/PipelineStateCache.h"
 #include "../Rendering/RootSignatureCache.h"
+#include "../IO/TextureLoader.h"
 
 namespace DX12Engine
 {

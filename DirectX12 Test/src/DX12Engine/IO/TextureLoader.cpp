@@ -2,6 +2,7 @@
 #include "DirectXTex.h"
 #include "../Utils/EngineUtils.h"
 #include "../Resources/ResourceManager.h"
+#include <iostream>
 
 namespace DX12Engine
 {
@@ -13,10 +14,10 @@ namespace DX12Engine
 	{
 	}
 
-	std::unique_ptr<Texture> TextureLoader::LoadDDS(const std::string& filename)
+	std::unique_ptr<Texture> TextureLoader::LoadDDS(const std::wstring& filename)
 	{
 		DirectX::ScratchImage* imageData = new DirectX::ScratchImage();
-		EngineUtils::ThrowIfFailed(DirectX::LoadFromDDSFile((wchar_t*)filename.c_str(), DirectX::DDS_FLAGS_NONE, nullptr, *imageData));
+		EngineUtils::ThrowIfFailed(DirectX::LoadFromDDSFile(filename.c_str(), DirectX::DDS_FLAGS_NONE, nullptr, *imageData));
 		return ResourceManager::GetInstance().CreateTexture(imageData);
 	}
 

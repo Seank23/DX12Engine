@@ -19,13 +19,12 @@ namespace DX12Engine
 		bool PollWindow();
 		void UpdateCameraPosition(float x, float y, float z);
 		void SetLightBuffer(LightBuffer* lightBuffer) { m_LightBuffer = lightBuffer; }
+		DirectX::XMFLOAT3 GetCameraPosition() { return m_CameraPosition; }
 
 		D3D12_VIEWPORT GetDefaultViewport();
 		D3D12_RECT GetDefaultScissorRect();
 
 	private:
-		void UpdateMVPMatrix(RenderObject* renderObject);
-
 		std::shared_ptr<RenderContext> m_RenderContext;
 		CommandQueueManager& m_QueueManager;
 		ID3D12GraphicsCommandList* m_CommandList;

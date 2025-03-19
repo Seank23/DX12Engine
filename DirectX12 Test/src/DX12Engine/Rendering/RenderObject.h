@@ -11,15 +11,11 @@ namespace DX12Engine
 	struct RenderObjectData
 	{
 		DirectX::XMMATRIX ModelMatrix;
-		DirectX::XMMATRIX WVPMatrix;
+		DirectX::XMMATRIX ViewMatrix;
+		DirectX::XMMATRIX ProjectionMatrix;
+		DirectX::XMMATRIX MVPMatrix;
 		DirectX::XMFLOAT3 CameraPosition;
 		float Padding;
-
-		void Reset()
-		{
-			ModelMatrix = DirectX::XMMatrixIdentity();
-			WVPMatrix = DirectX::XMMatrixIdentity();
-		}
 	};
 
 	class RenderObject
@@ -27,16 +23,18 @@ namespace DX12Engine
 	public:
 		friend class Renderer;
 
+		RenderObject() = default;
 		RenderObject(Mesh mesh);
 		~RenderObject();
 
+		void SetMesh(Mesh mesh);
 		void SetModelMatrix(DirectX::XMMATRIX modelMatrix) { m_ModelMatrix = modelMatrix; }	
 		void SetMaterial(std::shared_ptr<Material> material) { m_Material = material; }
 
 		D3D12_GPU_VIRTUAL_ADDRESS GetCBVAddress() { return m_ConstantBuffer->GetGPUAddress(); }
 
 	private:
-		void UpdateConstantBufferData(DirectX::XMMATRIX wvpMatrix, DirectX::XMFLOAT3 cameraPosition);
+		void UpdateConstantBufferData(DirectX::XMMATRIX viewMatrix, DirectX::XMMATRIX projectionMatrix, DirectX::XMFLOAT3 cameraPosition);
 
 		Mesh m_Mesh;
 		std::unique_ptr<VertexBuffer> m_VertexBuffer;

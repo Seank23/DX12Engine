@@ -5,14 +5,16 @@
 
 namespace DX12Engine
 {
-    struct Vertex {
+    struct Vertex 
+    {
         DirectX::XMFLOAT3 Position;
         DirectX::XMFLOAT3 Normal;
         DirectX::XMFLOAT2 TexCoord;
         DirectX::XMFLOAT3 Tangent;
     };
 
-    struct Mesh {
+    struct Mesh 
+    {
         std::vector<Vertex> Vertices;
         std::vector<UINT> Indices;
 

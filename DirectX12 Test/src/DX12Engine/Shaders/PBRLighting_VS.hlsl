@@ -1,7 +1,9 @@
 cbuffer ConstantBuffer : register(b1)
 {
     float4x4 ModelMatrix;
-    float4x4 WVPMatrix;
+    float4x4 ViewMatrix;
+    float4x4 ProjectionMatrix;
+    float4x4 MVPMatrix;
     float3 CameraPosition;
 };
 
@@ -30,10 +32,10 @@ PSInput main(VSInput input)
     output.cameraPos = CameraPosition;
     float4 worldPos = mul(ModelMatrix, float4(input.position, 1.0f));
     output.worldPos = worldPos.xyz;
-    output.position = mul(WVPMatrix, float4(input.position, 1.0f));
+    output.position = mul(MVPMatrix, float4(input.position, 1.0f));
     output.normal = input.normal;
     float4 tangent = normalize(mul(ModelMatrix, float4(input.tangent, 1.0)));
-    output.tangent = tangent.xyz;
+    output.tangent = tangent.xyz / tangent.w;
     output.bitangent = cross(output.tangent, output.normal);
     output.texCoord = input.texCoord;
     return output;

@@ -16,7 +16,7 @@ namespace DX12Engine
 		m_ProjectionMatrix = DirectX::XMMatrixPerspectiveFovLH(
 			DirectX::XM_PIDIV4,           // Field of view (radians)
 			windowSize.x / windowSize.y, // Aspect ratio (width / height)
-			0.1f,                // Near plane
+			0.001f,                // Near plane
 			100.0f               // Far plane
 		);
 
@@ -55,7 +55,7 @@ namespace DX12Engine
 	void Renderer::Render(RenderObject* renderObject)
 	{
 		// Object binding
-		UpdateMVPMatrix(renderObject);
+		renderObject->UpdateConstantBufferData(m_ViewMatrix, m_ProjectionMatrix, m_CameraPosition);
 		m_CommandList->SetGraphicsRootSignature(renderObject->m_Material->GetRootSignature().Get());
 		m_CommandList->SetGraphicsRootConstantBufferView(0, m_LightBuffer->GetCBVAddress());
 		m_CommandList->SetGraphicsRootConstantBufferView(1, renderObject->GetCBVAddress());
@@ -121,10 +121,5 @@ namespace DX12Engine
 		scissorRect.right = static_cast<LONG>(windowSize.x);
 		scissorRect.bottom = static_cast<LONG>(windowSize.y);
 		return scissorRect;
-	}
-
-	void Renderer::UpdateMVPMatrix(RenderObject* renderObject)
-	{
-		renderObject->UpdateConstantBufferData(renderObject->m_ModelMatrix * m_ViewMatrix * m_ProjectionMatrix, m_CameraPosition);
 	}
 }

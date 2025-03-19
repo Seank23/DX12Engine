@@ -9,9 +9,11 @@
 #include "DX12Engine/Rendering/GPUUploader.h"
 #include "DX12Engine/Resources/Materials/BasicMaterial.h"
 #include "DX12Engine/Resources/Materials/PBRMaterial.h"
+#include "DX12Engine/Resources/Materials/SkyboxMaterial.h"
 #include "DX12Engine/Rendering/PipelineStateBuilder.h"
 #include "DX12Engine/Rendering/RootSignatureBuilder.h"
 #include "DX12Engine/Buffers/LightBuffer.h"
+#include "DX12Engine/Resources/Skybox.h"
 
 int main() 
 {
@@ -26,9 +28,10 @@ int main()
 	DX12Engine::TextureLoader textureLoader;
 	std::shared_ptr<DX12Engine::Texture> textureMC = textureLoader.LoadWIC(L"E:\\Projects\\source\\repos\\DirectX12 Test\\minecraft_block_uv.png");
 	std::shared_ptr<DX12Engine::Texture> textureWall = textureLoader.LoadWIC(L"E:\\Projects\\source\\repos\\DirectX12 Test\\TCom_Wall_Stone3_2x2_512_albedo.tiff");
-
+	std::shared_ptr<DX12Engine::Texture> skyboxDDS = textureLoader.LoadDDS(L"E:\\Projects\\source\\repos\\DirectX12 Test\\DirectX12 Test\\res\\skybox\\kloofendal_48d_partly_cloudy_puresky_4k.dds");
+	
 	DX12Engine::GPUUploader uploader = context->GetUploader();
-	std::vector<DX12Engine::Texture*> textures = { textureMC.get(), textureWall.get() };
+	std::vector<DX12Engine::Texture*> textures = { textureMC.get(), textureWall.get(), skyboxDDS.get() };
 	uploader.UploadTextureBatch(textures);
 
 	std::shared_ptr<DX12Engine::Texture> stoneAlbedo = textureLoader.LoadWIC(L"E:\\Projects\\source\\repos\\DirectX12 Test\\DirectX12 Test\\res\\dark-worn-stone-ue\\dark-worn-stonework_albedo.png");
@@ -39,47 +42,63 @@ int main()
 	textures = { stoneAlbedo.get(), stoneNormal.get(), stoneMetallic.get(), stoneRoughness.get(), stoneAO.get() };
 	uploader.UploadTextureBatch(textures);
 
+	std::shared_ptr<DX12Engine::Texture> goldAlbedo = textureLoader.LoadWIC(L"E:\\Projects\\source\\repos\\DirectX12 Test\\DirectX12 Test\\res\\hammered-gold-ue\\hammered-gold_albedo.png");
+	std::shared_ptr<DX12Engine::Texture> goldNormal = textureLoader.LoadWIC(L"E:\\Projects\\source\\repos\\DirectX12 Test\\DirectX12 Test\\res\\hammered-gold-ue\\hammered-gold_normal-dx.png");
+	std::shared_ptr<DX12Engine::Texture> goldMetallic = textureLoader.LoadWIC(L"E:\\Projects\\source\\repos\\DirectX12 Test\\DirectX12 Test\\res\\hammered-gold-ue\\hammered-gold_metallic.png");
+	std::shared_ptr<DX12Engine::Texture> goldRoughness = textureLoader.LoadWIC(L"E:\\Projects\\source\\repos\\DirectX12 Test\\DirectX12 Test\\res\\hammered-gold-ue\\hammered-gold_roughness.png");
+	std::shared_ptr<DX12Engine::Texture> goldAO = textureLoader.LoadWIC(L"E:\\Projects\\source\\repos\\DirectX12 Test\\DirectX12 Test\\res\\hammered-gold-ue\\hammered-gold_ao.png");
+	textures = { goldAlbedo.get(), goldNormal.get(), goldMetallic.get(), goldRoughness.get(), goldAO.get() };
+	uploader.UploadTextureBatch(textures);
+
+	DX12Engine::Skybox skybox(skyboxDDS);
+
 	std::shared_ptr<DX12Engine::BasicMaterial> basicMaterial = std::make_shared<DX12Engine::BasicMaterial>();
-	basicMaterial->SetTexture(stoneAlbedo);
+	basicMaterial->SetTexture(goldAlbedo);
 
+	std::shared_ptr<DX12Engine::PBRMaterial> pbrStone = std::make_shared<DX12Engine::PBRMaterial>();
+	pbrStone->SetAlbedoMap(stoneAlbedo);
+	pbrStone->SetNormalMap(stoneNormal);
+	pbrStone->SetMetallicMap(stoneMetallic);
+	pbrStone->SetRoughnessMap(stoneRoughness);
+	pbrStone->SetAOMap(stoneAO);
 
-	std::shared_ptr<DX12Engine::PBRMaterial> pbrMaterial = std::make_shared<DX12Engine::PBRMaterial>();
-	pbrMaterial->SetAlbedoMap(stoneAlbedo);
-	pbrMaterial->SetNormalMap(stoneNormal);
-	pbrMaterial->SetMetallicMap(stoneMetallic);
-	pbrMaterial->SetRoughnessMap(stoneRoughness);
-	pbrMaterial->SetAOMap(stoneAO);
+	std::shared_ptr<DX12Engine::PBRMaterial> pbrGold = std::make_shared<DX12Engine::PBRMaterial>();
+	pbrGold->SetAlbedoMap(goldAlbedo);
+	pbrGold->SetNormalMap(goldNormal);
+	pbrGold->SetMetallicMap(goldMetallic);
+	pbrGold->SetRoughnessMap(goldRoughness);
+	pbrGold->SetAOMap(goldAO);
 
-	DX12Engine::RenderObject cube1(mesh);
-	DX12Engine::RenderObject cube2(mesh);
-	cube1.SetMaterial(pbrMaterial);
-	cube2.SetMaterial(basicMaterial);
-	cube1.SetModelMatrix(DirectX::XMMatrixTranslation(-1.5f, 0.0f, 0.0f));
-	cube2.SetModelMatrix(DirectX::XMMatrixTranslation(1.5f, 0.0f, 0.0f));
+	DX12Engine::RenderObject object1(mesh);
+	DX12Engine::RenderObject object2(mesh2);
+	object1.SetMaterial(pbrStone);
+	object2.SetMaterial(pbrGold);
+	object1.SetModelMatrix(DirectX::XMMatrixTranslation(-1.5f, 0.0f, 0.0f));
+	object2.SetModelMatrix(DirectX::XMMatrixTranslation(1.5f, 0.0f, 0.0f));
 	float count = 0.0f;
 
 	DX12Engine::LightBuffer lightBuffer;
 	DX12Engine::Light pointLight;
 	pointLight.Type = (int)DX12Engine::LightType::Point;
 	pointLight.Position = { 0.0f, 2.0f, 0.0f };
-	pointLight.Intensity = 8.0f;
+	pointLight.Intensity = 10.0f;
 	pointLight.Range = 10.0f;
 	pointLight.Color = { 1.0f, 1.0f, 1.0f };
 	lightBuffer.AddLight(pointLight);
 	DX12Engine::Light spotLight1;
 	spotLight1.Type = (int)DX12Engine::LightType::Spot;
 	spotLight1.Position = { -2.0f, 2.5f, 2.0f };
-	spotLight1.Intensity = 1.0f;
+	spotLight1.Intensity = 10.0f;
 	spotLight1.Color = { 0.0f, 0.0f, 1.0f };
 	spotLight1.SpotAngle = cos(DirectX::XMConvertToRadians(-60.0f));
-	lightBuffer.AddLight(spotLight1);
+	//lightBuffer.AddLight(spotLight1);
 	DX12Engine::Light spotLight2;
 	spotLight2.Type = (int)DX12Engine::LightType::Spot;
 	spotLight2.Position = { 2.0f, 2.5f, -2.0f };
-	spotLight2.Intensity = 1.0f;
+	spotLight2.Intensity = 10.0f;
 	spotLight2.Color = { 1.0f, 0.0f, 0.0f };
 	spotLight2.SpotAngle = cos(DirectX::XMConvertToRadians(60.0f));
-	lightBuffer.AddLight(spotLight2);
+	//lightBuffer.AddLight(spotLight2);
 	renderer.SetLightBuffer(&lightBuffer);
 
 	while (renderer.PollWindow())
@@ -92,8 +111,9 @@ int main()
 		lightBuffer.Update();
 		//cube1.SetModelMatrix(DirectX::XMMatrixTranslation(-2.0f * DirectX::XMScalarSin(count), 0.0f, 0.0f));
 		//cube2.SetModelMatrix(DirectX::XMMatrixTranslation(2.0f * DirectX::XMScalarSin(count), -0.5f, -0.5f));
-		renderer.Render(&cube1);
-		renderer.Render(&cube2);
+		renderer.Render(&skybox);
+		renderer.Render(&object1);
+		renderer.Render(&object2);
 		renderer.PresentFrame();
 		count += 0.01f;
 	}

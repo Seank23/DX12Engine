@@ -64,7 +64,7 @@ float GeometrySchlickGGX(float NdotV, float NdotL, float roughness)
     return (NdotV / (NdotV * (1.0 - k) + k)) * (NdotL / (NdotL * (1.0 - k) + k));
 }
 
-float3 PBRLighting(float3 albedo, float metallic, float roughness, float3 N, float3 V, float3 L, Light light)
+float3 PBRLighting(float3 albedo, float metallic, float roughness, float ao, float3 N, float3 V, float3 L, Light light)
 {
     float3 H = normalize(V + L);
     float NdotV = max(dot(N, V), 0.0);
@@ -84,7 +84,7 @@ float3 PBRLighting(float3 albedo, float metallic, float roughness, float3 N, flo
     float3 radiance = light.Color * NdotL * light.Intensity;
     float3 kD = (1.0 - F) * (1.0 - metallic);
     
-    float3 color = (kD * albedo / 3.14159) + specular;
+    float3 color = (kD * albedo * ao / 3.14159) + specular;
     return color * radiance;
 }
 
@@ -95,9 +95,8 @@ float4 main(PSInput input) : SV_TARGET
     float3 albedo = albedoMap.Sample(samp, input.texCoord).rgb;
     float metallic = metallicMap.Sample(samp, input.texCoord).r;
     float roughness = roughnessMap.Sample(samp, input.texCoord).r;
-    //float3 textureNormal = normalMap.Sample(samp, input.texCoord).rgb * 2.0 - 1.0;
-    float noise = frac(sin(dot(input.texCoord, float2(12.9898, 78.233))) * 43758.5453);
-    float3 textureNormal = normalMap.Sample(samp, input.texCoord + noise * 0.001).rgb * 2.0 - 1.0;
+    float ao = aoMap.Sample(samp, input.texCoord).r;
+    float3 textureNormal = normalMap.Sample(samp, input.texCoord).rgb * 2.0 - 1.0;
     float3x3 TBN = float3x3(normalize(input.tangent), normalize(input.bitangent), normalize(input.normal));
     float3 worldNormal = normalize(mul(textureNormal, TBN));
     
@@ -105,9 +104,26 @@ float4 main(PSInput input) : SV_TARGET
     
     for (int i = 0; i < LightCount; i++)
     {
-        float3 L = normalize(Lights[i].Position - input.worldPos);
-        float3 lightColor = Lights[i].Color;
-        finalColor += PBRLighting(albedo, metallic, roughness, worldNormal, V, L, Lights[i]);
+        float3 lightDir = normalize(Lights[i].Position - input.worldPos);
+        if (Lights[i].Type == 0) // Directional Light
+        {
+            finalColor += PBRLighting(albedo, metallic, roughness, ao, worldNormal, V, -Lights[i].Direction, Lights[i]);
+        }
+        else if (Lights[i].Type == 1) // Point Light
+        {
+            float dist = length(Lights[i].Position - input.worldPos);
+            float attenuation = saturate(1.0 - (dist * dist) / (Lights[i].Range * Lights[i].Range));
+            finalColor += PBRLighting(albedo, metallic, roughness, ao, worldNormal, V, lightDir, Lights[i]) * attenuation;
+        }
+        else if (Lights[i].Type == 2) // Spot Light
+        {
+            float theta = dot(lightDir, normalize(-Lights[i].Direction));
+            float epsilon = Lights[i].SpotAngle - Lights[i].SpotAngle * 0.9;
+            float intensity = saturate((theta - Lights[i].SpotAngle * 0.9) / epsilon);
+            float dist = length(Lights[i].Position - input.worldPos);
+            float attenuation = saturate(1.0 - (dist * dist) / (Lights[i].Range * Lights[i].Range));
+            finalColor += PBRLighting(albedo, metallic, roughness, ao, worldNormal, V, lightDir, Lights[i]) * intensity * attenuation;
+        }
     }
 
     return float4(finalColor, 1.0);
