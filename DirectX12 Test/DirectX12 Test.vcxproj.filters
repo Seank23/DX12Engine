@@ -93,12 +93,26 @@
     <ClCompile Include="src\DX12Engine\Resources\Materials\PBRMaterial.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="src\DX12Engine\Resources\Skybox.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="src\DX12Engine\Resources\Materials\SkyboxMaterial.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="src\DX12Engine\Input\Camera.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="src\ClientApplication.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <FxCompile Include="src\DX12Engine\Shaders\BasicLighting_VS.hlsl" />
     <FxCompile Include="src\DX12Engine\Shaders\BasicLighting_PS.hlsl" />
     <FxCompile Include="src\DX12Engine\Shaders\PBRLighting_VS.hlsl" />
     <FxCompile Include="src\DX12Engine\Shaders\PBRLighting_PS.hlsl" />
+    <FxCompile Include="src\DX12Engine\Shaders\Skybox_VS.hlsl" />
+    <FxCompile Include="src\DX12Engine\Shaders\Skybox_PS.hlsl" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\DX12Engine\Rendering\RenderWindow.h">
@@ -198,6 +212,21 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="src\DX12Engine\Resources\Materials\PBRMaterial.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\DX12Engine\Resources\Skybox.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\DX12Engine\Resources\Materials\SkyboxMaterial.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\DX12Engine\Input\Camera.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\DX12Engine\Application.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\ClientApplication.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

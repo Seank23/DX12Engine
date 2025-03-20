@@ -4,6 +4,7 @@
 #include "../Resources/Texture.h"
 #include "../Heaps/RenderPassDescriptorHeap.h"
 #include "../Buffers/LightBuffer.h"
+#include "../Input/Camera.h"
 
 namespace DX12Engine
 {
@@ -17,9 +18,9 @@ namespace DX12Engine
 		void Render(RenderObject* renderObject);
 		void PresentFrame();
 		bool PollWindow();
-		void UpdateCameraPosition(float x, float y, float z);
+
 		void SetLightBuffer(LightBuffer* lightBuffer) { m_LightBuffer = lightBuffer; }
-		DirectX::XMFLOAT3 GetCameraPosition() { return m_CameraPosition; }
+		void SetCamera(Camera* camera) { m_Camera = camera; }
 
 		D3D12_VIEWPORT GetDefaultViewport();
 		D3D12_RECT GetDefaultScissorRect();
@@ -29,13 +30,10 @@ namespace DX12Engine
 		CommandQueueManager& m_QueueManager;
 		ID3D12GraphicsCommandList* m_CommandList;
 
-		DirectX::XMMATRIX m_ViewMatrix;
-		DirectX::XMMATRIX m_ProjectionMatrix;
-
-		DirectX::XMFLOAT3 m_CameraPosition;
-
 		RenderPassDescriptorHeap& m_RenderHeap;
 		LightBuffer* m_LightBuffer;
+
+		Camera* m_Camera;
 	};
 }
 

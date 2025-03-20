@@ -6,6 +6,7 @@
 #include <DirectXMath.h>
 #include <d3dcompiler.h>
 #include "d3dx12.h"
+#include "../Application.h"
 
 namespace DX12Engine
 {
@@ -15,7 +16,7 @@ namespace DX12Engine
 		RenderWindow();
 		~RenderWindow();
 
-		HWND Init(DirectX::XMFLOAT2 windowSize);
+		HWND Init(Application* app, DirectX::XMFLOAT2 windowSize);
 		void CreateSwapChain(ID3D12CommandQueue* commandQueue);
 		void CreateRTVHeap(ID3D12Device* device);
 		void CreateDepthStencilBuffer(ID3D12Device* device);

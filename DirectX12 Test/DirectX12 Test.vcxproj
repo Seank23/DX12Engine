@@ -135,6 +135,10 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="src\ClientApplication.cpp" />
+    <ClCompile Include="src\DX12Engine\Input\Camera.cpp" />
+    <ClCompile Include="src\DX12Engine\Resources\Materials\SkyboxMaterial.cpp" />
+    <ClCompile Include="src\DX12Engine\Resources\Skybox.cpp" />
     <ClCompile Include="src\DX12Engine\Resources\Materials\PBRMaterial.cpp" />
     <ClCompile Include="src\DX12Engine\Resources\Materials\BasicMaterial.cpp" />
     <ClCompile Include="src\DX12Engine\Buffers\LightBuffer.cpp" />
@@ -187,8 +191,25 @@
       <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">Vertex</ShaderType>
       <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Vertex</ShaderType>
     </FxCompile>
+    <FxCompile Include="src\DX12Engine\Shaders\Skybox_PS.hlsl">
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Pixel</ShaderType>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Pixel</ShaderType>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">Pixel</ShaderType>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Pixel</ShaderType>
+    </FxCompile>
+    <FxCompile Include="src\DX12Engine\Shaders\Skybox_VS.hlsl">
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Vertex</ShaderType>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Vertex</ShaderType>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">Vertex</ShaderType>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Vertex</ShaderType>
+    </FxCompile>
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="src\ClientApplication.h" />
+    <ClInclude Include="src\DX12Engine\Application.h" />
+    <ClInclude Include="src\DX12Engine\Input\Camera.h" />
+    <ClInclude Include="src\DX12Engine\Resources\Materials\SkyboxMaterial.h" />
+    <ClInclude Include="src\DX12Engine\Resources\Skybox.h" />
     <ClInclude Include="src\DX12Engine\Resources\Materials\PBRMaterial.h" />
     <ClInclude Include="src\DX12Engine\Resources\Materials\BasicMaterial.h" />
     <ClInclude Include="src\DX12Engine\Rendering\GPUUploader.h" />

@@ -5,21 +5,8 @@
 namespace DX12Engine
 {
 	Renderer::Renderer(std::shared_ptr<RenderContext> context)
-		: m_CameraPosition({ 0.0f, 0.0f, -4.0f }), m_RenderContext(context), m_RenderHeap(context->GetHeapManager().GetRenderPassHeap()), m_QueueManager(context->GetQueueManager())
+		: m_RenderContext(context), m_RenderHeap(context->GetHeapManager().GetRenderPassHeap()), m_QueueManager(context->GetQueueManager())
 	{
-		m_ViewMatrix = DirectX::XMMatrixLookAtLH(
-			DirectX::XMVectorSet(m_CameraPosition.x, m_CameraPosition.y, m_CameraPosition.z, 1.0f), // Camera position
-			DirectX::XMVectorSet(0.0f, 0.0f, 0.0f, 1.0f),  // Look-at target
-			DirectX::XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f)   // Up direction
-		);
-		DirectX::XMFLOAT2 windowSize = context->GetWindowSize();
-		m_ProjectionMatrix = DirectX::XMMatrixPerspectiveFovLH(
-			DirectX::XM_PIDIV4,           // Field of view (radians)
-			windowSize.x / windowSize.y, // Aspect ratio (width / height)
-			0.001f,                // Near plane
-			100.0f               // Far plane
-		);
-
 		m_CommandList = m_QueueManager.GetGraphicsQueue().GetCommandList();
 	}
 
@@ -55,7 +42,7 @@ namespace DX12Engine
 	void Renderer::Render(RenderObject* renderObject)
 	{
 		// Object binding
-		renderObject->UpdateConstantBufferData(m_ViewMatrix, m_ProjectionMatrix, m_CameraPosition);
+		renderObject->UpdateConstantBufferData(m_Camera->GetViewMatrix(), m_Camera->GetProjectionMatrix(), m_Camera->GetPosition());
 		m_CommandList->SetGraphicsRootSignature(renderObject->m_Material->GetRootSignature().Get());
 		m_CommandList->SetGraphicsRootConstantBufferView(0, m_LightBuffer->GetCBVAddress());
 		m_CommandList->SetGraphicsRootConstantBufferView(1, renderObject->GetCBVAddress());
@@ -85,18 +72,6 @@ namespace DX12Engine
 	bool Renderer::PollWindow()
 	{
 		return m_RenderContext->ProcessWindowMessages();
-	}
-
-	void Renderer::UpdateCameraPosition(float x, float y, float z)
-	{
-		m_CameraPosition.x += x;
-		m_CameraPosition.y += y;
-		m_CameraPosition.z += z;
-		m_ViewMatrix = DirectX::XMMatrixLookAtLH(
-			DirectX::XMVectorSet(m_CameraPosition.x, m_CameraPosition.y, m_CameraPosition.z, 1.0f), // Camera position
-			DirectX::XMVectorSet(0.0f, 0.0f, 0.0f, 1.0f),  // Look-at target
-			DirectX::XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f)   // Up direction
-		);
 	}
 
 	D3D12_VIEWPORT Renderer::GetDefaultViewport()

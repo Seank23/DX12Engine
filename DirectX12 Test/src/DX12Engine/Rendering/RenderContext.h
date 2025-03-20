@@ -4,6 +4,7 @@
 #include "../Heaps/DescriptorHeapManager.h"
 #include "../Resources/Shader.h"
 #include "../Rendering/GPUUploader.h"
+#include "../Application.h"
 
 namespace DX12Engine
 {
@@ -13,7 +14,7 @@ namespace DX12Engine
 	class RenderContext
 	{
 	public:
-		RenderContext(int width, int height);
+		RenderContext(Application* app, int width, int height);
 		~RenderContext();
 
 		DirectX::XMFLOAT2							GetWindowSize() const { return m_WindowSize; }

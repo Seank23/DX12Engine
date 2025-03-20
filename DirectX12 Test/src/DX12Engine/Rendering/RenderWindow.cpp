@@ -1,10 +1,24 @@
 #include "RenderWindow.h"
+#include "../Application.h"
 
 LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 {
+	DX12Engine::Application* app = reinterpret_cast<DX12Engine::Application*>(GetWindowLongPtr(hwnd, GWLP_USERDATA));
+	if (uMsg == WM_CREATE)
+	{
+		// Store the application pointer in the window
+		CREATESTRUCT* pCreate = reinterpret_cast<CREATESTRUCT*>(lParam);
+		SetWindowLongPtr(hwnd, GWLP_USERDATA, (LONG_PTR)pCreate->lpCreateParams);
+		return 0;
+	}
 	if (uMsg == WM_DESTROY)
 	{
 		PostQuitMessage(0);
+		return 0;
+	}
+	if (uMsg == WM_MOUSEMOVE)
+	{
+		if (app != nullptr) app->HandleMouseMovement(hwnd, lParam);
 		return 0;
 	}
 	return DefWindowProc(hwnd, uMsg, wParam, lParam);
@@ -33,12 +47,12 @@ namespace DX12Engine
 		m_DSVDescriptorSize = 0;
 	}
 
-	HWND RenderWindow::Init(DirectX::XMFLOAT2 windowSize)
+	HWND RenderWindow::Init(Application* app, DirectX::XMFLOAT2 windowSize)
 	{
 		m_WindowSize = windowSize;
 		WNDCLASSEX wc = { sizeof(WNDCLASSEX), CS_CLASSDC, WindowProc, 0, 0, m_WindowInstance, nullptr, nullptr, nullptr, nullptr, L"DX12Window", nullptr };
 		RegisterClassEx(&wc);
-		m_WindowHandle = CreateWindow(wc.lpszClassName, L"DirectX 12 Renderer", WS_OVERLAPPEDWINDOW, 100, 100, windowSize.x, windowSize.y, nullptr, nullptr, wc.hInstance, nullptr);
+		m_WindowHandle = CreateWindow(wc.lpszClassName, L"DirectX 12 Renderer", WS_OVERLAPPEDWINDOW, 100, 100, windowSize.x, windowSize.y, nullptr, nullptr, wc.hInstance, app);
 		ShowWindow(m_WindowHandle, SW_SHOWDEFAULT);
 		return m_WindowHandle;
 	}
