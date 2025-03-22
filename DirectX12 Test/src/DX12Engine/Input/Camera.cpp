@@ -57,13 +57,13 @@ namespace DX12Engine
 		if (GetAsyncKeyState('Q') & 0x8000)
 		{
 			DirectX::XMVECTOR positionVector = DirectX::XMLoadFloat3(&m_Position);
-			positionVector = DirectX::XMVectorAdd(positionVector, DirectX::XMVectorSet(0.0f, speed, 0.0f, 0.0f));
+			positionVector = DirectX::XMVectorSubtract(positionVector, DirectX::XMVectorSet(0.0f, speed, 0.0f, 0.0f));
 			DirectX::XMStoreFloat3(&m_Position, positionVector);
 		}
 		if (GetAsyncKeyState('E') & 0x8000)
 		{
 			DirectX::XMVECTOR positionVector = DirectX::XMLoadFloat3(&m_Position);
-			positionVector = DirectX::XMVectorSubtract(positionVector, DirectX::XMVectorSet(0.0f, speed, 0.0f, 0.0f));
+			positionVector = DirectX::XMVectorAdd(positionVector, DirectX::XMVectorSet(0.0f, speed, 0.0f, 0.0f));
 			DirectX::XMStoreFloat3(&m_Position, positionVector);
 		}
 		UpdateViewMatrix();
@@ -71,11 +71,14 @@ namespace DX12Engine
 
 	void Camera::ProcessMouseInput(float dX, float dY)
 	{
-		float sensitivity = 0.002f;
-		m_Yaw -= dX * sensitivity;
-		m_Pitch -= dY * sensitivity;
-		m_Pitch = max(-DirectX::XM_PIDIV2, min(DirectX::XM_PIDIV2, m_Pitch));
-		UpdateViewMatrix();
+		if (GetAsyncKeyState(VK_RBUTTON))
+		{
+			float sensitivity = 0.005f;
+			m_Yaw -= dX * sensitivity;
+			m_Pitch -= dY * sensitivity;
+			m_Pitch = max(-DirectX::XM_PIDIV2, min(DirectX::XM_PIDIV2, m_Pitch));
+			UpdateViewMatrix();
+		}
 	}
 
 	void Camera::SetPosition(DirectX::XMFLOAT3 position)

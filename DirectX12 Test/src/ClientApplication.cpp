@@ -135,7 +135,8 @@ void ClientApplication::HandleMouseMovement(HWND hwnd, LPARAM lParam)
 	int mouseX = GET_X_LPARAM(lParam);
 	int mouseY = GET_Y_LPARAM(lParam);
 
-	if (m_FirstMouse) {
+	if (m_FirstMouse) 
+	{
 		m_LastMouseX = (float)mouseX;
 		m_LastMouseY = (float)mouseY;
 		m_FirstMouse = false;

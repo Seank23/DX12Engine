@@ -7,15 +7,19 @@ struct PSInput
 Texture2D skyboxTexture : register(t0);
 SamplerState samplerState : register(s0);
 
-float3 SampleEquirectangular(float3 dir)
+float2 SampleSphericalMap(float3 v)
 {
-    float2 uv;
-    uv.x = (atan2(dir.z, dir.x) / (2.0 * 3.14159265359)) + 0.5;
-    uv.y = acos(dir.y) / 3.14159265359;
-    return skyboxTexture.Sample(samplerState, uv).rgb;
+    float phi = atan2(v.z, v.x); // Longitude
+    float theta = acos(v.y); // Latitude
+
+    float u = phi / (2.0f * 3.14159265359f) + 0.5f;
+    float vTex = theta / 3.14159265359f;
+
+    return float2(u, vTex);
 }
 
 float4 main(PSInput input) : SV_TARGET
 {
-    return float4(SampleEquirectangular(input.texCoord), 1.0);
+    float2 uv = SampleSphericalMap(normalize(input.texCoord));
+    return skyboxTexture.Sample(samplerState, uv);
 }
