@@ -6,7 +6,7 @@ namespace DX12Engine
 	PBRMaterial::PBRMaterial()
 		: Material()
 	{
-		ConfigureFromDefault(ResourceManager::GetInstance().GetShader("PBRLighting_VS"), ResourceManager::GetInstance().GetShader("PBRLighting_PS"), 5);
+		ConfigureFromDefault(ResourceManager::GetInstance().GetShader("PBRLighting_VS"), ResourceManager::GetInstance().GetShader("PBRLighting_PS"), 6);
 	}
 
 	PBRMaterial::~PBRMaterial()
@@ -55,7 +55,7 @@ namespace DX12Engine
 		Material::Bind(commandList, startIndex);
 		if (HasTexture(TextureType::Albedo))
 			commandList->SetGraphicsRootDescriptorTable(*startIndex, m_AlbedoMap->GetGPUHandle());
-		BindPipelineState(commandList);
+		*startIndex += 5;
 	}
 
 	void PBRMaterial::SetAlbedo(DirectX::XMFLOAT3 albedo)

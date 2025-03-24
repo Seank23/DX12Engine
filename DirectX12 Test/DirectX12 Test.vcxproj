@@ -110,7 +110,7 @@
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>D3D12.lib;d3d12.lib;dxgi.lib;dxguid.lib;D3DCompiler.lib;dxcompiler.lib;$(CoreLibraryDependencies);E:\Projects\source\repos\DirectX12 Test\vendor\DirectXTex-main\DirectXTex\Bin\Desktop_2022\x64\Debug\DirectXTex.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>D3D12.lib;d3d12.lib;dxgi.lib;dxguid.lib;D3DCompiler.lib;dxcompiler.lib;$(CoreLibraryDependencies);E:\Projects\source\repos\DirectX12 Test\vendor\DirectXTex-main\DirectXTex\Bin\GDK_2022\Gaming.Desktop.x64\Debug\DirectXTex.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
     <FxCompile>
       <ShaderModel>6.0</ShaderModel>

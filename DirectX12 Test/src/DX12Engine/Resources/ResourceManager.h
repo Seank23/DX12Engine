@@ -43,6 +43,7 @@ namespace DX12Engine
 		std::unique_ptr<IndexBuffer> CreateIndexBuffer(const std::vector<UINT>& indices);
 		std::unique_ptr<ConstantBuffer> CreateConstantBuffer(const UINT bufferSize);
 		std::unique_ptr<Texture> CreateTexture(const DirectX::ScratchImage* imageData);
+		std::unique_ptr<Texture> CreateCubeMap(const DirectX::ScratchImage* imageData);
 
 		Microsoft::WRL::ComPtr<ID3D12PipelineState> CreatePipelineState(const D3D12_GRAPHICS_PIPELINE_STATE_DESC& desc);
 		Microsoft::WRL::ComPtr<ID3D12RootSignature> CreateRootSignature(const D3D12_ROOT_SIGNATURE_DESC& desc);

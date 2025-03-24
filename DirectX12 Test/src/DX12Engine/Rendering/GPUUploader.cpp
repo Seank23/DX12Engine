@@ -24,7 +24,7 @@ namespace DX12Engine
 		UINT descriptorSize = m_RenderHeap.GetDescriptorSize();	
 		for (Texture* texture : textures)
 		{
-			UpdateSubresources(m_CopyCommandList, texture->GetResource(), texture->m_UploadResource, 0, 0, 1, &texture->m_Data);
+			UpdateSubresources(m_CopyCommandList, texture->GetResource(), texture->m_UploadResource, 0, 0, static_cast<UINT>(texture->m_Data.size()), texture->m_Data.data());
 			auto barrier = CD3DX12_RESOURCE_BARRIER::Transition(texture->m_MainResource,
 				D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
 			m_GraphicsCommandList->ResourceBarrier(1, &barrier);

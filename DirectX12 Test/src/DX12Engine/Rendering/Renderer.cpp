@@ -37,6 +37,8 @@ namespace DX12Engine
 
 		auto srvHeap = m_RenderHeap.GetHeap();
 		m_CommandList->SetDescriptorHeaps(1, &srvHeap);
+
+		if (m_Skybox != nullptr) RenderSkybox();
 	}
 
 	void Renderer::Render(RenderObject* renderObject)
@@ -48,6 +50,11 @@ namespace DX12Engine
 		m_CommandList->SetGraphicsRootConstantBufferView(1, renderObject->GetCBVAddress());
 		// Material binding
 		int startIndex = 2;
+		if (m_Skybox != nullptr && renderObject != m_Skybox)
+		{
+			D3D12_GPU_DESCRIPTOR_HANDLE skyboxHandle = m_Skybox->m_Material->GetTexture()->GetGPUHandle();
+			renderObject->m_Material->SetEnvironmentMapHandle(&skyboxHandle);
+		}
 		renderObject->m_Material->Bind(m_CommandList, &startIndex);
 		// Mesh binding
 		auto vertexBufferView = renderObject->m_VertexBuffer->GetVertexBufferView();
@@ -96,5 +103,10 @@ namespace DX12Engine
 		scissorRect.right = static_cast<LONG>(windowSize.x);
 		scissorRect.bottom = static_cast<LONG>(windowSize.y);
 		return scissorRect;
+	}
+
+	void Renderer::RenderSkybox()
+	{
+		Render(m_Skybox);
 	}
 }

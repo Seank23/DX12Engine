@@ -44,6 +44,7 @@ Texture2D normalMap : register(t1);
 Texture2D metallicMap : register(t2);
 Texture2D roughnessMap : register(t3);
 Texture2D aoMap : register(t4);
+TextureCube environmentMap : register(t5);
 SamplerState samp : register(s0);
 
 float3 FresnelSchlick(float cosTheta, float3 F0)
@@ -79,7 +80,12 @@ float3 PBRLighting(float3 albedo, float metallic, float roughness, float ao, flo
     
     float3 numerator = D * F * G;
     float denominator = 4.0 * NdotV * NdotL + 0.001;
-    float3 specular = numerator / denominator;
+    float3 specularLight = numerator / denominator;
+    
+    float3 reflectionVector = reflect(-V, N);
+    float3 specularEnv = environmentMap.SampleLevel(samp, reflectionVector, roughness * 12).rgb;
+    
+    float3 specular = specularLight * specularEnv;
     
     float3 radiance = light.Color * NdotL * light.Intensity;
     float3 kD = (1.0 - F) * (1.0 - metallic);
@@ -125,6 +131,5 @@ float4 main(PSInput input) : SV_TARGET
             finalColor += PBRLighting(albedo, metallic, roughness, ao, worldNormal, V, lightDir, Lights[i]) * intensity * attenuation;
         }
     }
-
     return float4(finalColor, 1.0);
 }

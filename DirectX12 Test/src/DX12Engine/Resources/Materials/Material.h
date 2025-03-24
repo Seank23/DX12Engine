@@ -39,15 +39,18 @@ namespace DX12Engine
 
 		virtual void Bind(ID3D12GraphicsCommandList* commandList, int* startIndex);
 
+		void SetEnvironmentMapHandle(D3D12_GPU_DESCRIPTOR_HANDLE* handle) { m_EnvironmentMapHandle = handle; }
+
 		PipelineStateBuilder PipelineStateBuilder;
 		RootSignatureBuilder RootSignatureBuilder;
 
 	protected:
 		void UpdateConstantBufferData(MaterialData materialData);
-		void BindPipelineState(ID3D12GraphicsCommandList* commandList);
 
 		std::unique_ptr<ConstantBuffer> m_ConstantBuffer;
 		Microsoft::WRL::ComPtr<ID3D12PipelineState> m_PipelineState;
 		Microsoft::WRL::ComPtr<ID3D12RootSignature> m_RootSignature;
+
+		D3D12_GPU_DESCRIPTOR_HANDLE* m_EnvironmentMapHandle;
 	};
 }

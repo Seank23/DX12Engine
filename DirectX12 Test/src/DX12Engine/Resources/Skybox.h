@@ -11,6 +11,8 @@ namespace DX12Engine
 	class Skybox : public RenderObject
 	{
 	public:
+		friend class Renderer;
+
 		Skybox(std::shared_ptr<Texture> skyboxTexture);
 		~Skybox();
 

@@ -54,6 +54,5 @@ namespace DX12Engine
 		Material::Bind(commandList, startIndex);
 		if (HasTexture(TextureType::Albedo))
 			commandList->SetGraphicsRootDescriptorTable(*startIndex, m_Texture->GetGPUHandle());
-		BindPipelineState(commandList);
 	}
 }	

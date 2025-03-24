@@ -4,6 +4,7 @@
 namespace DX12Engine
 {
 	Material::Material()
+		: m_EnvironmentMapHandle(nullptr)
 	{
 		m_ConstantBuffer = ResourceManager::GetInstance().CreateConstantBuffer(sizeof(MaterialData));
 	}
@@ -28,17 +29,12 @@ namespace DX12Engine
 
 	void Material::Bind(ID3D12GraphicsCommandList* commandList, int* startIndex)
 	{
-		commandList->SetGraphicsRootConstantBufferView(*startIndex, GetCBVAddress());
-		*startIndex += 1;
+		commandList->SetPipelineState(m_PipelineState.Get());
+		commandList->SetGraphicsRootConstantBufferView((*startIndex)++, GetCBVAddress());
 	}
 
 	void Material::UpdateConstantBufferData(MaterialData materialData)
 	{
 		m_ConstantBuffer->Update(&materialData, sizeof(materialData));
-	}
-
-	void Material::BindPipelineState(ID3D12GraphicsCommandList* commandList)
-	{
-		commandList->SetPipelineState(m_PipelineState.Get());
 	}
 }

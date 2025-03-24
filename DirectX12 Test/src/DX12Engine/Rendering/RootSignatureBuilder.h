@@ -36,7 +36,7 @@ namespace DX12Engine
             param.ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
             param.DescriptorTable.NumDescriptorRanges = 1;
             param.DescriptorTable.pDescriptorRanges = &m_DescriptorRanges.back();
-            param.ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
+            param.ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
 
             m_Parameters.push_back(param);
             return *this;

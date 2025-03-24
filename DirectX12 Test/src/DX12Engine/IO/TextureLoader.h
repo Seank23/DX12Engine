@@ -10,6 +10,7 @@ namespace DX12Engine
 		~TextureLoader();
 
 		std::unique_ptr<Texture> LoadDDS(const std::wstring& filename);
+		std::unique_ptr<Texture> LoadCubemapDDS(const std::wstring& filename);
 		std::unique_ptr<Texture> LoadWIC(const std::wstring& filename);
 	};
 }
