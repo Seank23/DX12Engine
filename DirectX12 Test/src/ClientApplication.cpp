@@ -26,33 +26,40 @@ ClientApplication::ClientApplication()
 
 	DX12Engine::ModelLoader modelLoader;
 	DX12Engine::Mesh mesh = modelLoader.LoadObj("E:\\Projects\\source\\repos\\DirectX12 Test\\cube2.obj");
-	DX12Engine::Mesh mesh2 = modelLoader.LoadObj("E:\\Projects\\source\\repos\\DirectX12 Test\\cylinder.obj");
+	DX12Engine::Mesh mesh2 = modelLoader.LoadObj("E:\\Projects\\source\\repos\\DirectX12 Test\\sphere.obj");
 	DX12Engine::Mesh floorMesh = modelLoader.LoadObj("E:\\Projects\\source\\repos\\DirectX12 Test\\floor.obj");
 
 	DX12Engine::TextureLoader textureLoader;
-	std::shared_ptr<DX12Engine::Texture> skyboxDDS = textureLoader.LoadDDS(L"E:\\Projects\\source\\repos\\DirectX12 Test\\DirectX12 Test\\res\\skybox\\kloofendal_48d_partly_cloudy_puresky_4k.dds");
-	std::shared_ptr<DX12Engine::Texture> skyboxCube = textureLoader.LoadCubemapDDS(L"E:\\Projects\\source\\repos\\DirectX12 Test\\DirectX12 Test\\res\\skybox\\skybox_cubemap.dds");
+	DX12Engine::GPUUploader uploader = context->GetUploader();
+	std::vector<DX12Engine::Texture*> textures;
+
+	std::shared_ptr<DX12Engine::Texture> skyboxCube = textureLoader.LoadCubemapDDS(L"E:\\Projects\\source\\repos\\DirectX12 Test\\DirectX12 Test\\res\\skybox\\skybox2_cubemap.dds");
+	std::shared_ptr<DX12Engine::Texture> skyboxIrradiance = textureLoader.LoadCubemapDDS(L"E:\\Projects\\source\\repos\\DirectX12 Test\\DirectX12 Test\\res\\skybox\\skybox2_irradiance.dds");
+	textures = { skyboxCube.get(), skyboxIrradiance.get() };
+	uploader.UploadTextureBatch(textures);
 
 	std::shared_ptr<DX12Engine::Texture> stoneAlbedo = textureLoader.LoadWIC(L"E:\\Projects\\source\\repos\\DirectX12 Test\\DirectX12 Test\\res\\dark-worn-stone-ue\\dark-worn-stonework_albedo.png");
 	std::shared_ptr<DX12Engine::Texture> stoneNormal = textureLoader.LoadWIC(L"E:\\Projects\\source\\repos\\DirectX12 Test\\DirectX12 Test\\res\\dark-worn-stone-ue\\dark-worn-stonework_normal-dx.png");
 	std::shared_ptr<DX12Engine::Texture> stoneMetallic = textureLoader.LoadWIC(L"E:\\Projects\\source\\repos\\DirectX12 Test\\DirectX12 Test\\res\\dark-worn-stone-ue\\dark-worn-stonework_metallic.png");
 	std::shared_ptr<DX12Engine::Texture> stoneRoughness = textureLoader.LoadWIC(L"E:\\Projects\\source\\repos\\DirectX12 Test\\DirectX12 Test\\res\\dark-worn-stone-ue\\dark-worn-stonework_roughness.png");
 	std::shared_ptr<DX12Engine::Texture> stoneAO = textureLoader.LoadWIC(L"E:\\Projects\\source\\repos\\DirectX12 Test\\DirectX12 Test\\res\\dark-worn-stone-ue\\dark-worn-stonework_ao.png");
+	textures = { stoneAlbedo.get(), stoneNormal.get(), stoneMetallic.get(), stoneRoughness.get(), stoneAO.get() };
+	uploader.UploadTextureBatch(textures);
 
 	std::shared_ptr<DX12Engine::Texture> goldAlbedo = textureLoader.LoadWIC(L"E:\\Projects\\source\\repos\\DirectX12 Test\\DirectX12 Test\\res\\hammered-gold-ue\\hammered-gold_albedo.png");
 	std::shared_ptr<DX12Engine::Texture> goldNormal = textureLoader.LoadWIC(L"E:\\Projects\\source\\repos\\DirectX12 Test\\DirectX12 Test\\res\\hammered-gold-ue\\hammered-gold_normal-dx.png");
 	std::shared_ptr<DX12Engine::Texture> goldMetallic = textureLoader.LoadWIC(L"E:\\Projects\\source\\repos\\DirectX12 Test\\DirectX12 Test\\res\\hammered-gold-ue\\hammered-gold_metallic.png");
 	std::shared_ptr<DX12Engine::Texture> goldRoughness = textureLoader.LoadWIC(L"E:\\Projects\\source\\repos\\DirectX12 Test\\DirectX12 Test\\res\\hammered-gold-ue\\hammered-gold_roughness.png");
 	std::shared_ptr<DX12Engine::Texture> goldAO = textureLoader.LoadWIC(L"E:\\Projects\\source\\repos\\DirectX12 Test\\DirectX12 Test\\res\\hammered-gold-ue\\hammered-gold_ao.png");
+	textures = { goldAlbedo.get(), goldNormal.get(), goldMetallic.get(), goldRoughness.get(), goldAO.get(), };
+	uploader.UploadTextureBatch(textures);
 
 	std::shared_ptr<DX12Engine::Texture> concreteAlbedo = textureLoader.LoadWIC(L"E:\\Projects\\source\\repos\\DirectX12 Test\\DirectX12 Test\\res\\clean-concrete-ue\\clean-concrete_albedo.png");
 	std::shared_ptr<DX12Engine::Texture> concreteNormal = textureLoader.LoadWIC(L"E:\\Projects\\source\\repos\\DirectX12 Test\\DirectX12 Test\\res\\clean-concrete-ue\\clean-concrete_normal-dx.png");
 	std::shared_ptr<DX12Engine::Texture> concreteMetallic = textureLoader.LoadWIC(L"E:\\Projects\\source\\repos\\DirectX12 Test\\DirectX12 Test\\res\\clean-concrete-ue\\clean-concrete_metallic.png");
 	std::shared_ptr<DX12Engine::Texture> concreteRoughness = textureLoader.LoadWIC(L"E:\\Projects\\source\\repos\\DirectX12 Test\\DirectX12 Test\\res\\clean-concrete-ue\\clean-concrete_roughness.png");
 	std::shared_ptr<DX12Engine::Texture> concreteAO = textureLoader.LoadWIC(L"E:\\Projects\\source\\repos\\DirectX12 Test\\DirectX12 Test\\res\\clean-concrete-ue\\clean-concrete_ao.png");
-
-	std::vector<DX12Engine::Texture*> textures = { stoneAlbedo.get(), stoneNormal.get(), stoneMetallic.get(), stoneRoughness.get(), stoneAO.get(), skyboxCube.get(), goldAlbedo.get(), goldNormal.get(), goldMetallic.get(), goldRoughness.get(), goldAO.get(), skyboxCube.get(), concreteAlbedo.get(), concreteNormal.get(), concreteMetallic.get(), concreteRoughness.get(), concreteAO.get(), skyboxCube.get() };
-	DX12Engine::GPUUploader uploader = context->GetUploader();
+	textures = { concreteAlbedo.get(), concreteNormal.get(), concreteMetallic.get(), concreteRoughness.get(), concreteAO.get(), };
 	uploader.UploadTextureBatch(textures);
 
 	DX12Engine::Skybox skybox(skyboxCube);
@@ -94,27 +101,26 @@ ClientApplication::ClientApplication()
 	float count = 0.0f;
 
 	DX12Engine::LightBuffer lightBuffer;
+	DX12Engine::Light sunLight;
+	sunLight.Type = (int)DX12Engine::LightType::Directional;
+	sunLight.Position = { -0.577f, -0.577f, -0.577f };
+	sunLight.Intensity = 8.0f;
+	sunLight.Color = { 1.0f, 0.95f, 0.9f };
+	lightBuffer.AddLight(sunLight);
 	DX12Engine::Light pointLight;
 	pointLight.Type = (int)DX12Engine::LightType::Point;
 	pointLight.Position = { 0.0f, 2.0f, 0.0f };
 	pointLight.Intensity = 10.0f;
-	pointLight.Range = 10.0f;
+	pointLight.Range = 3.0f;
 	pointLight.Color = { 1.0f, 1.0f, 1.0f };
-	lightBuffer.AddLight(pointLight);
-	DX12Engine::Light spotLight1;
-	spotLight1.Type = (int)DX12Engine::LightType::Spot;
-	spotLight1.Position = { -2.0f, 2.5f, 2.0f };
-	spotLight1.Intensity = 10.0f;
-	spotLight1.Color = { 0.0f, 0.0f, 1.0f };
-	spotLight1.SpotAngle = cos(DirectX::XMConvertToRadians(-60.0f));
-	//lightBuffer.AddLight(spotLight1);
-	DX12Engine::Light spotLight2;
-	spotLight2.Type = (int)DX12Engine::LightType::Spot;
-	spotLight2.Position = { 2.0f, 2.5f, -2.0f };
-	spotLight2.Intensity = 10.0f;
-	spotLight2.Color = { 1.0f, 0.0f, 0.0f };
-	spotLight2.SpotAngle = cos(DirectX::XMConvertToRadians(60.0f));
-	//lightBuffer.AddLight(spotLight2);
+	//lightBuffer.AddLight(pointLight);
+	DX12Engine::Light spotLight;
+	spotLight.Type = (int)DX12Engine::LightType::Spot;
+	spotLight.Position = { -2.0f, 2.5f, -2.0f };
+	spotLight.Intensity = 10.0f;
+	spotLight.Color = { 1.0f, 0.6f, 0.0f };
+	spotLight.SpotAngle = cos(DirectX::XMConvertToRadians(60.0f));
+	//lightBuffer.AddLight(spotLight);
 	renderer.SetLightBuffer(&lightBuffer);
 
 	m_Camera = std::make_unique<DX12Engine::Camera>(1600.0f / 900.0f, 0.001f, 100.0f);
@@ -125,9 +131,8 @@ ClientApplication::ClientApplication()
 		m_Camera->ProcessKeyboardInput(0.01f);
 
 		renderer.InitFrame(renderer.GetDefaultViewport(), renderer.GetDefaultScissorRect());
-		//lightBuffer.GetLight(1)->SpotAngle = cos(DirectX::XMConvertToRadians(60.0f + count * 10));
-		//lightBuffer.GetLight(2)->SpotAngle = sin(DirectX::XMConvertToRadians(60.0f + count * 10));
-		lightBuffer.GetLight(0)->Position = { 2.0f * DirectX::XMScalarSin(count), 2.0f, 2.0f * DirectX::XMScalarCos(count) };
+		//lightBuffer.GetLight(2)->SpotAngle = cos(DirectX::XMConvertToRadians(60.0f + count * 10));
+		//lightBuffer.GetLight(1)->Position = { 2.0f * DirectX::XMScalarSin(count), 2.0f, 2.0f * DirectX::XMScalarCos(count) };
 		lightBuffer.Update();
 		//object1.SetModelMatrix(DirectX::XMMatrixTranslation(-2.0f * DirectX::XMScalarSin(count), 0.0f, 1.0f));
 		//object2.SetModelMatrix(DirectX::XMMatrixTranslation(2.0f * DirectX::XMScalarSin(count), 0.0f, -1.0f));

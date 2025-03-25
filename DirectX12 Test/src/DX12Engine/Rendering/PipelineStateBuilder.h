@@ -16,15 +16,31 @@ namespace DX12Engine
             inputElementDescs[3] = { "TANGENT", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 36, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 };
         }
 
-        PipelineStateBuilder& ConfigureFromDefault()
+        PipelineStateBuilder& ConfigureFromDefault(Shader* vertexShader = nullptr, Shader* pixelShader = nullptr)
         {
-            return AddInputLayout()
-                .SetBlendState(CD3DX12_BLEND_DESC(D3D12_DEFAULT))
-                .SetRasterizerState(CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT))
-                .SetDepthStencilState(CD3DX12_DEPTH_STENCIL_DESC(D3D12_DEFAULT))
-                .SetPrimitiveTopologyType(D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE)
-                .SetRenderTargetFormats(DXGI_FORMAT_R8G8B8A8_UNORM, DXGI_FORMAT_D24_UNORM_S8_UINT)
-                .SetSampleDesc(UINT_MAX, 1, 0);
+            if (vertexShader != nullptr && pixelShader != nullptr)
+            {
+                return AddInputLayout()
+                    .SetBlendState(CD3DX12_BLEND_DESC(D3D12_DEFAULT))
+                    .SetRasterizerState(CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT))
+                    .SetDepthStencilState(CD3DX12_DEPTH_STENCIL_DESC(D3D12_DEFAULT))
+                    .SetPrimitiveTopologyType(D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE)
+                    .SetRenderTargetFormats(DXGI_FORMAT_R8G8B8A8_UNORM, DXGI_FORMAT_D24_UNORM_S8_UINT)
+                    .SetSampleDesc(UINT_MAX, 1, 0)
+                    .SetVertexShader(vertexShader)
+                    .SetPixelShader(pixelShader);
+            }
+            else
+            {
+                return AddInputLayout()
+                    .SetBlendState(CD3DX12_BLEND_DESC(D3D12_DEFAULT))
+                    .SetRasterizerState(CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT))
+                    .SetDepthStencilState(CD3DX12_DEPTH_STENCIL_DESC(D3D12_DEFAULT))
+                    .SetPrimitiveTopologyType(D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE)
+                    .SetRenderTargetFormats(DXGI_FORMAT_R8G8B8A8_UNORM, DXGI_FORMAT_D24_UNORM_S8_UINT)
+                    .SetSampleDesc(UINT_MAX, 1, 0);
+            }
+            
         }
 
         PipelineStateBuilder& SetRootSignature(ID3D12RootSignature* rootSig) 

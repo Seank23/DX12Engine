@@ -45,6 +45,7 @@ Texture2D metallicMap : register(t2);
 Texture2D roughnessMap : register(t3);
 Texture2D aoMap : register(t4);
 TextureCube environmentMap : register(t5);
+TextureCube irradianceMap : register(t6);
 SamplerState samp : register(s0);
 
 float3 FresnelSchlick(float cosTheta, float3 F0)
@@ -107,6 +108,9 @@ float4 main(PSInput input) : SV_TARGET
     float3 worldNormal = normalize(mul(textureNormal, TBN));
     
     float3 finalColor = float3(0, 0, 0);
+    
+    float3 indirectDiffuse = albedo * irradianceMap.Sample(samp, worldNormal).rgb;
+    finalColor += indirectDiffuse;
     
     for (int i = 0; i < LightCount; i++)
     {

@@ -3,6 +3,17 @@
 
 namespace DX12Engine
 {
+    struct DescriptorTableConfig
+    {
+        UINT NumDescriptors;
+        D3D12_DESCRIPTOR_RANGE_TYPE Type; 
+        UINT BaseShaderRegister;
+        UINT Space = 0;
+
+        DescriptorTableConfig(UINT numDescriptors, D3D12_DESCRIPTOR_RANGE_TYPE type, UINT baseShaderRegister)
+            : NumDescriptors(numDescriptors), Type(type), BaseShaderRegister(baseShaderRegister) {}
+    };
+
     class RootSignatureBuilder 
     {
     public:
@@ -12,33 +23,38 @@ namespace DX12Engine
         }
 
         RootSignatureBuilder& ConfigureFromDefault(int numTextures = 1)
-		{
+        {
+            DescriptorTableConfig config(numTextures, D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 0);
             return AddConstantBuffer(0)
                 .AddConstantBuffer(1)
-				.AddConstantBuffer(2)
-                .AddDescriptorTable(numTextures, D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 0)
+                .AddConstantBuffer(2)
+                .AddDescriptorTables({config})
                 .AddSampler(0, D3D12_FILTER_ANISOTROPIC);
-		}
+        }
 
-        RootSignatureBuilder& AddDescriptorTable(UINT numDescriptors, D3D12_DESCRIPTOR_RANGE_TYPE type, UINT baseShaderRegister, UINT space = 0) 
+        RootSignatureBuilder& AddDescriptorTables(std::vector<DescriptorTableConfig> configs) 
         {
-            D3D12_DESCRIPTOR_RANGE range = {};
-            range.RangeType = type;
-            range.NumDescriptors = numDescriptors;
-            range.BaseShaderRegister = baseShaderRegister;
-            range.RegisterSpace = space;
-            range.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
+            for (int i = 0; i < configs.size(); i++)
+            {
+                D3D12_DESCRIPTOR_RANGE range{};
+                range.RangeType = configs[i].Type;
+                range.NumDescriptors = configs[i].NumDescriptors;
+                range.BaseShaderRegister = configs[i].BaseShaderRegister;
+                range.RegisterSpace = configs[i].Space;
+                range.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
 
-            m_DescriptorRanges.push_back(range);
+                m_DescriptorRanges.push_back(range);
+            }
+            for (int i = 0; i < configs.size(); i++)
+            {
+                D3D12_ROOT_PARAMETER param{};
+                param.ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+                param.DescriptorTable.NumDescriptorRanges = 1;
+                param.DescriptorTable.pDescriptorRanges = &m_DescriptorRanges[i];
+                param.ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
 
-            // Create descriptor table entry
-            D3D12_ROOT_PARAMETER param = {};
-            param.ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
-            param.DescriptorTable.NumDescriptorRanges = 1;
-            param.DescriptorTable.pDescriptorRanges = &m_DescriptorRanges.back();
-            param.ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
-
-            m_Parameters.push_back(param);
+                m_Parameters.push_back(param);
+            }
             return *this;
         }
 

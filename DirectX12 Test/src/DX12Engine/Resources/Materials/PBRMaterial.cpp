@@ -6,7 +6,15 @@ namespace DX12Engine
 	PBRMaterial::PBRMaterial()
 		: Material()
 	{
-		ConfigureFromDefault(ResourceManager::GetInstance().GetShader("PBRLighting_VS"), ResourceManager::GetInstance().GetShader("PBRLighting_PS"), 6);
+		PipelineStateBuilder = PipelineStateBuilder.ConfigureFromDefault(ResourceManager::GetInstance().GetShader("PBRLighting_VS"), ResourceManager::GetInstance().GetShader("PBRLighting_PS"));
+		DescriptorTableConfig materialTable(5, D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 0);
+		DescriptorTableConfig envTable(2, D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 5);
+		RootSignatureBuilder = RootSignatureBuilder.AddConstantBuffer(0)
+			.AddConstantBuffer(1)
+			.AddConstantBuffer(2)
+			.AddDescriptorTables({materialTable, envTable})
+			.AddSampler(0, D3D12_FILTER_ANISOTROPIC);
+		BuildPipelineState();
 	}
 
 	PBRMaterial::~PBRMaterial()
@@ -55,7 +63,9 @@ namespace DX12Engine
 		Material::Bind(commandList, startIndex);
 		if (HasTexture(TextureType::Albedo))
 			commandList->SetGraphicsRootDescriptorTable(*startIndex, m_AlbedoMap->GetGPUHandle());
-		*startIndex += 5;
+		*startIndex += 1;
+		if (m_EnvironmentMapHandle != nullptr)
+			commandList->SetGraphicsRootDescriptorTable(*startIndex, *m_EnvironmentMapHandle);
 	}
 
 	void PBRMaterial::SetAlbedo(DirectX::XMFLOAT3 albedo)
