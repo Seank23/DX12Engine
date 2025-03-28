@@ -17,6 +17,8 @@
 #include "DX12Engine/Rendering/RootSignatureBuilder.h"
 #include "DX12Engine/Buffers/LightBuffer.h"
 #include "DX12Engine/Resources/Skybox.h"
+#include "DX12Engine/Rendering/ProceduralRenderer.h"
+#include "DX12Engine/Resources/DepthMap.h"
 
 ClientApplication::ClientApplication()
 {
@@ -95,45 +97,54 @@ ClientApplication::ClientApplication()
 	object1.SetMaterial(pbrStone);
 	object2.SetMaterial(pbrGold);
 	floor.SetMaterial(pbrConcrete);
-	object1.SetModelMatrix(DirectX::XMMatrixTranslation(-1.5f, 0.0f, 0.0f));
-	object2.SetModelMatrix(DirectX::XMMatrixTranslation(1.5f, 0.0f, 0.0f));
+	object1.SetModelMatrix(DirectX::XMMatrixTranslation(-1.5f, 1.0f, 0.0f));
+	object2.SetModelMatrix(DirectX::XMMatrixTranslation(1.5f, 1.0f, 0.0f));
 	floor.SetModelMatrix(DirectX::XMMatrixTranslation(0.0f, -1.0f, 0.0f));
 	float count = 0.0f;
 
 	DX12Engine::LightBuffer lightBuffer;
 	DX12Engine::Light sunLight;
 	sunLight.Type = (int)DX12Engine::LightType::Directional;
-	sunLight.Position = { -0.577f, -0.577f, -0.577f };
+	//sunLight.SetDirection({ -0.577f, -0.577f, -0.577f });
+	sunLight.SetDirection({ 0.0001f, -0.5f, 0.0f });
 	sunLight.Intensity = 8.0f;
 	sunLight.Color = { 1.0f, 0.95f, 0.9f };
 	lightBuffer.AddLight(sunLight);
-	DX12Engine::Light pointLight;
+	/*DX12Engine::Light pointLight;
 	pointLight.Type = (int)DX12Engine::LightType::Point;
 	pointLight.Position = { 0.0f, 2.0f, 0.0f };
 	pointLight.Intensity = 10.0f;
 	pointLight.Range = 3.0f;
-	pointLight.Color = { 1.0f, 1.0f, 1.0f };
+	pointLight.Color = { 1.0f, 1.0f, 1.0f };*/
 	//lightBuffer.AddLight(pointLight);
-	DX12Engine::Light spotLight;
+	/*DX12Engine::Light spotLight;
 	spotLight.Type = (int)DX12Engine::LightType::Spot;
 	spotLight.Position = { -2.0f, 2.5f, -2.0f };
 	spotLight.Intensity = 10.0f;
 	spotLight.Color = { 1.0f, 0.6f, 0.0f };
-	spotLight.SpotAngle = cos(DirectX::XMConvertToRadians(60.0f));
+	spotLight.SpotAngle = cos(DirectX::XMConvertToRadians(60.0f));*/
 	//lightBuffer.AddLight(spotLight);
 	renderer.SetLightBuffer(&lightBuffer);
 
 	m_Camera = std::make_unique<DX12Engine::Camera>(1600.0f / 900.0f, 0.001f, 100.0f);
 	renderer.SetCamera(m_Camera.get());
 
+	DX12Engine::ProceduralRenderer proceduralRenderer = context->GetProcedualRenderer();
+	std::unique_ptr<DX12Engine::DepthMap> shadowMap = proceduralRenderer.CreateShadowMapResource();
+
+	std::vector<DX12Engine::RenderObject*> sceneObjects{ &object1, &object2, &floor };
+
 	while (renderer.PollWindow())
 	{
 		m_Camera->ProcessKeyboardInput(0.01f);
 
+		proceduralRenderer.RenderShadowMap(shadowMap.get(), *lightBuffer.GetLight(0), sceneObjects);
+
 		renderer.InitFrame(renderer.GetDefaultViewport(), renderer.GetDefaultScissorRect());
 		//lightBuffer.GetLight(2)->SpotAngle = cos(DirectX::XMConvertToRadians(60.0f + count * 10));
-		//lightBuffer.GetLight(1)->Position = { 2.0f * DirectX::XMScalarSin(count), 2.0f, 2.0f * DirectX::XMScalarCos(count) };
+		lightBuffer.GetLight(0)->SetDirection({ 0.1f * cosf(count), -0.5f, -0.1f * sinf(count)});
 		lightBuffer.Update();
+		renderer.SetShadowMap(shadowMap.get());
 		//object1.SetModelMatrix(DirectX::XMMatrixTranslation(-2.0f * DirectX::XMScalarSin(count), 0.0f, 1.0f));
 		//object2.SetModelMatrix(DirectX::XMMatrixTranslation(2.0f * DirectX::XMScalarSin(count), 0.0f, -1.0f));
 		renderer.Render(&object1);

@@ -16,6 +16,7 @@ namespace DX12Engine
 		m_QueueManager = std::make_unique<CommandQueueManager>(m_Device.Get());
 		m_HeapManager = std::make_unique<DescriptorHeapManager>(m_Device);
 		m_Uploader = std::make_unique<GPUUploader>(*this);
+		m_ProcRenderer = std::make_unique<ProceduralRenderer>(*this);
 
 		m_RenderWindow->CreateSwapChain(m_QueueManager->GetGraphicsQueue().GetCommandQueue().Get());
 		m_RenderWindow->CreateRTVHeap(m_Device.Get());
@@ -31,6 +32,7 @@ namespace DX12Engine
 		m_Device.Reset();
 		m_RenderWindow.reset();
 		m_Uploader.reset();
+		m_ProcRenderer.reset();
 	}
 
 	void RenderContext::InitDevice(HWND hwnd)

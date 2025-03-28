@@ -9,11 +9,13 @@ namespace DX12Engine
 		PipelineStateBuilder = PipelineStateBuilder.ConfigureFromDefault(ResourceManager::GetInstance().GetShader("PBRLighting_VS"), ResourceManager::GetInstance().GetShader("PBRLighting_PS"));
 		DescriptorTableConfig materialTable(5, D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 0);
 		DescriptorTableConfig envTable(2, D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 5);
+		DescriptorTableConfig shadowTable(1, D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 7);
 		RootSignatureBuilder = RootSignatureBuilder.AddConstantBuffer(0)
 			.AddConstantBuffer(1)
 			.AddConstantBuffer(2)
-			.AddDescriptorTables({materialTable, envTable})
-			.AddSampler(0, D3D12_FILTER_ANISOTROPIC);
+			.AddDescriptorTables({ materialTable, envTable, shadowTable })
+			.AddSampler(0, D3D12_FILTER_ANISOTROPIC)
+			.AddShadowMapSampler(1);
 		BuildPipelineState();
 	}
 
@@ -62,10 +64,11 @@ namespace DX12Engine
 	{
 		Material::Bind(commandList, startIndex);
 		if (HasTexture(TextureType::Albedo))
-			commandList->SetGraphicsRootDescriptorTable(*startIndex, m_AlbedoMap->GetGPUHandle());
-		*startIndex += 1;
+			commandList->SetGraphicsRootDescriptorTable((*startIndex)++, m_AlbedoMap->GetGPUHandle());
 		if (m_EnvironmentMapHandle != nullptr)
-			commandList->SetGraphicsRootDescriptorTable(*startIndex, *m_EnvironmentMapHandle);
+			commandList->SetGraphicsRootDescriptorTable((*startIndex)++, *m_EnvironmentMapHandle);
+		if (m_ShadowMapHandle != nullptr)
+			commandList->SetGraphicsRootDescriptorTable((*startIndex)++, *m_ShadowMapHandle);
 	}
 
 	void PBRMaterial::SetAlbedo(DirectX::XMFLOAT3 albedo)

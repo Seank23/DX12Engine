@@ -21,6 +21,29 @@ namespace DX12Engine
         DirectX::XMFLOAT3 Color = { 1.0f, 1.0f, 1.0f };
         float SpotAngle = 0.0f;              // Spot cone angle (for spotlights)
         DirectX::XMFLOAT3 Padding = { 0.0f, 0.0f, 0.0f };
+        DirectX::XMMATRIX ViewProjMatrix;
+
+        void SetPosition(DirectX::XMFLOAT3 position)
+        {
+            Position = position;
+            UpdateViewProjMatrix();
+        }
+
+        void SetDirection(DirectX::XMFLOAT3 direction)
+        {
+            Direction = direction;
+            UpdateViewProjMatrix();
+        }
+
+        void UpdateViewProjMatrix()
+        {
+            DirectX::XMFLOAT3 centre(0.0f, 0.0f, 0.0f);
+            DirectX::XMVECTOR lightDir = DirectX::XMVector3Normalize(XMLoadFloat3(&Direction));
+            DirectX::XMVECTOR lightPos = DirectX::XMVectorSubtract(DirectX::XMLoadFloat3(&centre), DirectX::XMVectorScale(lightDir, 18.0f));
+            DirectX::XMMATRIX lightView = DirectX::XMMatrixLookAtLH(lightPos, DirectX::XMLoadFloat3(&centre), DirectX::XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f));
+            DirectX::XMMATRIX lightProj = DirectX::XMMatrixOrthographicLH(10.0f, 10.0f, 0.01f, 20.0f);
+            ViewProjMatrix = DirectX::XMMatrixMultiply(lightView, lightProj);
+        }
     };
 
     struct LightBufferData

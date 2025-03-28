@@ -135,6 +135,8 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="src\DX12Engine\Resources\DepthMap.cpp" />
+    <ClCompile Include="src\DX12Engine\Rendering\ProceduralRenderer.cpp" />
     <ClCompile Include="src\ClientApplication.cpp" />
     <ClCompile Include="src\DX12Engine\Input\Camera.cpp" />
     <ClCompile Include="src\DX12Engine\Resources\Materials\SkyboxMaterial.cpp" />
@@ -191,6 +193,12 @@
       <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">Vertex</ShaderType>
       <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Vertex</ShaderType>
     </FxCompile>
+    <FxCompile Include="src\DX12Engine\Shaders\ShadowMap_VS.hlsl">
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Vertex</ShaderType>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Vertex</ShaderType>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">Vertex</ShaderType>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Vertex</ShaderType>
+    </FxCompile>
     <FxCompile Include="src\DX12Engine\Shaders\Skybox_PS.hlsl">
       <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Pixel</ShaderType>
       <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Pixel</ShaderType>
@@ -205,6 +213,8 @@
     </FxCompile>
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="src\DX12Engine\Resources\DepthMap.h" />
+    <ClInclude Include="src\DX12Engine\Rendering\ProceduralRenderer.h" />
     <ClInclude Include="src\ClientApplication.h" />
     <ClInclude Include="src\DX12Engine\Application.h" />
     <ClInclude Include="src\DX12Engine\Input\Camera.h" />

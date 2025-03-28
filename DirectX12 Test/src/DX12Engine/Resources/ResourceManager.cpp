@@ -16,6 +16,7 @@ namespace DX12Engine
 		m_Shaders.insert({ "PBRLighting_PS", std::make_unique<Shader>("E:\\Projects\\source\\repos\\DirectX12 Test\\DirectX12 Test\\src\\DX12Engine\\Shaders\\PBRLighting_PS.hlsl", "pixel") });
 		m_Shaders.insert({ "Skybox_VS", std::make_unique<Shader>("E:\\Projects\\source\\repos\\DirectX12 Test\\DirectX12 Test\\src\\DX12Engine\\Shaders\\Skybox_VS.hlsl", "vertex") });
 		m_Shaders.insert({ "Skybox_PS", std::make_unique<Shader>("E:\\Projects\\source\\repos\\DirectX12 Test\\DirectX12 Test\\src\\DX12Engine\\Shaders\\Skybox_PS.hlsl", "pixel") });
+		m_Shaders.insert({ "ShadowMap_VS", std::make_unique<Shader>("E:\\Projects\\source\\repos\\DirectX12 Test\\DirectX12 Test\\src\\DX12Engine\\Shaders\\ShadowMap_VS.hlsl", "vertex") });
 	}
 
 	ResourceManager::~ResourceManager()
@@ -236,7 +237,6 @@ namespace DX12Engine
 		data.RowPitch = image->rowPitch;
 		data.SlicePitch = image->slicePitch;
 		textureData.emplace_back(data);
-
 
 		D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
 		srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;

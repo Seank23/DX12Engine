@@ -1,5 +1,6 @@
 #include "Camera.h"
 #include <Windows.h>
+#include <iostream>
 
 namespace DX12Engine
 {
@@ -66,6 +67,7 @@ namespace DX12Engine
 			positionVector = DirectX::XMVectorAdd(positionVector, DirectX::XMVectorSet(0.0f, speed, 0.0f, 0.0f));
 			DirectX::XMStoreFloat3(&m_Position, positionVector);
 		}
+		//std::cout << "x: " << m_Position.x << ", y: " << m_Position.y << ", z: " << m_Position.z << std::endl;
 		UpdateViewMatrix();
 	}
 

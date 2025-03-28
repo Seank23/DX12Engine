@@ -22,6 +22,7 @@ namespace DX12Engine
 	{
 	public:
 		friend class Renderer;
+		friend class ProceduralRenderer;
 
 		RenderObject() = default;
 		RenderObject(Mesh mesh);
@@ -31,6 +32,7 @@ namespace DX12Engine
 		void SetModelMatrix(DirectX::XMMATRIX modelMatrix) { m_ModelMatrix = modelMatrix; }	
 		void SetMaterial(std::shared_ptr<Material> material) { m_Material = material; }
 
+		DirectX::XMMATRIX GetModelMatrix() { return m_ModelMatrix; }
 		D3D12_GPU_VIRTUAL_ADDRESS GetCBVAddress() { return m_ConstantBuffer->GetGPUAddress(); }
 
 	private:

@@ -3,6 +3,7 @@ struct PSInput
     float4 position : SV_POSITION;
     float3 cameraPos : POSITION0;
     float3 worldPos : POSITION1;
+    float4 lightSpacePos : POSITION2;
     float3 normal : NORMAL;
     float2 texCoord : TEXCOORD;
     float3 tangent : TANGENT;
@@ -19,6 +20,7 @@ struct Light
     float3 Color;
     float SpotAngle;
     float3 Padding;
+    matrix ViewProjMatrix;
 };
 
 cbuffer LightBuffer : register(b0)
@@ -46,7 +48,9 @@ Texture2D roughnessMap : register(t3);
 Texture2D aoMap : register(t4);
 TextureCube environmentMap : register(t5);
 TextureCube irradianceMap : register(t6);
+Texture2D shadowMap : register(t7);
 SamplerState samp : register(s0);
+SamplerComparisonState shadowSampler : register(s1);
 
 float3 FresnelSchlick(float cosTheta, float3 F0)
 {
@@ -64,6 +68,22 @@ float GeometrySchlickGGX(float NdotV, float NdotL, float roughness)
 {
     float k = (roughness + 1.0) * (roughness + 1.0) / 8.0;
     return (NdotV / (NdotV * (1.0 - k) + k)) * (NdotL / (NdotL * (1.0 - k) + k));
+}
+
+float ShadowCalculation(float4 lightSpacePos)
+{
+    float shadowFactor = 1.0f;
+    float depth = (lightSpacePos.z / lightSpacePos.w) * 0.5 + 0.2;
+    float2 shadowUV = (lightSpacePos.xy / lightSpacePos.w) * 0.5 + 0.5;
+    //float shadowDepth = shadowMap.SampleCmpLevelZero(shadowSampler, shadowUV, depth);
+    float shadowDepth = shadowMap.Sample(samp, shadowUV).x;
+    
+    float bias = 0.0025;
+    if (shadowDepth + bias < depth) // Bias to reduce shadow acne
+    {
+        shadowFactor = 0.5f; // In shadow
+    }
+    return shadowFactor; // Shadowed areas darker
 }
 
 float3 PBRLighting(float3 albedo, float metallic, float roughness, float ao, float3 N, float3 V, float3 L, Light light)
@@ -135,5 +155,10 @@ float4 main(PSInput input) : SV_TARGET
             finalColor += PBRLighting(albedo, metallic, roughness, ao, worldNormal, V, lightDir, Lights[i]) * intensity * attenuation;
         }
     }
+    input.lightSpacePos.y *= -1;
+    float shadowFactor = ShadowCalculation(input.lightSpacePos);
+    finalColor *= shadowFactor;
+    
+    //return float4(input.lightSpacePos.zzz, 1.0);
     return float4(finalColor, 1.0);
 }

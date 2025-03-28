@@ -40,6 +40,7 @@ namespace DX12Engine
 		virtual void Bind(ID3D12GraphicsCommandList* commandList, int* startIndex);
 
 		void SetEnvironmentMapHandle(D3D12_GPU_DESCRIPTOR_HANDLE* handle) { m_EnvironmentMapHandle = handle; }
+		void SetShadowMapHandle(D3D12_GPU_DESCRIPTOR_HANDLE* handle) { m_ShadowMapHandle = handle; }
 
 		PipelineStateBuilder PipelineStateBuilder;
 		RootSignatureBuilder RootSignatureBuilder;
@@ -52,5 +53,6 @@ namespace DX12Engine
 		Microsoft::WRL::ComPtr<ID3D12RootSignature> m_RootSignature;
 
 		D3D12_GPU_DESCRIPTOR_HANDLE* m_EnvironmentMapHandle;
+		D3D12_GPU_DESCRIPTOR_HANDLE* m_ShadowMapHandle;
 	};
 }
