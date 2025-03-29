@@ -65,7 +65,7 @@ namespace DX12Engine
 
 		return std::make_unique<DepthMap>(shadowMapResource, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, srvHandle, dsvHandle);
 	}
-	void ProceduralRenderer::RenderShadowMap(DepthMap* shadowMap, Light lightSource, std::vector<RenderObject*> sceneObjects)
+	void ProceduralRenderer::RenderShadowMap(DepthMap* shadowMap, LightData lightSource, std::vector<RenderObject*> sceneObjects)
 	{
 		ID3D12RootSignature* rootSignature = nullptr;
 		ID3D12PipelineState* pipelineState = nullptr;

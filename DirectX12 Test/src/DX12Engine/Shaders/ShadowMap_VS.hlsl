@@ -17,5 +17,7 @@ VSOutput main(VSInput input)
 {
     VSOutput output;
     output.pos = mul(LightViewProj, float4(input.pos, 1.0f));
+    output.pos = output.pos / output.pos.w;
+    output.pos.z = output.pos.z * 0.5 + 0.5;
     return output;
 }

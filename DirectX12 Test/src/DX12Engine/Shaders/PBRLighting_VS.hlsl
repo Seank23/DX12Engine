@@ -50,15 +50,17 @@ struct PSInput
 PSInput main(VSInput input)
 {
     PSInput output;
+    output.position = mul(MVPMatrix, float4(input.position, 1.0f));
     output.cameraPos = CameraPosition;
     float4 worldPos = mul(ModelMatrix, float4(input.position, 1.0f));
     output.worldPos = worldPos.xyz;
-    output.position = mul(MVPMatrix, float4(input.position, 1.0f));
-    output.lightSpacePos = mul(Lights[0].ViewProjMatrix, worldPos);
+    float3 offsetPos = worldPos.xyz + input.normal * 0.04f;
+    output.lightSpacePos = mul(Lights[0].ViewProjMatrix, float4(offsetPos, 1.0));
+    output.lightSpacePos.y *= -1;
     output.normal = input.normal;
+    output.texCoord = input.texCoord;
     float4 tangent = normalize(mul(ModelMatrix, float4(input.tangent, 1.0)));
     output.tangent = tangent.xyz / tangent.w;
     output.bitangent = cross(output.tangent, output.normal);
-    output.texCoord = input.texCoord;
     return output;
 }

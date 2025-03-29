@@ -135,6 +135,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="src\DX12Engine\Resources\Light.cpp" />
     <ClCompile Include="src\DX12Engine\Resources\DepthMap.cpp" />
     <ClCompile Include="src\DX12Engine\Rendering\ProceduralRenderer.cpp" />
     <ClCompile Include="src\ClientApplication.cpp" />
@@ -213,6 +214,7 @@
     </FxCompile>
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="src\DX12Engine\Resources\Light.h" />
     <ClInclude Include="src\DX12Engine\Resources\DepthMap.h" />
     <ClInclude Include="src\DX12Engine\Rendering\ProceduralRenderer.h" />
     <ClInclude Include="src\ClientApplication.h" />

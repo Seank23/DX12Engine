@@ -18,7 +18,7 @@ namespace DX12Engine
 		~ProceduralRenderer();
 
 		std::unique_ptr<DepthMap> CreateShadowMapResource();
-		void RenderShadowMap(DepthMap* shadowMap, Light lightSource, std::vector<RenderObject*> sceneObjects);
+		void RenderShadowMap(DepthMap* shadowMap, LightData lightSource, std::vector<RenderObject*> sceneObjects);
 
 	private:
 		void CreateShadowMapPSO(ID3D12RootSignature** outRootSignature, ID3D12PipelineState** outPipelineState);

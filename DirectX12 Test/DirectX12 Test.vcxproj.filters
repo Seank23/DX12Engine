@@ -111,6 +111,9 @@
     <ClCompile Include="src\DX12Engine\Resources\DepthMap.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="src\DX12Engine\Resources\Light.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <FxCompile Include="src\DX12Engine\Shaders\BasicLighting_VS.hlsl" />
@@ -240,6 +243,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="src\DX12Engine\Resources\DepthMap.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\DX12Engine\Resources\Light.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
