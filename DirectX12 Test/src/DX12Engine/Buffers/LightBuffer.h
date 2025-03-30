@@ -22,6 +22,8 @@ namespace DX12Engine
 		void AddLight(Light* light);
         D3D12_GPU_VIRTUAL_ADDRESS GetCBVAddress() { return m_ConstantBuffer->GetGPUAddress(); }
         Light* GetLight(int index) { return m_Lights[index]; }
+        std::vector<Light*> GetAllLights() { return m_Lights; }
+        int GetLightCount() { return m_Lights.size(); }
 
     private:
         LightBufferData m_LightsBufferData;

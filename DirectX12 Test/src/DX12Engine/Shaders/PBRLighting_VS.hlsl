@@ -1,3 +1,5 @@
+#define MAX_LIGHTS 4
+
 cbuffer ConstantBuffer : register(b1)
 {
     float4x4 ModelMatrix;
@@ -24,7 +26,7 @@ cbuffer LightBuffer : register(b0)
 {
     int LightCount;
     float3 Padding;
-    Light Lights[4];
+    Light Lights[MAX_LIGHTS];
 };
 
 struct VSInput
@@ -40,7 +42,7 @@ struct PSInput
     float4 position : SV_POSITION;
     float3 cameraPos : POSITION0;
     float3 worldPos : POSITION1;
-    float4 lightSpacePos : POSITION2;
+    float4 lightSpacePos[MAX_LIGHTS] : POSITION2;
     float3 normal : NORMAL;
     float2 texCoord : TEXCOORD;
     float3 tangent : TANGENT;
@@ -55,8 +57,11 @@ PSInput main(VSInput input)
     float4 worldPos = mul(ModelMatrix, float4(input.position, 1.0f));
     output.worldPos = worldPos.xyz;
     float3 offsetPos = worldPos.xyz + input.normal * 0.04f;
-    output.lightSpacePos = mul(Lights[0].ViewProjMatrix, float4(offsetPos, 1.0));
-    output.lightSpacePos.y *= -1;
+    for (int i = 0; i < LightCount; i++)
+    {
+        output.lightSpacePos[i] = mul(Lights[i].ViewProjMatrix, float4(offsetPos, 1.0));
+        output.lightSpacePos[i].y *= -1;
+    }
     output.normal = input.normal;
     output.texCoord = input.texCoord;
     float4 tangent = normalize(mul(ModelMatrix, float4(input.tangent, 1.0)));

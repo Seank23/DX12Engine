@@ -2,10 +2,10 @@
 
 namespace DX12Engine
 {
-	DepthMap::DepthMap(ID3D12Resource* mainResource, D3D12_RESOURCE_STATES usageState, DescriptorHeapHandle shaderDescriptor, DescriptorHeapHandle depthStencilDescriptor)
+	DepthMap::DepthMap(ID3D12Resource* mainResource, D3D12_RESOURCE_STATES usageState, DescriptorHeapHandle shaderDescriptor, std::vector<DescriptorHeapHandle> depthStencilDescriptors)
 		: GPUResource(mainResource, usageState, shaderDescriptor)
 	{
-		m_DepthStencilDescriptor = depthStencilDescriptor;
+		m_DepthStencilDescriptors = depthStencilDescriptors;
 	}
 
 	DepthMap::~DepthMap()

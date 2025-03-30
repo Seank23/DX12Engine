@@ -1,14 +1,4 @@
-struct PSInput
-{
-    float4 position : SV_POSITION;
-    float3 cameraPos : POSITION0;
-    float3 worldPos : POSITION1;
-    float4 lightSpacePos : POSITION2;
-    float3 normal : NORMAL;
-    float2 texCoord : TEXCOORD;
-    float3 tangent : TANGENT;
-    float3 bitangent : BITANGENT;
-};
+#define MAX_LIGHTS 4
 
 struct Light
 {
@@ -27,7 +17,19 @@ cbuffer LightBuffer : register(b0)
 {
     int LightCount;
     float3 Padding;
-    Light Lights[4];
+    Light Lights[MAX_LIGHTS];
+};
+
+struct PSInput
+{
+    float4 position : SV_POSITION;
+    float3 cameraPos : POSITION0;
+    float3 worldPos : POSITION1;
+    float4 lightSpacePos[MAX_LIGHTS] : POSITION2;
+    float3 normal : NORMAL;
+    float2 texCoord : TEXCOORD;
+    float3 tangent : TANGENT;
+    float3 bitangent : BITANGENT;
 };
 
 // PBR Material Data
@@ -48,7 +50,7 @@ Texture2D roughnessMap : register(t3);
 Texture2D aoMap : register(t4);
 TextureCube environmentMap : register(t5);
 TextureCube irradianceMap : register(t6);
-Texture2D shadowMap : register(t7);
+Texture2DArray shadowMaps : register(t7);
 SamplerState samp : register(s0);
 SamplerComparisonState shadowSampler : register(s1);
 
@@ -99,22 +101,23 @@ float3 PBRLighting(float3 albedo, float metallic, float roughness, float ao, flo
     return color * radiance;
 }
 
-float ShadowPCF(float4 lightSpacePos, float softRadius)
+float ShadowPCF(int lightIndex, float4 lightSpacePos, float softRadius)
 {
     float shadow = 0.0f;
-    float2 texSize;
-    shadowMap.GetDimensions(texSize.x, texSize.y);
+    float3 texSize;
+    shadowMaps.GetDimensions(texSize.x, texSize.y, texSize.z);
     float texelSize = 1.0 / texSize.x;
     float radius = texelSize * softRadius;
     
-    float depth = (lightSpacePos.z / lightSpacePos.w);
+    float depth = lightSpacePos.z / lightSpacePos.w;
     float2 shadowUV = (lightSpacePos.xy / lightSpacePos.w) * 0.5 + 0.5;
-
+    
     for (int y = -1; y <= 1; y++)
     {
         for (int x = -1; x <= 1; x++)
         {
-            shadow += shadowMap.SampleCmpLevelZero(shadowSampler, shadowUV + float2(x, y) * radius, depth);
+            float2 transformedUV = shadowUV + float2(x, y) * radius;
+            shadow += shadowMaps.SampleCmpLevelZero(shadowSampler, float3(transformedUV, lightIndex), depth);
         }
     }
     shadow /= 9.0;
@@ -136,6 +139,7 @@ float4 main(PSInput input) : SV_TARGET
     float3 worldNormal = normalize(mul(textureNormal, TBN));
     
     float3 finalColor = float3(0, 0, 0);
+    float shadowFactor = 1.0;
     
     float3 indirectDiffuse = albedo * irradianceMap.Sample(samp, worldNormal).rgb;
     finalColor += indirectDiffuse;
@@ -162,8 +166,8 @@ float4 main(PSInput input) : SV_TARGET
             float attenuation = saturate(1.0 - (dist * dist) / (Lights[i].Range * Lights[i].Range));
             finalColor += PBRLighting(albedo, metallic, roughness, ao, worldNormal, V, lightDir, Lights[i]) * intensity * attenuation;
         }
+        shadowFactor *= ShadowPCF(i, input.lightSpacePos[i], 2.0);
     }
-    float shadowFactor = ShadowPCF(input.lightSpacePos, 2.0);
     finalColor *= shadowFactor;
     
     return float4(finalColor, 1.0);

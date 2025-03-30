@@ -18,14 +18,14 @@ namespace DX12Engine
 	{
 	}
 
-	std::unique_ptr<DepthMap> ProceduralRenderer::CreateShadowMapResource()
+	std::unique_ptr<DepthMap> ProceduralRenderer::CreateShadowMapResource(int numLights)
 	{
 		auto device = m_RenderContext.GetDevice();
 		D3D12_RESOURCE_DESC shadowMapDesc = {};
 		shadowMapDesc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
 		shadowMapDesc.Width = SHADOW_MAP_SIZE;
 		shadowMapDesc.Height = SHADOW_MAP_SIZE;
-		shadowMapDesc.DepthOrArraySize = 1;
+		shadowMapDesc.DepthOrArraySize = numLights;
 		shadowMapDesc.MipLevels = 1;
 		shadowMapDesc.Format = DXGI_FORMAT_D32_FLOAT;
 		shadowMapDesc.SampleDesc.Count = 1;
@@ -46,77 +46,88 @@ namespace DX12Engine
 			&depthOptimizedClearValue,
 			IID_PPV_ARGS(&shadowMapResource));
 
-		D3D12_DEPTH_STENCIL_VIEW_DESC dsvDesc = {};
-		dsvDesc.Format = DXGI_FORMAT_D32_FLOAT;
-		dsvDesc.ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2D;
-		dsvDesc.Flags = D3D12_DSV_FLAG_NONE;
+		std::vector<DescriptorHeapHandle> dsvDescriptors;
+		for (int i = 0; i < numLights; i++)
+		{
+			D3D12_DEPTH_STENCIL_VIEW_DESC dsvDesc = {};
+			dsvDesc.Format = DXGI_FORMAT_D32_FLOAT;
+			dsvDesc.ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2DARRAY;
+			dsvDesc.Texture2DArray.FirstArraySlice = i;
+			dsvDesc.Texture2DArray.ArraySize = 1;
+			dsvDesc.Texture2DArray.MipSlice = 0;
 
-		DescriptorHeapHandle dsvHandle = m_HeapManager->GetNewDSVDescriptorHeapHandle();
-		device->CreateDepthStencilView(shadowMapResource, &dsvDesc, dsvHandle.GetCPUHandle());
+			DescriptorHeapHandle dsvHandle = m_HeapManager->GetNewDSVDescriptorHeapHandle();
+			device->CreateDepthStencilView(shadowMapResource, &dsvDesc, dsvHandle.GetCPUHandle());
+			dsvDescriptors.push_back(dsvHandle);
+		}
 
 		D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
 		srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
 		srvDesc.Format = DXGI_FORMAT_R32_FLOAT;
-		srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+		srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2DARRAY;
 		srvDesc.Texture2D.MipLevels = 1;
+		srvDesc.Texture2DArray.ArraySize = numLights;
 
 		DescriptorHeapHandle srvHandle = m_HeapManager->GetRenderHeapHandleBlock(1);
 		device->CreateShaderResourceView(shadowMapResource, &srvDesc, srvHandle.GetCPUHandle());
 
-		return std::make_unique<DepthMap>(shadowMapResource, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, srvHandle, dsvHandle);
+		return std::make_unique<DepthMap>(shadowMapResource, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, srvHandle, dsvDescriptors);
 	}
-	void ProceduralRenderer::RenderShadowMap(DepthMap* shadowMap, LightData lightSource, std::vector<RenderObject*> sceneObjects)
+	void ProceduralRenderer::RenderShadowMap(DepthMap* shadowMap, std::vector<Light*> lights, std::vector<RenderObject*> sceneObjects)
 	{
 		ID3D12RootSignature* rootSignature = nullptr;
 		ID3D12PipelineState* pipelineState = nullptr;
 		CreateShadowMapPSO(&rootSignature, &pipelineState);
 
-		if (!m_RenderContext.GetUploader().UploadAllPending()) // Upload any pending resources
-			m_QueueManager.GetGraphicsQueue().ResetCommandAllocatorAndList();
-
-		m_GraphicsCommandList->SetPipelineState(pipelineState);
-		m_GraphicsCommandList->SetGraphicsRootSignature(rootSignature);
-
-		D3D12_VIEWPORT shadowViewport = { 0.0f, 0.0f, (float)SHADOW_MAP_SIZE, (float)SHADOW_MAP_SIZE, -1.0f, 1.0f };
-		D3D12_RECT shadowScissorRect = { 0, 0, SHADOW_MAP_SIZE, SHADOW_MAP_SIZE };
-		m_GraphicsCommandList->RSSetViewports(1, &shadowViewport);
-		m_GraphicsCommandList->RSSetScissorRects(1, &shadowScissorRect);
-
-		auto barrier = CD3DX12_RESOURCE_BARRIER::Transition(
-			shadowMap->GetResource(),
-			D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE,
-			D3D12_RESOURCE_STATE_DEPTH_WRITE
-		);
-		m_GraphicsCommandList->ResourceBarrier(1, &barrier);
-		shadowMap->SetUsageState(D3D12_RESOURCE_STATE_DEPTH_WRITE);
-
-		auto dsvHandle = shadowMap->GetDepthStencilDescriptor().GetCPUHandle();
-		m_GraphicsCommandList->OMSetRenderTargets(0, nullptr, FALSE, &dsvHandle);
-		m_GraphicsCommandList->ClearDepthStencilView(dsvHandle, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
-
-		m_GraphicsCommandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-
-		for (RenderObject* object : sceneObjects)
+		for (int i = 0; i < lights.size(); i++)
 		{
-			DirectX::XMMATRIX mvpMatrix = DirectX::XMMatrixMultiply(object->GetModelMatrix(), lightSource.ViewProjMatrix);
+			if (!m_RenderContext.GetUploader().UploadAllPending()) // Upload any pending resources
+				m_QueueManager.GetGraphicsQueue().ResetCommandAllocatorAndList();
 
-			m_GraphicsCommandList->SetGraphicsRoot32BitConstants(0, sizeof(mvpMatrix) / 4, &mvpMatrix, 0);
-			auto vertexBufferView = object->m_VertexBuffer->GetVertexBufferView();
-			auto indexBufferView = object->m_IndexBuffer->GetIndexBufferView();
-			m_GraphicsCommandList->IASetVertexBuffers(0, 1, &vertexBufferView);
-			m_GraphicsCommandList->IASetIndexBuffer(&indexBufferView);
-			m_GraphicsCommandList->DrawIndexedInstanced(indexBufferView.SizeInBytes / 4, 1, 0, 0, 0);
+			m_GraphicsCommandList->SetPipelineState(pipelineState);
+			m_GraphicsCommandList->SetGraphicsRootSignature(rootSignature);
+
+			D3D12_VIEWPORT shadowViewport = { 0.0f, 0.0f, (float)SHADOW_MAP_SIZE, (float)SHADOW_MAP_SIZE, -1.0f, 1.0f };
+			D3D12_RECT shadowScissorRect = { 0, 0, SHADOW_MAP_SIZE, SHADOW_MAP_SIZE };
+			m_GraphicsCommandList->RSSetViewports(1, &shadowViewport);
+			m_GraphicsCommandList->RSSetScissorRects(1, &shadowScissorRect);
+
+			auto barrier = CD3DX12_RESOURCE_BARRIER::Transition(
+				shadowMap->GetResource(),
+				D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE,
+				D3D12_RESOURCE_STATE_DEPTH_WRITE
+			);
+			m_GraphicsCommandList->ResourceBarrier(1, &barrier);
+			shadowMap->SetUsageState(D3D12_RESOURCE_STATE_DEPTH_WRITE);
+
+			auto dsvHandle = shadowMap->GetDepthStencilDescriptor(i).GetCPUHandle();
+			m_GraphicsCommandList->OMSetRenderTargets(0, nullptr, FALSE, &dsvHandle);
+			m_GraphicsCommandList->ClearDepthStencilView(dsvHandle, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
+
+			m_GraphicsCommandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+
+			for (RenderObject* object : sceneObjects)
+			{
+				DirectX::XMMATRIX mvpMatrix = DirectX::XMMatrixMultiply(object->GetModelMatrix(), lights[i]->GetViewProjMatrix());
+
+				m_GraphicsCommandList->SetGraphicsRoot32BitConstants(0, sizeof(mvpMatrix) / 4, &mvpMatrix, 0);
+				auto vertexBufferView = object->m_VertexBuffer->GetVertexBufferView();
+				auto indexBufferView = object->m_IndexBuffer->GetIndexBufferView();
+				m_GraphicsCommandList->IASetVertexBuffers(0, 1, &vertexBufferView);
+				m_GraphicsCommandList->IASetIndexBuffer(&indexBufferView);
+				m_GraphicsCommandList->DrawIndexedInstanced(indexBufferView.SizeInBytes / 4, 1, 0, 0, 0);
+			}
+			barrier = CD3DX12_RESOURCE_BARRIER::Transition(
+				shadowMap->GetResource(),
+				D3D12_RESOURCE_STATE_DEPTH_WRITE,
+				D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE
+			);
+			m_GraphicsCommandList->ResourceBarrier(1, &barrier);
+			shadowMap->SetUsageState(D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+
+			UINT fenceVal = m_QueueManager.GetGraphicsQueue().ExecuteCommandList();
+			m_QueueManager.WaitForFenceCPUBlocking(fenceVal);
 		}
-		barrier = CD3DX12_RESOURCE_BARRIER::Transition(
-			shadowMap->GetResource(),
-			D3D12_RESOURCE_STATE_DEPTH_WRITE,
-			D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE
-		);
-		m_GraphicsCommandList->ResourceBarrier(1, &barrier);
-		shadowMap->SetUsageState(D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
-
-		UINT fenceVal = m_QueueManager.GetGraphicsQueue().ExecuteCommandList();
-		m_QueueManager.WaitForFenceCPUBlocking(fenceVal);
 	}
 
 	void ProceduralRenderer::CreateShadowMapPSO(ID3D12RootSignature** outRootSignature, ID3D12PipelineState** outPipelineState)

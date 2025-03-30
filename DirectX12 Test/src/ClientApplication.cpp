@@ -117,20 +117,23 @@ ClientApplication::ClientApplication()
 	pointLight.Range = 3.0f;
 	pointLight.Color = { 1.0f, 1.0f, 1.0f };*/
 	//lightBuffer.AddLight(pointLight);
-	/*DX12Engine::Light spotLight;
+	DX12Engine::Light spotLight;
 	spotLight.SetType((int)DX12Engine::LightType::Spot);
-	spotLight.SetPosition({ -5.0f, 5.5f, -5.0f });
-	spotLight.SetDirection({ 0.577f, -0.777f, 0.577f });
-	spotLight.SetIntensity(10.0f);
+	spotLight.SetPosition({ 1.0f, 6.0f, -1.0f });
+	spotLight.SetDirection({ -0.1f, -0.8f, 0.1f });
+	spotLight.SetColor({ 0.9f, 0.5f, 0.0f });
+	spotLight.SetIntensity(4.0f);
 	spotLight.SetSpotAngle(45.0f);
-	lightBuffer.AddLight(&spotLight);*/
+	lightBuffer.AddLight(&spotLight);
 	renderer.SetLightBuffer(&lightBuffer);
 
 	m_Camera = std::make_unique<DX12Engine::Camera>(1600.0f / 900.0f, 0.001f, 100.0f);
+	m_Camera->SetPosition({ 4.0f, 2.0f, -5.0f });
+	m_Camera->SetRotation(-20.0, 125.0);
 	renderer.SetCamera(m_Camera.get());
 
 	DX12Engine::ProceduralRenderer proceduralRenderer = context->GetProcedualRenderer();
-	std::unique_ptr<DX12Engine::DepthMap> shadowMap = proceduralRenderer.CreateShadowMapResource();
+	std::unique_ptr<DX12Engine::DepthMap> shadowMap = proceduralRenderer.CreateShadowMapResource(lightBuffer.GetLightCount());
 
 	std::vector<DX12Engine::RenderObject*> shadowCastingObjects{ &object1, &object2, &floor };
 
@@ -138,14 +141,14 @@ ClientApplication::ClientApplication()
 	{
 		m_Camera->ProcessKeyboardInput(0.01f);
 
-		proceduralRenderer.RenderShadowMap(shadowMap.get(), lightBuffer.GetLight(0)->GetLightData(), shadowCastingObjects);
+		proceduralRenderer.RenderShadowMap(shadowMap.get(), lightBuffer.GetAllLights(), shadowCastingObjects);
 
 		renderer.InitFrame(renderer.GetDefaultViewport(), renderer.GetDefaultScissorRect());
 		//lightBuffer.GetLight(0)->SetPosition({ -5.0f + count, 5.5f, -5.0f });
 		lightBuffer.Update();
 		renderer.SetShadowMap(shadowMap.get());
-		//object1.SetModelMatrix(DirectX::XMMatrixTranslation(-2.0f * DirectX::XMScalarSin(count), 0.0f, 1.0f));
-		//object2.SetModelMatrix(DirectX::XMMatrixTranslation(2.0f * DirectX::XMScalarSin(count), 0.0f, -1.0f));
+		//object1.SetModelMatrix(DirectX::XMMatrixTranslation(2.0f * DirectX::XMScalarCos(count), 1.0f + DirectX::XMScalarSin(count), 1.0f));
+		//object2.SetModelMatrix(DirectX::XMMatrixTranslation(2.0f * DirectX::XMScalarSin(count), 1.0f + DirectX::XMScalarCos(count), -1.0f));
 		renderer.Render(&object1);
 		renderer.Render(&object2);
 		renderer.Render(&floor);

@@ -91,8 +91,8 @@ namespace DX12Engine
 
 	void Camera::SetRotation(float pitch, float yaw)
 	{
-		m_Pitch = pitch;
-		m_Yaw = yaw;
+		m_Pitch = DirectX::XMConvertToRadians(pitch);
+		m_Yaw = DirectX::XMConvertToRadians(yaw);
 		UpdateViewMatrix();
 	}
 

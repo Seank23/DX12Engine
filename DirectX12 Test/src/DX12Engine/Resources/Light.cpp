@@ -50,7 +50,7 @@ namespace DX12Engine
             lightPos = DirectX::XMLoadFloat3(&m_LightData.Position);
             DirectX::XMVECTOR target = DirectX::XMVectorAdd(lightPos, lightDir);
             lightView = DirectX::XMMatrixLookAtLH(lightPos, target, UpDirection);
-            lightProj = DirectX::XMMatrixPerspectiveFovLH(m_LightData.SpotAngle * 2.0f, 1.0, 1.0f, 20.0f);
+            lightProj = DirectX::XMMatrixPerspectiveFovLH(m_LightData.SpotAngle * 2.0f, 1.0, 1.0f, 50.0f);
             m_LightData.ViewProjMatrix = DirectX::XMMatrixMultiply(lightView, lightProj);
             break;
         }
