@@ -17,6 +17,8 @@ namespace DX12Engine
 		m_Shaders.insert({ "Skybox_VS", std::make_unique<Shader>("E:\\Projects\\source\\repos\\DirectX12 Test\\DirectX12 Test\\src\\DX12Engine\\Shaders\\Skybox_VS.hlsl", "vertex") });
 		m_Shaders.insert({ "Skybox_PS", std::make_unique<Shader>("E:\\Projects\\source\\repos\\DirectX12 Test\\DirectX12 Test\\src\\DX12Engine\\Shaders\\Skybox_PS.hlsl", "pixel") });
 		m_Shaders.insert({ "ShadowMap_VS", std::make_unique<Shader>("E:\\Projects\\source\\repos\\DirectX12 Test\\DirectX12 Test\\src\\DX12Engine\\Shaders\\ShadowMap_VS.hlsl", "vertex") });
+		m_Shaders.insert({ "ShadowCubeMap_VS", std::make_unique<Shader>("E:\\Projects\\source\\repos\\DirectX12 Test\\DirectX12 Test\\src\\DX12Engine\\Shaders\\ShadowCubeMap_VS.hlsl", "vertex") });
+		m_Shaders.insert({ "ShadowCubeMap_PS", std::make_unique<Shader>("E:\\Projects\\source\\repos\\DirectX12 Test\\DirectX12 Test\\src\\DX12Engine\\Shaders\\ShadowCubeMap_PS.hlsl", "pixel") });
 	}
 
 	ResourceManager::~ResourceManager()

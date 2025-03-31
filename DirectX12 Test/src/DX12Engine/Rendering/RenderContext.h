@@ -26,7 +26,7 @@ namespace DX12Engine
 		CommandQueueManager&						GetQueueManager() const { return *m_QueueManager; }
 		DescriptorHeapManager&						GetHeapManager() const { return *m_HeapManager; }
 		GPUUploader&								GetUploader() const { return *m_Uploader; }
-		ProceduralRenderer&							GetProcedualRenderer() const { return *m_ProcRenderer; }
+		ProceduralRenderer&							GetProceduralRenderer() const { return *m_ProcRenderer; }
 
 		CD3DX12_RESOURCE_BARRIER	TransitionRenderTarget(bool forward) const { return m_RenderWindow->TransitionRenderTarget(forward); }
 		bool						ProcessWindowMessages() const { return m_RenderWindow->ProcessWindowMessages(); }

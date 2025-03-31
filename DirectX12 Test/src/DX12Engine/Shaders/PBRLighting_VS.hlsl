@@ -56,7 +56,7 @@ PSInput main(VSInput input)
     output.cameraPos = CameraPosition;
     float4 worldPos = mul(ModelMatrix, float4(input.position, 1.0f));
     output.worldPos = worldPos.xyz;
-    float3 offsetPos = worldPos.xyz + input.normal * 0.04f;
+    float3 offsetPos = worldPos.xyz + input.normal * 0.02f;
     for (int i = 0; i < LightCount; i++)
     {
         output.lightSpacePos[i] = mul(Lights[i].ViewProjMatrix, float4(offsetPos, 1.0));

@@ -41,6 +41,7 @@ namespace DX12Engine
 
 		void SetEnvironmentMapHandle(D3D12_GPU_DESCRIPTOR_HANDLE* handle) { m_EnvironmentMapHandle = handle; }
 		void SetShadowMapHandle(D3D12_GPU_DESCRIPTOR_HANDLE* handle) { m_ShadowMapHandle = handle; }
+		void SetShadowCubeMapHandle(D3D12_GPU_DESCRIPTOR_HANDLE* handle) { m_ShadowCubeMapHandle = handle; }
 
 		PipelineStateBuilder PipelineStateBuilder;
 		RootSignatureBuilder RootSignatureBuilder;
@@ -54,5 +55,6 @@ namespace DX12Engine
 
 		D3D12_GPU_DESCRIPTOR_HANDLE* m_EnvironmentMapHandle;
 		D3D12_GPU_DESCRIPTOR_HANDLE* m_ShadowMapHandle;
+		D3D12_GPU_DESCRIPTOR_HANDLE* m_ShadowCubeMapHandle;
 	};
 }

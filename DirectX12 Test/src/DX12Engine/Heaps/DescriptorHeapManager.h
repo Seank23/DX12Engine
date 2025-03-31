@@ -16,6 +16,7 @@ namespace DX12Engine
 
 		StagingDescriptorHeap& GetStagingHeap() { return *m_StagingHeap; }
 		RenderPassDescriptorHeap& GetRenderPassHeap() { return *m_RenderPassHeap; }
+		StagingDescriptorHeap& GetDepthStencilHeap() { return *m_DepthStencilHeap; }
 
 	private:
 		Microsoft::WRL::ComPtr<ID3D12Device> m_Device;

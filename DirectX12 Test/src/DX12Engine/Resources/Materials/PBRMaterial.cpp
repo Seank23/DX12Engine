@@ -9,7 +9,7 @@ namespace DX12Engine
 		PipelineStateBuilder = PipelineStateBuilder.ConfigureFromDefault(ResourceManager::GetInstance().GetShader("PBRLighting_VS"), ResourceManager::GetInstance().GetShader("PBRLighting_PS"));
 		DescriptorTableConfig materialTable(5, D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 0);
 		DescriptorTableConfig envTable(2, D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 5);
-		DescriptorTableConfig shadowTable(1, D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 7);
+		DescriptorTableConfig shadowTable(2, D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 7);
 		RootSignatureBuilder = RootSignatureBuilder.AddConstantBuffer(0)
 			.AddConstantBuffer(1)
 			.AddConstantBuffer(2)
@@ -69,6 +69,8 @@ namespace DX12Engine
 			commandList->SetGraphicsRootDescriptorTable((*startIndex)++, *m_EnvironmentMapHandle);
 		if (m_ShadowMapHandle != nullptr)
 			commandList->SetGraphicsRootDescriptorTable((*startIndex)++, *m_ShadowMapHandle);
+		//if (m_ShadowCubeMapHandle != nullptr)
+		//	commandList->SetGraphicsRootDescriptorTable((*startIndex)++, *m_ShadowCubeMapHandle);
 	}
 
 	void PBRMaterial::SetAlbedo(DirectX::XMFLOAT3 albedo)

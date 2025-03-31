@@ -25,6 +25,7 @@ namespace DX12Engine
 		void SetCamera(Camera* camera) { m_Camera = camera; }
 		void SetSkybox(Skybox* skybox) { m_Skybox = skybox; }
 		void SetShadowMap(DepthMap* shadowMap) { m_ShadowMap = shadowMap; }
+		void SetShadowCubeMap(DepthMap* shadowCubeMap) { m_ShadowCubeMap = shadowCubeMap; }
 
 		D3D12_VIEWPORT GetDefaultViewport();
 		D3D12_RECT GetDefaultScissorRect();
@@ -42,6 +43,7 @@ namespace DX12Engine
 		Camera* m_Camera;
 		Skybox* m_Skybox;
 		DepthMap* m_ShadowMap;
+		DepthMap* m_ShadowCubeMap;
 	};
 }
 

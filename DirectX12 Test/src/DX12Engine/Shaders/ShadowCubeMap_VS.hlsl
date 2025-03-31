@@ -8,19 +8,17 @@ cbuffer ShadowConstants : register(b0)
 
 struct VSInput
 {
-    float3 pos : POSITION;
+    float3 Position : POSITION;
 };
 
 struct VSOutput
 {
-    float4 pos : SV_POSITION;
+    float4 Position : SV_POSITION;
 };
 
 VSOutput main(VSInput input)
 {
     VSOutput output;
-    output.pos = mul(LightMVPMatrix, float4(input.pos, 1.0f));
-    output.pos = output.pos / output.pos.w;
-    output.pos.z = output.pos.z * 0.5 + 0.5;
+    output.Position = mul(LightMVPMatrix, float4(input.Position, 1.0));
     return output;
 }

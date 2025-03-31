@@ -16,13 +16,14 @@ namespace DX12Engine
 		m_QueueManager = std::make_unique<CommandQueueManager>(m_Device.Get());
 		m_HeapManager = std::make_unique<DescriptorHeapManager>(m_Device);
 		m_Uploader = std::make_unique<GPUUploader>(*this);
+
+		ResourceManager::GetInstance().Init(*this);
+
 		m_ProcRenderer = std::make_unique<ProceduralRenderer>(*this);
 
 		m_RenderWindow->CreateSwapChain(m_QueueManager->GetGraphicsQueue().GetCommandQueue().Get());
 		m_RenderWindow->CreateRTVHeap(m_Device.Get());
 		m_RenderWindow->CreateDepthStencilBuffer(m_Device.Get());
-
-		ResourceManager::GetInstance().Init(*this);
 	}
 
 	RenderContext::~RenderContext()

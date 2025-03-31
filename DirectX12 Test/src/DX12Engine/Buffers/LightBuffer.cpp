@@ -6,6 +6,9 @@ namespace DX12Engine
 	LightBuffer::LightBuffer()
 	{
 		m_ConstantBuffer = ResourceManager::GetInstance().CreateConstantBuffer(sizeof(LightBufferData));
+		m_LightsByTypeMap[LightType::Directional] = {};
+		m_LightsByTypeMap[LightType::Spot] = {};
+		m_LightsByTypeMap[LightType::Point] = {};
 	}
 
 	LightBuffer::~LightBuffer()
@@ -23,7 +26,20 @@ namespace DX12Engine
 	void LightBuffer::AddLight(Light* light)
 	{
 		m_Lights.push_back(light);
+		m_LightsByTypeMap[light->GetType()].push_back(m_LightsBufferData.LightCount);
 		m_LightsBufferData.Lights[m_LightsBufferData.LightCount++] = light->GetLightData();
 		Update();
+	}
+
+	std::vector<Light*> LightBuffer::GetLightsByType(std::vector<LightType> types)
+	{
+		std::vector<Light*> lightsByType;
+		for (LightType type : types)
+		{
+			std::vector indices = m_LightsByTypeMap[type];
+			for (int index : indices)
+				lightsByType.push_back(m_Lights[index]);
+		}
+		return lightsByType;
 	}
 }

@@ -62,6 +62,11 @@ namespace DX12Engine
 				D3D12_GPU_DESCRIPTOR_HANDLE shadowMapHandle = m_ShadowMap->GetDescriptor()->GetGPUHandle();
 				renderObject->m_Material->SetShadowMapHandle(&shadowMapHandle);
 			}
+			if (m_ShadowCubeMap != nullptr)
+			{
+				D3D12_GPU_DESCRIPTOR_HANDLE shadowCubeMapHandle = m_ShadowCubeMap->GetDescriptor()->GetGPUHandle();
+				renderObject->m_Material->SetShadowCubeMapHandle(&shadowCubeMapHandle);
+			}
 		}
 		renderObject->m_Material->Bind(m_CommandList, &startIndex);
 		// Mesh binding

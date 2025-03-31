@@ -29,6 +29,19 @@ namespace DX12Engine
         UpdateViewProjMatrix();
     }
 
+    float Light::GetFarPlane()
+    {
+        switch (GetType())
+        {
+        case LightType::Directional:
+            return 20.0f;
+        case LightType::Point:
+            return 10.0f;
+        case LightType::Spot:
+            return 50.0f;
+        }
+    }
+
     void Light::UpdateViewProjMatrix()
     {
         DirectX::XMVECTOR lightDir;
@@ -42,7 +55,7 @@ namespace DX12Engine
             lightDir = DirectX::XMVector3Normalize(DirectX::XMLoadFloat3(&m_LightData.Direction));
             lightPos = DirectX::XMVectorSubtract(DirectX::XMLoadFloat3(&centre), DirectX::XMVectorScale(lightDir, 10.0f));
             lightView = DirectX::XMMatrixLookAtLH(lightPos, DirectX::XMLoadFloat3(&centre), UpDirection);
-            lightProj = DirectX::XMMatrixOrthographicLH(15.0f, 15.0f, 1.f, 50.0f);
+            lightProj = DirectX::XMMatrixOrthographicLH(15.0f, 15.0f, 1.f, GetFarPlane());
             m_LightData.ViewProjMatrix = DirectX::XMMatrixMultiply(lightView, lightProj);
             break;
         case (int)LightType::Spot:
@@ -50,8 +63,12 @@ namespace DX12Engine
             lightPos = DirectX::XMLoadFloat3(&m_LightData.Position);
             DirectX::XMVECTOR target = DirectX::XMVectorAdd(lightPos, lightDir);
             lightView = DirectX::XMMatrixLookAtLH(lightPos, target, UpDirection);
-            lightProj = DirectX::XMMatrixPerspectiveFovLH(m_LightData.SpotAngle * 2.0f, 1.0, 1.0f, 50.0f);
+            lightProj = DirectX::XMMatrixPerspectiveFovLH(m_LightData.SpotAngle * 2.0f, 1.0, 1.0f, GetFarPlane());
             m_LightData.ViewProjMatrix = DirectX::XMMatrixMultiply(lightView, lightProj);
+            break;
+        case (int)LightType::Point:
+            lightProj = DirectX::XMMatrixPerspectiveFovLH(DirectX::XM_PIDIV2, 1.0f, 0.1, GetFarPlane());
+            m_LightData.ViewProjMatrix = lightProj;
             break;
         }
     }

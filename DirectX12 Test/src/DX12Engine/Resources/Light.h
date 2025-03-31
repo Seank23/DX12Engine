@@ -37,8 +37,10 @@ namespace DX12Engine
         void SetDirection(DirectX::XMFLOAT3 direction);
         void SetSpotAngle(float angle);
 
+        LightType GetType() { return (LightType)m_LightData.Type; }
         LightData& GetLightData() { return m_LightData; }
         DirectX::XMMATRIX GetViewProjMatrix() { return m_LightData.ViewProjMatrix; }
+        float GetFarPlane();
 
     private:
         void UpdateViewProjMatrix();
