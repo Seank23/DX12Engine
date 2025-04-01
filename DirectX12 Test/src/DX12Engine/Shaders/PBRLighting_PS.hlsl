@@ -127,19 +127,33 @@ float ShadowPCF(int lightIndex, float4 lightSpacePos, float softRadius, float3 n
     return shadow + bias;
 }
 
-float PointLightShadowPCF(float3 worldPos, float3 lightPos, float3 normal)
+float PointLightShadowPCF(float3 worldPos, float3 lightPos, float softRadius, float3 normal)
 {
-    float3 lightToFrag = (worldPos - lightPos) + normal * 0.1;
-    float lightDepth = length(lightToFrag) * 0.5;
-    float shadowBias = 0.002;
+    float3 texSize;
+    shadowCubeMap.GetDimensions(0, texSize.x, texSize.y, texSize.z);
+    float texelSize = 1.0 / texSize.x;
+    float radius = texelSize * softRadius;
     
-    float shadow = 0.0;
-    shadow += shadowCubeMap.Sample(samp, normalize(lightToFrag)).x;
-
-    if (shadow < lightDepth)
-        return shadow;
-    else
-        return 1.0;
+    float3 lightToFrag = (worldPos - lightPos) + normal * 0.05;
+    float lightDepth = length(lightToFrag) * 0.28;
+    float shadowBias = 0.002;
+    float shadowFactor = 0.0;
+    
+    for (int y = -1; y <= 1; y++)
+    {
+        for (int x = -1; x <= 1; x++)
+        {
+            float shadow = 0.0;
+            float3 transformedUV = normalize(lightToFrag) + float3(x, y, 0) * radius;
+            shadow = shadowCubeMap.Sample(samp, transformedUV).x;
+            if (shadow + shadowBias < lightDepth && shadow < 0.92)
+                shadowFactor += shadow / min(lightDepth * 2.0, 3.0);
+            else
+               shadowFactor += 1.0;
+        }
+    }
+    shadowFactor /= 9.0;
+    return shadowFactor;
 }
 
 float4 main(PSInput input) : SV_TARGET
@@ -176,7 +190,7 @@ float4 main(PSInput input) : SV_TARGET
             float dist = length(Lights[i].Position - input.worldPos);
             float attenuation = saturate(1.0 - (dist * dist) / (Lights[i].Range * Lights[i].Range));
             finalColor += PBRLighting(albedo, metallic, roughness, ao, worldNormal, V, lightDir, Lights[i]) * attenuation;
-            shadowFactor *= PointLightShadowPCF(input.worldPos, Lights[i].Position, worldNormal);
+            shadowFactor *= PointLightShadowPCF(input.worldPos, Lights[i].Position, 3.0, worldNormal);
         }
         else if (Lights[i].Type == 2) // Spot Light
         {

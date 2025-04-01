@@ -13,5 +13,5 @@ struct PSInput
 
 float main(PSInput input) : SV_Depth
 {
-    return input.Position.z;
+    return input.Position.z * 0.5 + 0.5;
 }

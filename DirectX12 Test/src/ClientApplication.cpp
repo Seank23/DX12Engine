@@ -107,14 +107,14 @@ ClientApplication::ClientApplication()
 	DX12Engine::Light sunLight;
 	sunLight.SetType((int)DX12Engine::LightType::Directional);
 	sunLight.SetDirection({ 0.45f, -0.577f, 0.577f });
-	sunLight.SetIntensity(3.0f);
+	sunLight.SetIntensity(2.0f);
 	sunLight.SetColor({ 1.0f, 0.85f, 0.8f });
 	lightBuffer.AddLight(&sunLight);
 	DX12Engine::Light pointLight;
 	pointLight.SetType((int)DX12Engine::LightType::Point);
-	pointLight.SetPosition({ 0.0f, 2.0f, 1.0f });
-	pointLight.SetIntensity(10.0f);
-	pointLight.SetRange(3.0f);
+	pointLight.SetPosition({ 0.0f, 1.0f, 1.0f });
+	pointLight.SetIntensity(3.0f);
+	pointLight.SetRange(10.0f);
 	pointLight.SetColor({ 1.0f, 1.0f, 1.0f });
 	//lightBuffer.AddLight(&pointLight);
 	DX12Engine::Light spotLight;
@@ -122,7 +122,7 @@ ClientApplication::ClientApplication()
 	spotLight.SetPosition({ 1.0f, 6.0f, -1.0f });
 	spotLight.SetDirection({ -0.1f, -0.8f, 0.1f });
 	spotLight.SetColor({ 0.9f, 0.5f, 0.0f });
-	spotLight.SetIntensity(4.0f);
+	spotLight.SetIntensity(3.0f);
 	spotLight.SetSpotAngle(45.0f);
 	lightBuffer.AddLight(&spotLight);
 	renderer.SetLightBuffer(&lightBuffer);
@@ -145,7 +145,7 @@ ClientApplication::ClientApplication()
 		proceduralRenderer.RenderShadowMaps(shadowMap.get(), lightBuffer.GetLightsByType({ DX12Engine::LightType::Directional, DX12Engine::LightType::Spot }), shadowCastingObjects);
 		proceduralRenderer.RenderShadowCubeMaps(shadowCubeMap.get(), lightBuffer.GetLightsByType({ DX12Engine::LightType::Point }), shadowCastingObjects);
 		renderer.InitFrame(renderer.GetDefaultViewport(), renderer.GetDefaultScissorRect());
-		//lightBuffer.GetLight(0)->SetPosition({ -5.0f + count, 5.5f, -5.0f });
+		//lightBuffer.GetLight(1)->SetPosition({ count, 2.0f, -count });
 		lightBuffer.Update();
 		renderer.SetShadowMap(shadowMap.get());
 		renderer.SetShadowCubeMap(shadowCubeMap.get());
@@ -155,7 +155,7 @@ ClientApplication::ClientApplication()
 		renderer.Render(&object2);
 		renderer.Render(&floor);
 		renderer.PresentFrame();
-		count += 0.01f;
+		count += 0.005f;
 	}
 }
 
