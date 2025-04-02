@@ -95,19 +95,23 @@ ClientApplication::ClientApplication()
 	DX12Engine::RenderObject object1(mesh);
 	DX12Engine::RenderObject object2(mesh2);
 	DX12Engine::RenderObject floor(floorMesh);
+	DX12Engine::RenderObject wallBack(floorMesh);
 	object1.SetMaterial(pbrStone);
 	object2.SetMaterial(pbrGold);
 	floor.SetMaterial(pbrConcrete);
-	object1.SetModelMatrix(DirectX::XMMatrixTranslation(-1.5f, 0.0f, 0.0f));
-	object2.SetModelMatrix(DirectX::XMMatrixTranslation(1.5f, 0.0f, 0.0f));
-	floor.SetModelMatrix(DirectX::XMMatrixTranslation(0.0f, -1.0f, 0.0f));
+	wallBack.SetMaterial(pbrConcrete);
+	object1.Move({ -1.5f, 0.0f, 0.0f });
+	object2.Move({ 1.5f, 0.0f, 0.0f });
+	floor.Move({ 0.0f, -1.0f, 0.0f });
+	wallBack.Move({ 0.0f, 4.0f, 5.0f });
+	wallBack.Rotate({ -90.0f, 0.0f, 0.0f });
 	float count = 0.0f;
 
 	DX12Engine::LightBuffer lightBuffer;
 	DX12Engine::Light sunLight;
 	sunLight.SetType((int)DX12Engine::LightType::Directional);
-	sunLight.SetDirection({ 0.45f, -0.577f, 0.577f });
-	sunLight.SetIntensity(2.0f);
+	sunLight.SetDirection({ 0.2f, -0.177f, 0.577f });
+	sunLight.SetIntensity(5.0f);
 	sunLight.SetColor({ 1.0f, 0.85f, 0.8f });
 	lightBuffer.AddLight(&sunLight);
 	DX12Engine::Light pointLight;
@@ -124,7 +128,7 @@ ClientApplication::ClientApplication()
 	spotLight.SetColor({ 0.9f, 0.5f, 0.0f });
 	spotLight.SetIntensity(3.0f);
 	spotLight.SetSpotAngle(45.0f);
-	lightBuffer.AddLight(&spotLight);
+	//lightBuffer.AddLight(&spotLight);
 	renderer.SetLightBuffer(&lightBuffer);
 
 	m_Camera = std::make_unique<DX12Engine::Camera>(1600.0f / 900.0f, 0.001f, 100.0f);
@@ -136,7 +140,7 @@ ClientApplication::ClientApplication()
 	std::unique_ptr<DX12Engine::DepthMap> shadowMap = proceduralRenderer.CreateShadowMapResource(2);
 	std::unique_ptr<DX12Engine::DepthMap> shadowCubeMap = proceduralRenderer.CreateShadowCubeMapResource(1);
 
-	std::vector<DX12Engine::RenderObject*> shadowCastingObjects{ &object1, &object2, &floor };
+	std::vector<DX12Engine::RenderObject*> shadowCastingObjects{ &object1, &object2, &floor, &wallBack };
 
 	while (renderer.PollWindow())
 	{
@@ -149,13 +153,14 @@ ClientApplication::ClientApplication()
 		lightBuffer.Update();
 		renderer.SetShadowMap(shadowMap.get());
 		renderer.SetShadowCubeMap(shadowCubeMap.get());
-		//object1.SetModelMatrix(DirectX::XMMatrixTranslation(2.0f * DirectX::XMScalarCos(count), 1.0f + DirectX::XMScalarSin(count), 1.0f));
-		//object2.SetModelMatrix(DirectX::XMMatrixTranslation(2.0f * DirectX::XMScalarSin(count), 1.0f + DirectX::XMScalarCos(count), -1.0f));
+		object1.Rotate({ 0.0f, 1.0f, 0.0f });
+		object2.Rotate({ 1.0f, 0.0f, 0.0f });
 		renderer.Render(&object1);
 		renderer.Render(&object2);
 		renderer.Render(&floor);
+		renderer.Render(&wallBack);
 		renderer.PresentFrame();
-		count += 0.005f;
+		count += 0.001f;
 	}
 }
 

@@ -11,6 +11,7 @@ namespace DX12Engine
 	struct RenderObjectData
 	{
 		DirectX::XMMATRIX ModelMatrix;
+		DirectX::XMMATRIX NormalMatrix;
 		DirectX::XMMATRIX ViewMatrix;
 		DirectX::XMMATRIX ProjectionMatrix;
 		DirectX::XMMATRIX MVPMatrix;
@@ -32,11 +33,16 @@ namespace DX12Engine
 		void SetModelMatrix(DirectX::XMMATRIX modelMatrix) { m_ModelMatrix = modelMatrix; }	
 		void SetMaterial(std::shared_ptr<Material> material) { m_Material = material; }
 
+		void Move(DirectX::XMFLOAT3 movement);
+		void Scale(DirectX::XMFLOAT3 newScale);
+		void Rotate(DirectX::XMFLOAT3 rotation);
+
 		DirectX::XMMATRIX GetModelMatrix() { return m_ModelMatrix; }
 		D3D12_GPU_VIRTUAL_ADDRESS GetCBVAddress() { return m_ConstantBuffer->GetGPUAddress(); }
 
 	private:
 		void UpdateConstantBufferData(DirectX::XMMATRIX viewMatrix, DirectX::XMMATRIX projectionMatrix, DirectX::XMFLOAT3 cameraPosition);
+		void UpdateModelMatrix();
 
 		Mesh m_Mesh;
 		std::unique_ptr<VertexBuffer> m_VertexBuffer;
@@ -45,5 +51,9 @@ namespace DX12Engine
 		RenderObjectData m_RenderObjectData;
 		DirectX::XMMATRIX m_ModelMatrix;
 		std::shared_ptr<Material> m_Material;
+
+		DirectX::XMVECTOR m_Position;
+		DirectX::XMVECTOR m_Scale;
+		DirectX::XMVECTOR m_Rotation;
 	};
 }

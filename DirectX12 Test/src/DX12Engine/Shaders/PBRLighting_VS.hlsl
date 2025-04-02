@@ -3,6 +3,7 @@
 cbuffer ConstantBuffer : register(b1)
 {
     float4x4 ModelMatrix;
+    float4x4 NormalMatrix;
     float4x4 ViewMatrix;
     float4x4 ProjectionMatrix;
     float4x4 MVPMatrix;
@@ -56,13 +57,14 @@ PSInput main(VSInput input)
     output.cameraPos = CameraPosition;
     float4 worldPos = mul(ModelMatrix, float4(input.position, 1.0f));
     output.worldPos = worldPos.xyz;
-    float3 offsetPos = worldPos.xyz + input.normal * 0.02f;
+    float3 offsetPos = worldPos.xyz + input.normal * 0.04f;
     for (int i = 0; i < LightCount; i++)
     {
         output.lightSpacePos[i] = mul(Lights[i].ViewProjMatrix, float4(offsetPos, 1.0));
         output.lightSpacePos[i].y *= -1;
     }
-    output.normal = input.normal;
+    output.normal = normalize(mul(NormalMatrix, float4(input.normal, 1.0))).xyz;
+    //output.normal = input.normal;
     output.texCoord = input.texCoord;
     float4 tangent = normalize(mul(ModelMatrix, float4(input.tangent, 1.0)));
     output.tangent = tangent.xyz / tangent.w;

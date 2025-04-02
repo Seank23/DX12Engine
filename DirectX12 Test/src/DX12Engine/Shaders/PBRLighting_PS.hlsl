@@ -102,7 +102,7 @@ float3 PBRLighting(float3 albedo, float metallic, float roughness, float ao, flo
     return color * radiance;
 }
 
-float ShadowPCF(int lightIndex, float4 lightSpacePos, float softRadius, float3 normal)
+float ShadowPCF(int lightIndex, float4 lightSpacePos, float softRadius)
 {
     float shadow = 0.0f;
     float3 texSize;
@@ -183,7 +183,7 @@ float4 main(PSInput input) : SV_TARGET
         if (Lights[i].Type == 0) // Directional Light
         {
             finalColor += PBRLighting(albedo, metallic, roughness, ao, worldNormal, V, normalize(-Lights[i].Direction), Lights[i]);
-            shadowFactor *= ShadowPCF(i, lightSpacePosition, 2.0, worldNormal);
+            shadowFactor *= ShadowPCF(i, lightSpacePosition, 2.0);
         }
         else if (Lights[i].Type == 1) // Point Light
         {
@@ -200,7 +200,7 @@ float4 main(PSInput input) : SV_TARGET
             float dist = length(Lights[i].Position - input.worldPos);
             float attenuation = saturate(1.0 - (dist * dist) / (Lights[i].Range * Lights[i].Range));
             finalColor += PBRLighting(albedo, metallic, roughness, ao, worldNormal, V, lightDir, Lights[i]) * intensity * attenuation;
-            shadowFactor *= ShadowPCF(i, lightSpacePosition, 2.0, worldNormal);
+            shadowFactor *= ShadowPCF(i, lightSpacePosition, 2.0);
         }
     }
     finalColor *= shadowFactor;

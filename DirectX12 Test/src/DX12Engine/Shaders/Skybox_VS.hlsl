@@ -1,6 +1,7 @@
 cbuffer CameraBuffer : register(b1)
 {
     float4x4 ModelMatrix;
+    float4x4 NormalMatrix;
     float4x4 ViewMatrix;
     float4x4 ProjectionMatrix;
     float4x4 MVPMatrix;
