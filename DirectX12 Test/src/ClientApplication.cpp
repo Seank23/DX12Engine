@@ -18,8 +18,8 @@
 #include "DX12Engine/Buffers/LightBuffer.h"
 #include "DX12Engine/Resources/Light.h"
 #include "DX12Engine/Resources/Skybox.h"
-//#include "DX12Engine/Rendering/ProceduralRenderer.h"
 #include "DX12Engine/Resources/DepthMap.h"
+#include "DX12Engine/Resources/ResourceManager.h"
 
 ClientApplication::ClientApplication()
 {
@@ -28,40 +28,40 @@ ClientApplication::ClientApplication()
 	DX12Engine::Renderer renderer(context);
 
 	DX12Engine::ModelLoader modelLoader;
-	DX12Engine::Mesh mesh = modelLoader.LoadObj("E:\\Projects\\source\\repos\\DirectX12 Test\\cube2.obj");
-	DX12Engine::Mesh mesh2 = modelLoader.LoadObj("E:\\Projects\\source\\repos\\DirectX12 Test\\sphere.obj");
-	DX12Engine::Mesh floorMesh = modelLoader.LoadObj("E:\\Projects\\source\\repos\\DirectX12 Test\\floor.obj");
+	DX12Engine::Mesh mesh = modelLoader.LoadObj("../../cube2.obj");
+	DX12Engine::Mesh mesh2 = modelLoader.LoadObj("../../sphere.obj");
+	DX12Engine::Mesh floorMesh = modelLoader.LoadObj("../../floor.obj");
 
 	DX12Engine::TextureLoader textureLoader;
 	DX12Engine::GPUUploader uploader = context->GetUploader();
 	std::vector<DX12Engine::Texture*> textures;
 
-	std::shared_ptr<DX12Engine::Texture> skyboxCube = textureLoader.LoadCubemapDDS(L"E:\\Projects\\source\\repos\\DirectX12 Test\\DirectX12 Test\\res\\skybox\\skybox_cubemap.dds");
-	std::shared_ptr<DX12Engine::Texture> skyboxIrradiance = textureLoader.LoadCubemapDDS(L"E:\\Projects\\source\\repos\\DirectX12 Test\\DirectX12 Test\\res\\skybox\\skybox_irradiance.dds");
+	std::shared_ptr<DX12Engine::Texture> skyboxCube = textureLoader.LoadCubemapDDS(DX12Engine::ResourceManager::GetResourcePath("skybox/skybox_cubemap.dds"));
+	std::shared_ptr<DX12Engine::Texture> skyboxIrradiance = textureLoader.LoadCubemapDDS(DX12Engine::ResourceManager::GetResourcePath("skybox/skybox_irradiance.dds"));
 	textures = { skyboxCube.get(), skyboxIrradiance.get() };
 	uploader.UploadTextureBatch(textures);
 
-	std::shared_ptr<DX12Engine::Texture> stoneAlbedo = textureLoader.LoadWIC(L"E:\\Projects\\source\\repos\\DirectX12 Test\\DirectX12 Test\\res\\dark-worn-stone-ue\\dark-worn-stonework_albedo.png");
-	std::shared_ptr<DX12Engine::Texture> stoneNormal = textureLoader.LoadWIC(L"E:\\Projects\\source\\repos\\DirectX12 Test\\DirectX12 Test\\res\\dark-worn-stone-ue\\dark-worn-stonework_normal-dx.png");
-	std::shared_ptr<DX12Engine::Texture> stoneMetallic = textureLoader.LoadWIC(L"E:\\Projects\\source\\repos\\DirectX12 Test\\DirectX12 Test\\res\\dark-worn-stone-ue\\dark-worn-stonework_metallic.png");
-	std::shared_ptr<DX12Engine::Texture> stoneRoughness = textureLoader.LoadWIC(L"E:\\Projects\\source\\repos\\DirectX12 Test\\DirectX12 Test\\res\\dark-worn-stone-ue\\dark-worn-stonework_roughness.png");
-	std::shared_ptr<DX12Engine::Texture> stoneAO = textureLoader.LoadWIC(L"E:\\Projects\\source\\repos\\DirectX12 Test\\DirectX12 Test\\res\\dark-worn-stone-ue\\dark-worn-stonework_ao.png");
+	std::shared_ptr<DX12Engine::Texture> stoneAlbedo = textureLoader.LoadWIC(DX12Engine::ResourceManager::GetResourcePath("dark-worn-stone-ue\\dark-worn-stonework_albedo.png"));
+	std::shared_ptr<DX12Engine::Texture> stoneNormal = textureLoader.LoadWIC(DX12Engine::ResourceManager::GetResourcePath("dark-worn-stone-ue\\dark-worn-stonework_normal-dx.png"));
+	std::shared_ptr<DX12Engine::Texture> stoneMetallic = textureLoader.LoadWIC(DX12Engine::ResourceManager::GetResourcePath("dark-worn-stone-ue\\dark-worn-stonework_metallic.png"));
+	std::shared_ptr<DX12Engine::Texture> stoneRoughness = textureLoader.LoadWIC(DX12Engine::ResourceManager::GetResourcePath("dark-worn-stone-ue\\dark-worn-stonework_roughness.png"));
+	std::shared_ptr<DX12Engine::Texture> stoneAO = textureLoader.LoadWIC(DX12Engine::ResourceManager::GetResourcePath("dark-worn-stone-ue\\dark-worn-stonework_ao.png"));
 	textures = { stoneAlbedo.get(), stoneNormal.get(), stoneMetallic.get(), stoneRoughness.get(), stoneAO.get() };
 	uploader.UploadTextureBatch(textures);
 
-	std::shared_ptr<DX12Engine::Texture> goldAlbedo = textureLoader.LoadWIC(L"E:\\Projects\\source\\repos\\DirectX12 Test\\DirectX12 Test\\res\\hammered-gold-ue\\hammered-gold_albedo.png");
-	std::shared_ptr<DX12Engine::Texture> goldNormal = textureLoader.LoadWIC(L"E:\\Projects\\source\\repos\\DirectX12 Test\\DirectX12 Test\\res\\hammered-gold-ue\\hammered-gold_normal-dx.png");
-	std::shared_ptr<DX12Engine::Texture> goldMetallic = textureLoader.LoadWIC(L"E:\\Projects\\source\\repos\\DirectX12 Test\\DirectX12 Test\\res\\hammered-gold-ue\\hammered-gold_metallic.png");
-	std::shared_ptr<DX12Engine::Texture> goldRoughness = textureLoader.LoadWIC(L"E:\\Projects\\source\\repos\\DirectX12 Test\\DirectX12 Test\\res\\hammered-gold-ue\\hammered-gold_roughness.png");
-	std::shared_ptr<DX12Engine::Texture> goldAO = textureLoader.LoadWIC(L"E:\\Projects\\source\\repos\\DirectX12 Test\\DirectX12 Test\\res\\hammered-gold-ue\\hammered-gold_ao.png");
+	std::shared_ptr<DX12Engine::Texture> goldAlbedo = textureLoader.LoadWIC(DX12Engine::ResourceManager::GetResourcePath("hammered-gold-ue\\hammered-gold_albedo.png"));
+	std::shared_ptr<DX12Engine::Texture> goldNormal = textureLoader.LoadWIC(DX12Engine::ResourceManager::GetResourcePath("hammered-gold-ue\\hammered-gold_normal-dx.png"));
+	std::shared_ptr<DX12Engine::Texture> goldMetallic = textureLoader.LoadWIC(DX12Engine::ResourceManager::GetResourcePath("hammered-gold-ue\\hammered-gold_metallic.png"));
+	std::shared_ptr<DX12Engine::Texture> goldRoughness = textureLoader.LoadWIC(DX12Engine::ResourceManager::GetResourcePath("hammered-gold-ue\\hammered-gold_roughness.png"));
+	std::shared_ptr<DX12Engine::Texture> goldAO = textureLoader.LoadWIC(DX12Engine::ResourceManager::GetResourcePath("hammered-gold-ue\\hammered-gold_ao.png"));
 	textures = { goldAlbedo.get(), goldNormal.get(), goldMetallic.get(), goldRoughness.get(), goldAO.get(), };
 	uploader.UploadTextureBatch(textures);
 
-	std::shared_ptr<DX12Engine::Texture> concreteAlbedo = textureLoader.LoadWIC(L"E:\\Projects\\source\\repos\\DirectX12 Test\\DirectX12 Test\\res\\clean-concrete-ue\\clean-concrete_albedo.png");
-	std::shared_ptr<DX12Engine::Texture> concreteNormal = textureLoader.LoadWIC(L"E:\\Projects\\source\\repos\\DirectX12 Test\\DirectX12 Test\\res\\clean-concrete-ue\\clean-concrete_normal-dx.png");
-	std::shared_ptr<DX12Engine::Texture> concreteMetallic = textureLoader.LoadWIC(L"E:\\Projects\\source\\repos\\DirectX12 Test\\DirectX12 Test\\res\\clean-concrete-ue\\clean-concrete_metallic.png");
-	std::shared_ptr<DX12Engine::Texture> concreteRoughness = textureLoader.LoadWIC(L"E:\\Projects\\source\\repos\\DirectX12 Test\\DirectX12 Test\\res\\clean-concrete-ue\\clean-concrete_roughness.png");
-	std::shared_ptr<DX12Engine::Texture> concreteAO = textureLoader.LoadWIC(L"E:\\Projects\\source\\repos\\DirectX12 Test\\DirectX12 Test\\res\\clean-concrete-ue\\clean-concrete_ao.png");
+	std::shared_ptr<DX12Engine::Texture> concreteAlbedo = textureLoader.LoadWIC(DX12Engine::ResourceManager::GetResourcePath("clean-concrete-ue\\clean-concrete_albedo.png"));
+	std::shared_ptr<DX12Engine::Texture> concreteNormal = textureLoader.LoadWIC(DX12Engine::ResourceManager::GetResourcePath("clean-concrete-ue\\clean-concrete_normal-dx.png"));
+	std::shared_ptr<DX12Engine::Texture> concreteMetallic = textureLoader.LoadWIC(DX12Engine::ResourceManager::GetResourcePath("clean-concrete-ue\\clean-concrete_metallic.png"));
+	std::shared_ptr<DX12Engine::Texture> concreteRoughness = textureLoader.LoadWIC(DX12Engine::ResourceManager::GetResourcePath("clean-concrete-ue\\clean-concrete_roughness.png"));
+	std::shared_ptr<DX12Engine::Texture> concreteAO = textureLoader.LoadWIC(DX12Engine::ResourceManager::GetResourcePath("clean-concrete-ue\\clean-concrete_ao.png"));
 	textures = { concreteAlbedo.get(), concreteNormal.get(), concreteMetallic.get(), concreteRoughness.get(), concreteAO.get(), };
 	uploader.UploadTextureBatch(textures);
 
@@ -110,7 +110,7 @@ ClientApplication::ClientApplication()
 	DX12Engine::LightBuffer lightBuffer;
 	DX12Engine::Light sunLight;
 	sunLight.SetType((int)DX12Engine::LightType::Directional);
-	sunLight.SetDirection({ 0.2f, -0.177f, 0.577f });
+	sunLight.SetDirection({ 0.45f, -0.577f, 0.577f });
 	sunLight.SetIntensity(5.0f);
 	sunLight.SetColor({ 1.0f, 0.85f, 0.8f });
 	lightBuffer.AddLight(&sunLight);
@@ -158,7 +158,7 @@ ClientApplication::ClientApplication()
 		renderer.Render(&object1);
 		renderer.Render(&object2);
 		renderer.Render(&floor);
-		renderer.Render(&wallBack);
+		//renderer.Render(&wallBack);
 		renderer.PresentFrame();
 		count += 0.001f;
 	}

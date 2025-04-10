@@ -10,15 +10,15 @@ namespace DX12Engine
 
 	ResourceManager::ResourceManager()
 	{
-		m_Shaders.insert({ "BasicLighting_VS", std::make_unique<Shader>("E:\\Projects\\source\\repos\\DirectX12 Test\\DirectX12 Test\\src\\DX12Engine\\Shaders\\BasicLighting_VS.hlsl", "vertex") });
-		m_Shaders.insert({ "BasicLighting_PS", std::make_unique<Shader>("E:\\Projects\\source\\repos\\DirectX12 Test\\DirectX12 Test\\src\\DX12Engine\\Shaders\\BasicLighting_PS.hlsl", "pixel") });
-		m_Shaders.insert({ "PBRLighting_VS", std::make_unique<Shader>("E:\\Projects\\source\\repos\\DirectX12 Test\\DirectX12 Test\\src\\DX12Engine\\Shaders\\PBRLighting_VS.hlsl", "vertex") });
-		m_Shaders.insert({ "PBRLighting_PS", std::make_unique<Shader>("E:\\Projects\\source\\repos\\DirectX12 Test\\DirectX12 Test\\src\\DX12Engine\\Shaders\\PBRLighting_PS.hlsl", "pixel") });
-		m_Shaders.insert({ "Skybox_VS", std::make_unique<Shader>("E:\\Projects\\source\\repos\\DirectX12 Test\\DirectX12 Test\\src\\DX12Engine\\Shaders\\Skybox_VS.hlsl", "vertex") });
-		m_Shaders.insert({ "Skybox_PS", std::make_unique<Shader>("E:\\Projects\\source\\repos\\DirectX12 Test\\DirectX12 Test\\src\\DX12Engine\\Shaders\\Skybox_PS.hlsl", "pixel") });
-		m_Shaders.insert({ "ShadowMap_VS", std::make_unique<Shader>("E:\\Projects\\source\\repos\\DirectX12 Test\\DirectX12 Test\\src\\DX12Engine\\Shaders\\ShadowMap_VS.hlsl", "vertex") });
-		m_Shaders.insert({ "ShadowCubeMap_VS", std::make_unique<Shader>("E:\\Projects\\source\\repos\\DirectX12 Test\\DirectX12 Test\\src\\DX12Engine\\Shaders\\ShadowCubeMap_VS.hlsl", "vertex") });
-		m_Shaders.insert({ "ShadowCubeMap_PS", std::make_unique<Shader>("E:\\Projects\\source\\repos\\DirectX12 Test\\DirectX12 Test\\src\\DX12Engine\\Shaders\\ShadowCubeMap_PS.hlsl", "pixel") });
+		m_Shaders.insert({ "BasicLighting_VS", std::make_unique<Shader>(GetShaderPath("BasicLighting_VS.hlsl"), "vertex") });
+		m_Shaders.insert({ "BasicLighting_PS", std::make_unique<Shader>(GetShaderPath("BasicLighting_PS.hlsl"), "pixel") });
+		m_Shaders.insert({ "PBRLighting_VS", std::make_unique<Shader>(GetShaderPath("PBRLighting_VS.hlsl"), "vertex") });
+		m_Shaders.insert({ "PBRLighting_PS", std::make_unique<Shader>(GetShaderPath("PBRLighting_PS.hlsl"), "pixel") });
+		m_Shaders.insert({ "Skybox_VS", std::make_unique<Shader>(GetShaderPath("Skybox_VS.hlsl"), "vertex") });
+		m_Shaders.insert({ "Skybox_PS", std::make_unique<Shader>(GetShaderPath("Skybox_PS.hlsl"), "pixel") });
+		m_Shaders.insert({ "ShadowMap_VS", std::make_unique<Shader>(GetShaderPath("ShadowMap_VS.hlsl"), "vertex") });
+		m_Shaders.insert({ "ShadowCubeMap_VS", std::make_unique<Shader>(GetShaderPath("ShadowCubeMap_VS.hlsl"), "vertex") });
+		m_Shaders.insert({ "ShadowCubeMap_PS", std::make_unique<Shader>(GetShaderPath("ShadowCubeMap_PS.hlsl"), "pixel") });
 	}
 
 	ResourceManager::~ResourceManager()

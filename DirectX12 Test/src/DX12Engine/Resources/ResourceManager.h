@@ -50,6 +50,9 @@ namespace DX12Engine
 
 		Shader* GetShader(const std::string& name) { return m_Shaders[name].get(); }
 
+		static std::wstring GetResourcePath(std::string path) { return L"../../DirectX12 Test/res/" + std::wstring(path.begin(), path.end()); }
+		static std::string GetShaderPath(std::string path) { return "../../DirectX12 Test/src/DX12Engine/Shaders/" + path; }
+
 	private:
 		Microsoft::WRL::ComPtr<ID3D12Device> m_Device;
 		DescriptorHeapManager* m_HeapManager;

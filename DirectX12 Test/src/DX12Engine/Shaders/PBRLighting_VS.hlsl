@@ -64,7 +64,6 @@ PSInput main(VSInput input)
         output.lightSpacePos[i].y *= -1;
     }
     output.normal = normalize(mul(NormalMatrix, float4(input.normal, 1.0))).xyz;
-    //output.normal = input.normal;
     output.texCoord = input.texCoord;
     float4 tangent = normalize(mul(ModelMatrix, float4(input.tangent, 1.0)));
     output.tangent = tangent.xyz / tangent.w;
