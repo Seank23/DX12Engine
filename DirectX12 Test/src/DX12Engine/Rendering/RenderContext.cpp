@@ -23,7 +23,7 @@ namespace DX12Engine
 
 		m_RenderWindow->CreateSwapChain(m_QueueManager->GetGraphicsQueue().GetCommandQueue().Get());
 		m_RenderWindow->CreateRTVHeap(m_Device.Get());
-		m_RenderWindow->CreateDepthStencilBuffer(m_Device.Get());
+		m_RenderWindow->CreateDepthStencilBuffer();
 	}
 
 	RenderContext::~RenderContext()

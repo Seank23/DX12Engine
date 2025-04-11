@@ -20,113 +20,20 @@ namespace DX12Engine
 
 	std::unique_ptr<DepthMap> ProceduralRenderer::CreateShadowMapResource(int numLights)
 	{
-		auto device = m_RenderContext.GetDevice();
-		D3D12_RESOURCE_DESC shadowMapDesc = {};
-		shadowMapDesc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
-		shadowMapDesc.Width = SHADOW_MAP_SIZE;
-		shadowMapDesc.Height = SHADOW_MAP_SIZE;
-		shadowMapDesc.DepthOrArraySize = numLights;
-		shadowMapDesc.MipLevels = 1;
-		shadowMapDesc.Format = DXGI_FORMAT_D32_FLOAT;
-		shadowMapDesc.SampleDesc.Count = 1;
-		shadowMapDesc.Flags = D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL;
-
-		D3D12_CLEAR_VALUE depthOptimizedClearValue = {};
-		depthOptimizedClearValue.Format = DXGI_FORMAT_D32_FLOAT;
-		depthOptimizedClearValue.DepthStencil.Depth = 1.0f;
-		depthOptimizedClearValue.DepthStencil.Stencil = 0;
-
-		ID3D12Resource* shadowMapResource = nullptr;
-		auto heapProps = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);
-		device->CreateCommittedResource(
-			&heapProps,
-			D3D12_HEAP_FLAG_NONE,
-			&shadowMapDesc,
-			D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE,
-			&depthOptimizedClearValue,
-			IID_PPV_ARGS(&shadowMapResource));
-
-		std::vector<DescriptorHeapHandle> dsvDescriptors;
-		for (int i = 0; i < numLights; i++)
-		{
-			D3D12_DEPTH_STENCIL_VIEW_DESC dsvDesc = {};
-			dsvDesc.Format = DXGI_FORMAT_D32_FLOAT;
-			dsvDesc.ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2DARRAY;
-			dsvDesc.Texture2DArray.FirstArraySlice = i;
-			dsvDesc.Texture2DArray.ArraySize = 1;
-			dsvDesc.Texture2DArray.MipSlice = 0;
-
-			DescriptorHeapHandle dsvHandle = m_HeapManager->GetNewDSVDescriptorHeapHandle();
-				device->CreateDepthStencilView(shadowMapResource, &dsvDesc, dsvHandle.GetCPUHandle());
-				dsvDescriptors.push_back(dsvHandle);
-		}
-
-		D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
-		srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-		srvDesc.Format = DXGI_FORMAT_R32_FLOAT;
-		srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2DARRAY;
-		srvDesc.Texture2D.MipLevels = 1;
-		srvDesc.Texture2DArray.ArraySize = numLights;
-
-		DescriptorHeapHandle srvHandle = m_HeapManager->GetRenderHeapHandleBlock(1);
-		device->CreateShaderResourceView(shadowMapResource, &srvDesc, srvHandle.GetCPUHandle());
-
-		return std::make_unique<DepthMap>(shadowMapResource, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, srvHandle, dsvDescriptors);
+		return ResourceManager::GetInstance().CreateDepthMap(
+			DirectX::XMINT3(SHADOW_MAP_SIZE, SHADOW_MAP_SIZE, numLights),
+			DXGI_FORMAT_D32_FLOAT,
+			DXGI_FORMAT_R32_FLOAT,
+			false);
 	}
 
 	std::unique_ptr<DepthMap> ProceduralRenderer::CreateShadowCubeMapResource(int numLights)
 	{
-		auto device = m_RenderContext.GetDevice();
-		D3D12_RESOURCE_DESC shadowMapDesc = {};
-		shadowMapDesc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
-		shadowMapDesc.Width = SHADOW_MAP_SIZE;
-		shadowMapDesc.Height = SHADOW_MAP_SIZE;
-		shadowMapDesc.DepthOrArraySize = numLights * 6;
-		shadowMapDesc.MipLevels = 1;
-		shadowMapDesc.Format = DXGI_FORMAT_D32_FLOAT;
-		shadowMapDesc.SampleDesc.Count = 1;
-		shadowMapDesc.Flags = D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL;
-
-		D3D12_CLEAR_VALUE depthOptimizedClearValue = {};
-		depthOptimizedClearValue.Format = DXGI_FORMAT_D32_FLOAT;
-		depthOptimizedClearValue.DepthStencil.Depth = 1.0f;
-		depthOptimizedClearValue.DepthStencil.Stencil = 0;
-
-		ID3D12Resource* shadowMapResource = nullptr;
-		auto heapProps = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);
-		device->CreateCommittedResource(
-			&heapProps,
-			D3D12_HEAP_FLAG_NONE,
-			&shadowMapDesc,
-			D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE,
-			&depthOptimizedClearValue,
-			IID_PPV_ARGS(&shadowMapResource));
-
-		std::vector<DescriptorHeapHandle> dsvDescriptors;
-		for (int i = 0; i < numLights * 6; i++)
-		{
-			D3D12_DEPTH_STENCIL_VIEW_DESC dsvDesc = {};
-			dsvDesc.Format = DXGI_FORMAT_D32_FLOAT;
-			dsvDesc.ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2DARRAY;
-			dsvDesc.Texture2DArray.FirstArraySlice = i;
-			dsvDesc.Texture2DArray.ArraySize = 1;
-			dsvDesc.Texture2DArray.MipSlice = 0;
-
-			DescriptorHeapHandle dsvHandle = m_HeapManager->GetNewDSVDescriptorHeapHandle();
-			device->CreateDepthStencilView(shadowMapResource, &dsvDesc, dsvHandle.GetCPUHandle());
-			dsvDescriptors.push_back(dsvHandle);
-		}
-		D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
-		srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-		srvDesc.Format = DXGI_FORMAT_R32_FLOAT;
-		srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURECUBE;
-		srvDesc.Texture2D.MipLevels = 1;
-		srvDesc.Texture2DArray.ArraySize = numLights;
-
-		DescriptorHeapHandle srvHandle = m_HeapManager->GetRenderHeapHandleBlock(1);
-		device->CreateShaderResourceView(shadowMapResource, &srvDesc, srvHandle.GetCPUHandle());
-
-		return std::make_unique<DepthMap>(shadowMapResource, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, srvHandle, dsvDescriptors, true);
+		return ResourceManager::GetInstance().CreateDepthMap(
+			DirectX::XMINT3(SHADOW_MAP_SIZE, SHADOW_MAP_SIZE, numLights),
+			DXGI_FORMAT_D32_FLOAT,
+			DXGI_FORMAT_R32_FLOAT,
+			true);
 	}
 
 	void ProceduralRenderer::RenderShadowMaps(DepthMap* shadowMap, std::vector<Light*> lights, std::vector<RenderObject*> sceneObjects)

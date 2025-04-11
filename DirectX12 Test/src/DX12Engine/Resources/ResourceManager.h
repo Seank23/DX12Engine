@@ -15,6 +15,7 @@
 #include "../Buffers/ConstantBuffer.h"
 #include "../Resources/Mesh.h"
 #include "../Resources/Texture.h"
+#include "../Resources/DepthMap.h"
 #include "../Heaps/DescriptorHeapManager.h"
 #include "../Rendering/RenderContext.h"
 #include "../Rendering/GPUUploader.h"
@@ -44,6 +45,7 @@ namespace DX12Engine
 		std::unique_ptr<ConstantBuffer> CreateConstantBuffer(const UINT bufferSize);
 		std::unique_ptr<Texture> CreateTexture(const DirectX::ScratchImage* imageData);
 		std::unique_ptr<Texture> CreateCubeMap(const DirectX::ScratchImage* imageData);
+		std::unique_ptr<DepthMap> CreateDepthMap(DirectX::XMINT3 dimensions, DXGI_FORMAT dsvFormat, DXGI_FORMAT srvFormat, bool isCubeMap = false);
 
 		Microsoft::WRL::ComPtr<ID3D12PipelineState> CreatePipelineState(const D3D12_GRAPHICS_PIPELINE_STATE_DESC& desc);
 		Microsoft::WRL::ComPtr<ID3D12RootSignature> CreateRootSignature(const D3D12_ROOT_SIGNATURE_DESC& desc);

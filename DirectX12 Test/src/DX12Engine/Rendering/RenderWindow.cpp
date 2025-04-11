@@ -1,5 +1,5 @@
 #include "RenderWindow.h"
-#include "../Application.h"
+#include "../Resources/ResourceManager.h"
 
 LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 {
@@ -27,8 +27,8 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 namespace DX12Engine
 {
 	RenderWindow::RenderWindow()
-		: m_WindowHandle(nullptr), m_WindowInstance(nullptr), m_SwapChain(nullptr), m_RTVHeap(nullptr), m_DepthStencilBuffer(nullptr),
-		m_FrameIndex(0), m_RTVDescriptorSize(0), m_DSVDescriptorSize(0), m_WindowSize(DirectX::XMFLOAT2(0, 0))
+		: m_WindowHandle(nullptr), m_WindowInstance(nullptr), m_SwapChain(nullptr), m_RTVHeap(nullptr),
+		m_FrameIndex(0), m_RTVDescriptorSize(0), m_WindowSize(DirectX::XMFLOAT2(0, 0))
 	{
 	}
 
@@ -36,15 +36,12 @@ namespace DX12Engine
 	{
 		m_WindowHandle = nullptr;
 		m_WindowInstance = nullptr;
-		m_DepthStencilBuffer.Reset();
-		m_DSVHeap.Reset();
 		for (auto& rt : m_RenderTargets)
 			rt.Reset();
 		m_RTVHeap.Reset();
 		m_SwapChain.Reset();
 		m_FrameIndex = 0;
 		m_RTVDescriptorSize = 0;
-		m_DSVDescriptorSize = 0;
 	}
 
 	HWND RenderWindow::Init(Application* app, DirectX::XMFLOAT2 windowSize)
@@ -98,52 +95,14 @@ namespace DX12Engine
 			rtvHandle.Offset(1, m_RTVDescriptorSize); // Move to the next descriptor
 		}
 	}
-	void RenderWindow::CreateDepthStencilBuffer(ID3D12Device* device)
+	void RenderWindow::CreateDepthStencilBuffer()
 	{
-		D3D12_RESOURCE_DESC depthStencilDesc = {};
-		depthStencilDesc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
-		depthStencilDesc.Alignment = 0;
-		depthStencilDesc.Width = m_WindowSize.x;
-		depthStencilDesc.Height = m_WindowSize.y;
-		depthStencilDesc.DepthOrArraySize = 1;
-		depthStencilDesc.MipLevels = 1;
-		depthStencilDesc.Format = DXGI_FORMAT_D24_UNORM_S8_UINT;
-		depthStencilDesc.SampleDesc.Count = 1;
-		depthStencilDesc.SampleDesc.Quality = 0;
-		depthStencilDesc.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
-		depthStencilDesc.Flags = D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL;
-
-		D3D12_CLEAR_VALUE depthOptimizedClearValue = {};
-		depthOptimizedClearValue.Format = DXGI_FORMAT_D24_UNORM_S8_UINT;
-		depthOptimizedClearValue.DepthStencil.Depth = 1.0f;
-		depthOptimizedClearValue.DepthStencil.Stencil = 0;
-
-		auto heapProperties = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);
-		HRESULT result = device->CreateCommittedResource(
-			&heapProperties,
-			D3D12_HEAP_FLAG_NONE,
-			&depthStencilDesc,
-			D3D12_RESOURCE_STATE_DEPTH_WRITE,
-			&depthOptimizedClearValue,
-			IID_PPV_ARGS(&m_DepthStencilBuffer)
+		m_DepthBuffer = ResourceManager::GetInstance().CreateDepthMap(
+			DirectX::XMINT3(m_WindowSize.x, m_WindowSize.y, 1),
+			DXGI_FORMAT_D24_UNORM_S8_UINT,
+			DXGI_FORMAT_R24_UNORM_X8_TYPELESS,
+			false
 		);
-
-		D3D12_DEPTH_STENCIL_VIEW_DESC dsvDesc = {};
-		dsvDesc.Format = DXGI_FORMAT_D24_UNORM_S8_UINT;
-		dsvDesc.ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2D;
-		dsvDesc.Flags = D3D12_DSV_FLAG_NONE;
-
-		D3D12_DESCRIPTOR_HEAP_DESC dsvHeapDesc = {};
-		dsvHeapDesc.NumDescriptors = 1;
-		dsvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_DSV;
-		dsvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
-
-		device->CreateDescriptorHeap(&dsvHeapDesc, IID_PPV_ARGS(&m_DSVHeap));
-		m_DSVHandle = m_DSVHeap->GetCPUDescriptorHandleForHeapStart();
-
-		m_DSVDescriptorSize = device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_DSV);
-
-		device->CreateDepthStencilView(m_DepthStencilBuffer.Get(), &dsvDesc, m_DSVHandle);
 	}
 
 	CD3DX12_RESOURCE_BARRIER RenderWindow::TransitionRenderTarget(bool forward)

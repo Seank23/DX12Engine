@@ -18,6 +18,7 @@ namespace DX12Engine
 
 		void InitFrame(D3D12_VIEWPORT viewport, D3D12_RECT scissorRect);
 		void Render(RenderObject* renderObject);
+		void RenderObjectList(std::vector<RenderObject*> objects);
 		void PresentFrame();
 		bool PollWindow();
 

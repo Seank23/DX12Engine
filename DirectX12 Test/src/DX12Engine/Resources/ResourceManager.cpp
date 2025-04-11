@@ -318,6 +318,80 @@ namespace DX12Engine
 		return std::make_unique<Texture>(textureResource, textureUploadResource, D3D12_RESOURCE_STATE_COPY_DEST, cubemapData, srvHandle, true);
 	}
 
+	std::unique_ptr<DepthMap> ResourceManager::CreateDepthMap(DirectX::XMINT3 dimensions, DXGI_FORMAT dsvFormat, DXGI_FORMAT srvFormat, bool isCubeMap)
+	{
+		int arraySize = dimensions.z;
+		bool isSingleMap = arraySize == 1 && !isCubeMap;
+		if (isCubeMap)
+			arraySize = 6;
+
+		D3D12_RESOURCE_DESC depthMapDesc = {};
+		depthMapDesc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
+		depthMapDesc.Width = dimensions.x;
+		depthMapDesc.Height = dimensions.y;
+		depthMapDesc.DepthOrArraySize = arraySize;
+		depthMapDesc.MipLevels = 1;
+		depthMapDesc.Format = dsvFormat;
+		depthMapDesc.SampleDesc.Count = 1;
+		depthMapDesc.Flags = D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL;
+
+		D3D12_CLEAR_VALUE depthOptimizedClearValue = {};
+		depthOptimizedClearValue.Format = dsvFormat;
+		depthOptimizedClearValue.DepthStencil.Depth = 1.0f;
+		depthOptimizedClearValue.DepthStencil.Stencil = 0;
+
+		ID3D12Resource* depthMapResource = nullptr;
+		auto heapProps = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);
+		m_Device->CreateCommittedResource(
+			&heapProps,
+			D3D12_HEAP_FLAG_NONE,
+			&depthMapDesc,
+			D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE,
+			&depthOptimizedClearValue,
+			IID_PPV_ARGS(&depthMapResource));
+
+		std::vector<DescriptorHeapHandle> dsvDescriptors;
+		if (isSingleMap)
+		{
+			D3D12_DEPTH_STENCIL_VIEW_DESC dsvDesc = {};
+			dsvDesc.Format = dsvFormat;
+			dsvDesc.ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2D;
+			dsvDesc.Flags = D3D12_DSV_FLAG_NONE;
+
+			DescriptorHeapHandle dsvHandle = m_HeapManager->GetNewDSVDescriptorHeapHandle();
+			m_Device->CreateDepthStencilView(depthMapResource, &dsvDesc, dsvHandle.GetCPUHandle());
+			dsvDescriptors.push_back(dsvHandle);
+		}
+		else
+		{
+			for (int i = 0; i < arraySize; i++)
+			{
+				D3D12_DEPTH_STENCIL_VIEW_DESC dsvDesc = {};
+				dsvDesc.Format = dsvFormat;
+				dsvDesc.ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2DARRAY;
+				dsvDesc.Texture2DArray.FirstArraySlice = i;
+				dsvDesc.Texture2DArray.ArraySize = 1;
+				dsvDesc.Texture2DArray.MipSlice = 0;
+
+				DescriptorHeapHandle dsvHandle = m_HeapManager->GetNewDSVDescriptorHeapHandle();
+				m_Device->CreateDepthStencilView(depthMapResource, &dsvDesc, dsvHandle.GetCPUHandle());
+				dsvDescriptors.push_back(dsvHandle);
+			}
+		}
+
+		D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
+		srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+		srvDesc.Format = srvFormat;
+		srvDesc.ViewDimension = isCubeMap ? D3D12_SRV_DIMENSION_TEXTURECUBE : isSingleMap ? D3D12_SRV_DIMENSION_TEXTURE2D : D3D12_SRV_DIMENSION_TEXTURE2DARRAY;
+		srvDesc.Texture2D.MipLevels = 1;
+		if (!isSingleMap) srvDesc.Texture2DArray.ArraySize = arraySize;
+
+		DescriptorHeapHandle srvHandle = m_HeapManager->GetRenderHeapHandleBlock(1);
+		m_Device->CreateShaderResourceView(depthMapResource, &srvDesc, srvHandle.GetCPUHandle());
+
+		return std::make_unique<DepthMap>(depthMapResource, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, srvHandle, dsvDescriptors, isCubeMap);
+	}
+
 	Microsoft::WRL::ComPtr<ID3D12PipelineState> ResourceManager::CreatePipelineState(const D3D12_GRAPHICS_PIPELINE_STATE_DESC& desc)
 	{
 		return m_PipelineStateCache->GetOrCreatePSO(desc);

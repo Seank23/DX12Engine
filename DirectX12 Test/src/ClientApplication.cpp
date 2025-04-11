@@ -128,10 +128,10 @@ ClientApplication::ClientApplication()
 	spotLight.SetColor({ 0.9f, 0.5f, 0.0f });
 	spotLight.SetIntensity(3.0f);
 	spotLight.SetSpotAngle(45.0f);
-	//lightBuffer.AddLight(&spotLight);
+	lightBuffer.AddLight(&spotLight);
 	renderer.SetLightBuffer(&lightBuffer);
 
-	m_Camera = std::make_unique<DX12Engine::Camera>(1600.0f / 900.0f, 0.001f, 100.0f);
+	m_Camera = std::make_unique<DX12Engine::Camera>(1600.0f / 900.0f, 1.0f, 100.0f);
 	m_Camera->SetPosition({ 4.0f, 2.0f, -5.0f });
 	m_Camera->SetRotation(-20.0, 125.0);
 	renderer.SetCamera(m_Camera.get());
@@ -140,25 +140,25 @@ ClientApplication::ClientApplication()
 	std::unique_ptr<DX12Engine::DepthMap> shadowMap = proceduralRenderer.CreateShadowMapResource(2);
 	std::unique_ptr<DX12Engine::DepthMap> shadowCubeMap = proceduralRenderer.CreateShadowCubeMapResource(1);
 
-	std::vector<DX12Engine::RenderObject*> shadowCastingObjects{ &object1, &object2, &floor, &wallBack };
+	std::vector<DX12Engine::RenderObject*> sceneObjects{ &object1, &object2, &floor };
+
+	renderer.SetShadowMap(shadowMap.get());
+	renderer.SetShadowCubeMap(shadowCubeMap.get());
 
 	while (renderer.PollWindow())
 	{
 		m_Camera->ProcessKeyboardInput(0.01f);
 
-		proceduralRenderer.RenderShadowMaps(shadowMap.get(), lightBuffer.GetLightsByType({ DX12Engine::LightType::Directional, DX12Engine::LightType::Spot }), shadowCastingObjects);
-		proceduralRenderer.RenderShadowCubeMaps(shadowCubeMap.get(), lightBuffer.GetLightsByType({ DX12Engine::LightType::Point }), shadowCastingObjects);
-		renderer.InitFrame(renderer.GetDefaultViewport(), renderer.GetDefaultScissorRect());
-		//lightBuffer.GetLight(1)->SetPosition({ count, 2.0f, -count });
-		lightBuffer.Update();
-		renderer.SetShadowMap(shadowMap.get());
-		renderer.SetShadowCubeMap(shadowCubeMap.get());
+		proceduralRenderer.RenderShadowMaps(shadowMap.get(), lightBuffer.GetLightsByType({ DX12Engine::LightType::Directional, DX12Engine::LightType::Spot }), sceneObjects);
+		proceduralRenderer.RenderShadowCubeMaps(shadowCubeMap.get(), lightBuffer.GetLightsByType({ DX12Engine::LightType::Point }), sceneObjects);
+
 		object1.Rotate({ 0.0f, 1.0f, 0.0f });
 		object2.Rotate({ 1.0f, 0.0f, 0.0f });
-		renderer.Render(&object1);
-		renderer.Render(&object2);
-		renderer.Render(&floor);
-		//renderer.Render(&wallBack);
+		//lightBuffer.GetLight(1)->SetPosition({ count, 2.0f, -count });
+		lightBuffer.Update();
+
+		renderer.InitFrame(renderer.GetDefaultViewport(), renderer.GetDefaultScissorRect());
+		renderer.RenderObjectList(sceneObjects);
 		renderer.PresentFrame();
 		count += 0.001f;
 	}

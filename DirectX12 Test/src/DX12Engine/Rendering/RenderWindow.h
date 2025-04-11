@@ -7,9 +7,12 @@
 #include <d3dcompiler.h>
 #include "d3dx12.h"
 #include "../Application.h"
+#include "../Resources/DepthMap.h"
 
 namespace DX12Engine
 {
+	class DescriptorHeapManager;
+
 	class RenderWindow
 	{
 	public:
@@ -19,7 +22,7 @@ namespace DX12Engine
 		HWND Init(Application* app, DirectX::XMFLOAT2 windowSize);
 		void CreateSwapChain(ID3D12CommandQueue* commandQueue);
 		void CreateRTVHeap(ID3D12Device* device);
-		void CreateDepthStencilBuffer(ID3D12Device* device);
+		void CreateDepthStencilBuffer();
 
 		CD3DX12_CPU_DESCRIPTOR_HANDLE GetRTVHandle() 
 		{ 
@@ -28,7 +31,7 @@ namespace DX12Engine
 
 		D3D12_CPU_DESCRIPTOR_HANDLE GetDSVHandle() 
 		{
-			return m_DSVHeap->GetCPUDescriptorHandleForHeapStart();
+			return m_DepthBuffer->GetDepthStencilDescriptor().GetCPUHandle();
 		}
 
 		HWND GetWindowHandle() const { return m_WindowHandle; }
@@ -46,13 +49,11 @@ namespace DX12Engine
 		Microsoft::WRL::ComPtr<IDXGISwapChain3> m_SwapChain;
 		Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> m_RTVHeap;
 		Microsoft::WRL::ComPtr<ID3D12Resource> m_RenderTargets[2];
-		Microsoft::WRL::ComPtr<ID3D12Resource> m_DepthStencilBuffer;
-		Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> m_DSVHeap;
-		D3D12_CPU_DESCRIPTOR_HANDLE m_DSVHandle;
+
+		std::unique_ptr<DepthMap> m_DepthBuffer;
 
 		UINT m_FrameIndex = 0;
 		UINT m_RTVDescriptorSize;
-		UINT m_DSVDescriptorSize;
 	};
 }
 

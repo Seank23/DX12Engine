@@ -78,6 +78,12 @@ namespace DX12Engine
 		m_CommandList->DrawIndexedInstanced(indexBufferView.SizeInBytes / 4, 1, 0, 0, 0);
 	}
 
+	void Renderer::RenderObjectList(std::vector<RenderObject*> objects)
+	{
+		for (RenderObject* obj : objects)
+			Render(obj);
+	}
+
 	void Renderer::PresentFrame()
 	{
 		auto barrier = m_RenderContext->TransitionRenderTarget(false);
