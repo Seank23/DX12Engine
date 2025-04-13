@@ -1,5 +1,4 @@
 #pragma once
-#include "RenderContext.h"
 #include "../Resources/Mesh.h"
 #include "../Buffers/VertexBuffer.h"
 #include "../Buffers/IndexBuffer.h"
@@ -39,6 +38,9 @@ namespace DX12Engine
 
 		DirectX::XMMATRIX GetModelMatrix() { return m_ModelMatrix; }
 		D3D12_GPU_VIRTUAL_ADDRESS GetCBVAddress() { return m_ConstantBuffer->GetGPUAddress(); }
+
+		D3D12_VERTEX_BUFFER_VIEW GetVertexBufferView() { return m_VertexBuffer->GetVertexBufferView(); }
+		D3D12_INDEX_BUFFER_VIEW GetIndexBufferView() { return m_IndexBuffer->GetIndexBufferView(); }
 
 	private:
 		void UpdateConstantBufferData(DirectX::XMMATRIX viewMatrix, DirectX::XMMATRIX projectionMatrix, DirectX::XMFLOAT3 cameraPosition);

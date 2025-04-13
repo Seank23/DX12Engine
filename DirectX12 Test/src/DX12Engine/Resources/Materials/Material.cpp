@@ -4,7 +4,7 @@
 namespace DX12Engine
 {
 	Material::Material()
-		: m_EnvironmentMapHandle(nullptr)
+		: m_EnvironmentMapHandle(nullptr), m_ShadowMapHandle(nullptr), m_ShadowCubeMapHandle(nullptr)
 	{
 		m_ConstantBuffer = ResourceManager::GetInstance().CreateConstantBuffer(sizeof(MaterialData));
 	}

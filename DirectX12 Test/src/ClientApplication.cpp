@@ -20,6 +20,7 @@
 #include "DX12Engine/Resources/Skybox.h"
 #include "DX12Engine/Resources/DepthMap.h"
 #include "DX12Engine/Resources/ResourceManager.h"
+#include "DX12Engine/Rendering/RenderPass/ShadowMapRenderPass.h"
 
 ClientApplication::ClientApplication()
 {
@@ -126,7 +127,7 @@ ClientApplication::ClientApplication()
 	spotLight.SetPosition({ 1.0f, 6.0f, -1.0f });
 	spotLight.SetDirection({ -0.1f, -0.8f, 0.1f });
 	spotLight.SetColor({ 0.9f, 0.5f, 0.0f });
-	spotLight.SetIntensity(3.0f);
+	spotLight.SetIntensity(1.0f);
 	spotLight.SetSpotAngle(45.0f);
 	lightBuffer.AddLight(&spotLight);
 	renderer.SetLightBuffer(&lightBuffer);
@@ -136,21 +137,27 @@ ClientApplication::ClientApplication()
 	m_Camera->SetRotation(-20.0, 125.0);
 	renderer.SetCamera(m_Camera.get());
 
-	DX12Engine::ProceduralRenderer proceduralRenderer = context->GetProceduralRenderer();
-	std::unique_ptr<DX12Engine::DepthMap> shadowMap = proceduralRenderer.CreateShadowMapResource(2);
-	std::unique_ptr<DX12Engine::DepthMap> shadowCubeMap = proceduralRenderer.CreateShadowCubeMapResource(1);
-
 	std::vector<DX12Engine::RenderObject*> sceneObjects{ &object1, &object2, &floor };
 
-	renderer.SetShadowMap(shadowMap.get());
-	renderer.SetShadowCubeMap(shadowCubeMap.get());
+	DX12Engine::ShadowMapRenderPass shadowMapRenderPass(*context, 2, false);
+	shadowMapRenderPass.SetRenderObjects(sceneObjects);
+	shadowMapRenderPass.SetLights(lightBuffer.GetLightsByType({ DX12Engine::LightType::Directional, DX12Engine::LightType::Spot }));
+	shadowMapRenderPass.Init();
+
+	DX12Engine::ShadowMapRenderPass shadowCubeMapRenderPass(*context, 1, true);
+	shadowCubeMapRenderPass.SetRenderObjects(sceneObjects);
+	shadowCubeMapRenderPass.SetLights(lightBuffer.GetLightsByType({ DX12Engine::LightType::Point }));
+	shadowCubeMapRenderPass.Init();
+
+	renderer.SetShadowMap(shadowMapRenderPass.GetShadowMapOutput());
+	renderer.SetShadowCubeMap(shadowCubeMapRenderPass.GetShadowMapOutput());
 
 	while (renderer.PollWindow())
 	{
 		m_Camera->ProcessKeyboardInput(0.01f);
 
-		proceduralRenderer.RenderShadowMaps(shadowMap.get(), lightBuffer.GetLightsByType({ DX12Engine::LightType::Directional, DX12Engine::LightType::Spot }), sceneObjects);
-		proceduralRenderer.RenderShadowCubeMaps(shadowCubeMap.get(), lightBuffer.GetLightsByType({ DX12Engine::LightType::Point }), sceneObjects);
+		shadowMapRenderPass.Execute();
+		shadowCubeMapRenderPass.Execute();
 
 		object1.Rotate({ 0.0f, 1.0f, 0.0f });
 		object2.Rotate({ 1.0f, 0.0f, 0.0f });

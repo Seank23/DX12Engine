@@ -19,8 +19,6 @@ namespace DX12Engine
 
 		ResourceManager::GetInstance().Init(*this);
 
-		m_ProcRenderer = std::make_unique<ProceduralRenderer>(*this);
-
 		m_RenderWindow->CreateSwapChain(m_QueueManager->GetGraphicsQueue().GetCommandQueue().Get());
 		m_RenderWindow->CreateRTVHeap(m_Device.Get());
 		m_RenderWindow->CreateDepthStencilBuffer();
@@ -33,7 +31,6 @@ namespace DX12Engine
 		m_Device.Reset();
 		m_RenderWindow.reset();
 		m_Uploader.reset();
-		m_ProcRenderer.reset();
 	}
 
 	void RenderContext::InitDevice(HWND hwnd)
