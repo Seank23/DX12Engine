@@ -49,9 +49,9 @@ namespace DX12Engine
 		}
 	}
 
-	void BasicMaterial::Bind(ID3D12GraphicsCommandList* commandList, int* startIndex)
+	void BasicMaterial::Bind(ID3D12GraphicsCommandList* commandList, int* startIndex, bool bindPipelineState)
 	{
-		Material::Bind(commandList, startIndex);
+		Material::Bind(commandList, startIndex, bindPipelineState);
 		if (HasTexture(TextureType::Albedo))
 			commandList->SetGraphicsRootDescriptorTable(*startIndex, m_Texture->GetGPUHandle());
 	}

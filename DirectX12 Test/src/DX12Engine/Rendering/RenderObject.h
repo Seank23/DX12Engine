@@ -36,6 +36,7 @@ namespace DX12Engine
 		void Scale(DirectX::XMFLOAT3 newScale);
 		void Rotate(DirectX::XMFLOAT3 rotation);
 
+		Material* GetMaterial() { return m_Material.get(); }	
 		DirectX::XMMATRIX GetModelMatrix() { return m_ModelMatrix; }
 		D3D12_GPU_VIRTUAL_ADDRESS GetCBVAddress() { return m_ConstantBuffer->GetGPUAddress(); }
 

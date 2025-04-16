@@ -17,7 +17,7 @@ namespace DX12Engine
 		RenderContext(Application* app, int width, int height);
 		~RenderContext();
 
-		DirectX::XMFLOAT2							GetWindowSize() const { return m_WindowSize; }
+		DirectX::XMINT2							GetWindowSize() const { return m_WindowSize; }
 		HWND										GetWindowHandle() const { return m_RenderWindow->GetWindowHandle(); }
 		Microsoft::WRL::ComPtr<ID3D12Device>		GetDevice() const { return m_Device; }
 		CD3DX12_CPU_DESCRIPTOR_HANDLE				GetRTVHandle() const { return m_RenderWindow->GetRTVHandle(); }
@@ -39,7 +39,7 @@ namespace DX12Engine
 		std::unique_ptr<DescriptorHeapManager> m_HeapManager;
 		std::unique_ptr<GPUUploader> m_Uploader;
 
-		DirectX::XMFLOAT2 m_WindowSize;
+		DirectX::XMINT2 m_WindowSize;
 	};
 }
 

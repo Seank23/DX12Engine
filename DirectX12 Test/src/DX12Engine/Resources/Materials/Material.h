@@ -37,7 +37,7 @@ namespace DX12Engine
 		virtual Texture* GetTexture(TextureType type) = 0;
 		virtual bool HasTexture(TextureType type) = 0;
 
-		virtual void Bind(ID3D12GraphicsCommandList* commandList, int* startIndex);
+		virtual void Bind(ID3D12GraphicsCommandList* commandList, int* startIndex, bool bindPipelineState = true);
 
 		void SetEnvironmentMapHandle(D3D12_GPU_DESCRIPTOR_HANDLE* handle) { m_EnvironmentMapHandle = handle; }
 		void SetShadowMapHandle(D3D12_GPU_DESCRIPTOR_HANDLE* handle) { m_ShadowMapHandle = handle; }

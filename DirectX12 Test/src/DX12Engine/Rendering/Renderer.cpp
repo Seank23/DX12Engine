@@ -44,7 +44,6 @@ namespace DX12Engine
 	void Renderer::Render(RenderObject* renderObject)
 	{
 		// Object binding
-		renderObject->UpdateConstantBufferData(m_Camera->GetViewMatrix(), m_Camera->GetProjectionMatrix(), m_Camera->GetPosition());
 		m_CommandList->SetGraphicsRootSignature(renderObject->m_Material->GetRootSignature().Get());
 		m_CommandList->SetGraphicsRootConstantBufferView(0, m_LightBuffer->GetCBVAddress());
 		m_CommandList->SetGraphicsRootConstantBufferView(1, renderObject->GetCBVAddress());
@@ -100,9 +99,17 @@ namespace DX12Engine
 		return m_RenderContext->ProcessWindowMessages();
 	}
 
+	void Renderer::UpdateObjectList(std::vector<RenderObject*> objects)
+	{
+		for (RenderObject* obj : objects)
+		{
+			obj->UpdateConstantBufferData(m_Camera->GetViewMatrix(), m_Camera->GetProjectionMatrix(), m_Camera->GetPosition());
+		}
+	}
+
 	D3D12_VIEWPORT Renderer::GetDefaultViewport()
 	{
-		DirectX::XMFLOAT2 windowSize = m_RenderContext->GetWindowSize();
+		DirectX::XMINT2 windowSize = m_RenderContext->GetWindowSize();
 		D3D12_VIEWPORT viewport{};
 		viewport.TopLeftX = 0.0f;
 		viewport.TopLeftY = 0.0f;
@@ -115,7 +122,7 @@ namespace DX12Engine
 
 	D3D12_RECT Renderer::GetDefaultScissorRect()
 	{
-		DirectX::XMFLOAT2 windowSize = m_RenderContext->GetWindowSize();
+		DirectX::XMINT2 windowSize = m_RenderContext->GetWindowSize();
 		D3D12_RECT scissorRect{};
 		scissorRect.left = 0;
 		scissorRect.top = 0;
@@ -126,6 +133,7 @@ namespace DX12Engine
 
 	void Renderer::RenderSkybox()
 	{
+		m_Skybox->UpdateConstantBufferData(m_Camera->GetViewMatrix(), m_Camera->GetProjectionMatrix(), m_Camera->GetPosition());
 		Render(m_Skybox);
 	}
 }

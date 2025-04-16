@@ -1,6 +1,6 @@
 #include "ShadowMapRenderPass.h"
 #include "../RenderContext.h"
-#include "../../Resources/DepthMap.h"
+#include "../../Resources/RenderTexture.h"
 #include "../../Resources/ResourceManager.h"
 #include "../../Utils/Constants.h"
 #include "../RenderObject.h"
@@ -30,7 +30,7 @@ namespace DX12Engine
 
 	void ShadowMapRenderPass::Execute()
 	{
-		DepthMap* shadowMap = static_cast<DepthMap*>(m_RenderTargets[0].get());
+		RenderTexture* shadowMap = m_RenderTargets[0].get();
 		for (int i = 0; i < m_Lights.size(); i++)
 		{
 			if (m_IsCubeMap)
@@ -40,7 +40,18 @@ namespace DX12Engine
 		}
 	}
 
-	void ShadowMapRenderPass::RenderShadowMap(DepthMap* shadowMap, int lightIndex)
+	RenderTexture* ShadowMapRenderPass::GetRenderTarget(RenderTargetType type)
+	{
+		switch (type)
+		{
+		case RenderTargetType::Depth:
+			return m_RenderTargets[0].get();
+		default:
+			return nullptr;
+		}
+	}
+
+	void ShadowMapRenderPass::RenderShadowMap(RenderTexture* shadowMap, int lightIndex)
 	{
 		if (!m_RenderContext.GetUploader().UploadAllPending()) // Upload any pending resources
 			m_QueueManager.GetGraphicsQueue().ResetCommandAllocatorAndList();
@@ -61,7 +72,7 @@ namespace DX12Engine
 		m_CommandList.ResourceBarrier(1, &barrier);
 		shadowMap->SetUsageState(D3D12_RESOURCE_STATE_DEPTH_WRITE);
 
-		auto dsvHandle = shadowMap->GetDepthStencilDescriptor(lightIndex).GetCPUHandle();
+		auto dsvHandle = shadowMap->GetTextureDescriptor(lightIndex).GetCPUHandle();
 		m_CommandList.OMSetRenderTargets(0, nullptr, FALSE, &dsvHandle);
 		m_CommandList.ClearDepthStencilView(dsvHandle, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
 
@@ -91,7 +102,7 @@ namespace DX12Engine
 		m_QueueManager.WaitForFenceCPUBlocking(fenceVal);
 	}
 
-	void ShadowMapRenderPass::RenderShadowCubeMap(DepthMap* shadowMap, int lightIndex)
+	void ShadowMapRenderPass::RenderShadowCubeMap(RenderTexture* shadowMap, int lightIndex)
 	{
 		DirectX::XMVECTOR lightPos = DirectX::XMLoadFloat3(&m_Lights[lightIndex]->GetLightData().Position);
 		DirectX::XMMATRIX lightProj = m_Lights[lightIndex]->GetLightData().ViewProjMatrix;
@@ -127,7 +138,7 @@ namespace DX12Engine
 			m_CommandList.ResourceBarrier(1, &barrier);
 			shadowMap->SetUsageState(D3D12_RESOURCE_STATE_DEPTH_WRITE);
 
-			auto dsvHandle = shadowMap->GetDepthStencilDescriptor(j + 6 * lightIndex).GetCPUHandle();
+			auto dsvHandle = shadowMap->GetTextureDescriptor(j + 6 * lightIndex).GetCPUHandle();
 			m_CommandList.OMSetRenderTargets(0, nullptr, FALSE, &dsvHandle);
 			m_CommandList.ClearDepthStencilView(dsvHandle, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
 
@@ -173,7 +184,8 @@ namespace DX12Engine
 
 		pipelineStateBuilder = pipelineStateBuilder.ConfigureFromDefault()
 			.SetRasterizerState(rasterizerDesc)
-			.SetRenderTargetFormats(DXGI_FORMAT_R8G8B8A8_UNORM, DXGI_FORMAT_D32_FLOAT);
+			.SetRenderTargets({ DXGI_FORMAT_R8G8B8A8_UNORM })
+			.SetDepthStencilFormat(DXGI_FORMAT_D32_FLOAT);
 
 		if (m_IsCubeMap)
 		{

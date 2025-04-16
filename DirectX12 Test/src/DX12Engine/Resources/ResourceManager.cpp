@@ -19,6 +19,8 @@ namespace DX12Engine
 		m_Shaders.insert({ "ShadowMap_VS", std::make_unique<Shader>(GetShaderPath("ShadowMap_VS.hlsl"), "vertex") });
 		m_Shaders.insert({ "ShadowCubeMap_VS", std::make_unique<Shader>(GetShaderPath("ShadowCubeMap_VS.hlsl"), "vertex") });
 		m_Shaders.insert({ "ShadowCubeMap_PS", std::make_unique<Shader>(GetShaderPath("ShadowCubeMap_PS.hlsl"), "pixel") });
+		m_Shaders.insert({ "Geometry_VS", std::make_unique<Shader>(GetShaderPath("Geometry_VS.hlsl"), "vertex") });
+		m_Shaders.insert({ "Geometry_PS", std::make_unique<Shader>(GetShaderPath("Geometry_PS.hlsl"), "pixel") });
 	}
 
 	ResourceManager::~ResourceManager()
@@ -318,7 +320,7 @@ namespace DX12Engine
 		return std::make_unique<Texture>(textureResource, textureUploadResource, D3D12_RESOURCE_STATE_COPY_DEST, cubemapData, srvHandle, true);
 	}
 
-	std::unique_ptr<DepthMap> ResourceManager::CreateDepthMap(DirectX::XMINT3 dimensions, DXGI_FORMAT dsvFormat, DXGI_FORMAT srvFormat, bool isCubeMap)
+	std::unique_ptr<RenderTexture> ResourceManager::CreateDepthMap(DirectX::XMINT3 dimensions, DXGI_FORMAT dsvFormat, DXGI_FORMAT srvFormat, bool isCubeMap)
 	{
 		int arraySize = dimensions.z;
 		bool isSingleMap = arraySize == 1 && !isCubeMap;
@@ -333,6 +335,7 @@ namespace DX12Engine
 		depthMapDesc.MipLevels = 1;
 		depthMapDesc.Format = dsvFormat;
 		depthMapDesc.SampleDesc.Count = 1;
+		depthMapDesc.SampleDesc.Quality = 0;
 		depthMapDesc.Flags = D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL;
 
 		D3D12_CLEAR_VALUE depthOptimizedClearValue = {};
@@ -389,7 +392,58 @@ namespace DX12Engine
 		DescriptorHeapHandle srvHandle = m_HeapManager->GetRenderHeapHandleBlock(1);
 		m_Device->CreateShaderResourceView(depthMapResource, &srvDesc, srvHandle.GetCPUHandle());
 
-		return std::make_unique<DepthMap>(depthMapResource, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, srvHandle, dsvDescriptors, isCubeMap);
+		return std::make_unique<RenderTexture>(depthMapResource, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, srvHandle, dsvDescriptors, isCubeMap);
+	}
+
+	std::unique_ptr<RenderTexture> ResourceManager::CreateRenderTargetTexture(DirectX::XMINT2 dimensions, DXGI_FORMAT format, UINT mipLevels)
+	{
+		D3D12_RESOURCE_DESC textureDesc = {};
+		textureDesc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
+		textureDesc.Width = dimensions.x;
+		textureDesc.Height = dimensions.y;
+		textureDesc.DepthOrArraySize = 1;
+		textureDesc.MipLevels = mipLevels;
+		textureDesc.Format = format;
+		textureDesc.SampleDesc.Count = 1;
+		textureDesc.SampleDesc.Quality = 0;
+		textureDesc.Flags = D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET;
+
+		D3D12_CLEAR_VALUE clearValue = {};
+		clearValue.Format = format;
+		clearValue.Color[0] = 0.0f;
+		clearValue.Color[1] = 0.0f;
+		clearValue.Color[2] = 0.0f;
+		clearValue.Color[3] = 1.0f;
+
+		ID3D12Resource* renderTargetResource = nullptr;
+		auto heapProps = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);
+		m_Device->CreateCommittedResource(
+			&heapProps,
+			D3D12_HEAP_FLAG_NONE,
+			&textureDesc,
+			D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE,
+			&clearValue,
+			IID_PPV_ARGS(&renderTargetResource));
+
+		std::vector<DescriptorHeapHandle> rtvDescriptors;
+		D3D12_RENDER_TARGET_VIEW_DESC rtvDesc = {};
+		rtvDesc.Format = format;
+		rtvDesc.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2D;
+
+		DescriptorHeapHandle rtvHandle = m_HeapManager->GetNewRTVDescriptorHeapHandle();
+		m_Device->CreateRenderTargetView(renderTargetResource, &rtvDesc, rtvHandle.GetCPUHandle());
+		rtvDescriptors.push_back(rtvHandle);
+
+		D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
+		srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+		srvDesc.Format = format;
+		srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+		srvDesc.Texture2D.MipLevels = mipLevels;
+
+		DescriptorHeapHandle srvHandle = m_HeapManager->GetNewSRVDescriptorHeapHandle();
+		m_Device->CreateShaderResourceView(renderTargetResource, &srvDesc, srvHandle.GetCPUHandle());
+
+		return std::make_unique<RenderTexture>(renderTargetResource, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, srvHandle, rtvDescriptors, false);
 	}
 
 	Microsoft::WRL::ComPtr<ID3D12PipelineState> ResourceManager::CreatePipelineState(const D3D12_GRAPHICS_PIPELINE_STATE_DESC& desc)

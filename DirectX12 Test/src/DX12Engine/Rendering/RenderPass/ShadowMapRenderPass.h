@@ -13,7 +13,7 @@ namespace DX12Engine
 	};
 
 	class Light;
-	class DepthMap;
+	class RenderTexture;
 
 	class ShadowMapRenderPass : public RenderPass
 	{
@@ -24,13 +24,15 @@ namespace DX12Engine
 		void Init() override;
 		void Execute() override;
 
+		RenderTexture* GetRenderTarget(RenderTargetType type) override;
+
 		void SetLights(std::vector<Light*> lights) { m_Lights = lights; }
 
-		DepthMap* GetShadowMapOutput() { return static_cast<DepthMap*>(m_RenderTargets[0].get()); }
+		RenderTexture* GetShadowMapOutput() { return static_cast<RenderTexture*>(m_RenderTargets[0].get()); }
 
 	private:
-		void RenderShadowMap(DepthMap* shadowMap, int lightIndex);
-		void RenderShadowCubeMap(DepthMap* shadowMap, int lightIndex);
+		void RenderShadowMap(RenderTexture* shadowMap, int lightIndex);
+		void RenderShadowCubeMap(RenderTexture* shadowMap, int lightIndex);
 		void CreateShadowMapPSO();
 
 		int m_ShadowMapCount;

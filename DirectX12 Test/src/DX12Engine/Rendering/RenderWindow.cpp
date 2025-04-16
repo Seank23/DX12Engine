@@ -28,7 +28,7 @@ namespace DX12Engine
 {
 	RenderWindow::RenderWindow()
 		: m_WindowHandle(nullptr), m_WindowInstance(nullptr), m_SwapChain(nullptr), m_RTVHeap(nullptr),
-		m_FrameIndex(0), m_RTVDescriptorSize(0), m_WindowSize(DirectX::XMFLOAT2(0, 0))
+		m_FrameIndex(0), m_RTVDescriptorSize(0), m_WindowSize(DirectX::XMINT2(0, 0))
 	{
 	}
 
@@ -44,7 +44,7 @@ namespace DX12Engine
 		m_RTVDescriptorSize = 0;
 	}
 
-	HWND RenderWindow::Init(Application* app, DirectX::XMFLOAT2 windowSize)
+	HWND RenderWindow::Init(Application* app, DirectX::XMINT2 windowSize)
 	{
 		m_WindowSize = windowSize;
 		WNDCLASSEX wc = { sizeof(WNDCLASSEX), CS_CLASSDC, WindowProc, 0, 0, m_WindowInstance, nullptr, nullptr, nullptr, nullptr, L"DX12Window", nullptr };

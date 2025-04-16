@@ -15,7 +15,7 @@ namespace DX12Engine
 		virtual Texture* GetTexture(TextureType type = TextureType::Albedo) override { return m_Texture.get(); }
 		virtual bool HasTexture(TextureType type = TextureType::Albedo) override { return m_Texture != nullptr; }
 
-		virtual void Bind(ID3D12GraphicsCommandList* commandList, int* startIndex) override;
+		virtual void Bind(ID3D12GraphicsCommandList* commandList, int* startIndex, bool bindPipelineState = true) override;
 
 	private:
 		BasicMaterialData m_MaterialData;

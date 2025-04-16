@@ -12,17 +12,20 @@ namespace DX12Engine
 
 		DescriptorHeapHandle GetNewSRVDescriptorHeapHandle() { return m_StagingHeap->GetNewHeapHandle(); }
 		DescriptorHeapHandle GetNewDSVDescriptorHeapHandle() { return m_DepthStencilHeap->GetNewHeapHandle(); }
+		DescriptorHeapHandle GetNewRTVDescriptorHeapHandle() { return m_RenderTargetHeap->GetNewHeapHandle(); }
 		DescriptorHeapHandle GetRenderHeapHandleBlock(UINT count) { return m_RenderPassHeap->GetHeapHandleBlock(count); }
 
 		StagingDescriptorHeap& GetStagingHeap() { return *m_StagingHeap; }
 		RenderPassDescriptorHeap& GetRenderPassHeap() { return *m_RenderPassHeap; }
 		StagingDescriptorHeap& GetDepthStencilHeap() { return *m_DepthStencilHeap; }
+		StagingDescriptorHeap& GetRenderTargetHeap() { return *m_RenderTargetHeap; }
 
 	private:
 		Microsoft::WRL::ComPtr<ID3D12Device> m_Device;
 		std::unique_ptr<StagingDescriptorHeap> m_StagingHeap;
 		std::unique_ptr<RenderPassDescriptorHeap> m_RenderPassHeap;
 		std::unique_ptr<StagingDescriptorHeap> m_DepthStencilHeap;
+		std::unique_ptr<StagingDescriptorHeap> m_RenderTargetHeap;
 	};
 }
 

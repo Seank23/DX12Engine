@@ -18,9 +18,10 @@
 #include "DX12Engine/Buffers/LightBuffer.h"
 #include "DX12Engine/Resources/Light.h"
 #include "DX12Engine/Resources/Skybox.h"
-#include "DX12Engine/Resources/DepthMap.h"
+#include "DX12Engine/Resources/RenderTexture.h"
 #include "DX12Engine/Resources/ResourceManager.h"
 #include "DX12Engine/Rendering/RenderPass/ShadowMapRenderPass.h"
+#include "DX12Engine/Rendering/RenderPass/GeometryRenderPass.h"
 
 ClientApplication::ClientApplication()
 {
@@ -149,6 +150,10 @@ ClientApplication::ClientApplication()
 	shadowCubeMapRenderPass.SetLights(lightBuffer.GetLightsByType({ DX12Engine::LightType::Point }));
 	shadowCubeMapRenderPass.Init();
 
+	DX12Engine::GeometryRenderPass geometryRenderPass(*context);
+	geometryRenderPass.SetRenderObjects(sceneObjects);
+	geometryRenderPass.Init();
+
 	renderer.SetShadowMap(shadowMapRenderPass.GetShadowMapOutput());
 	renderer.SetShadowCubeMap(shadowCubeMapRenderPass.GetShadowMapOutput());
 
@@ -158,6 +163,7 @@ ClientApplication::ClientApplication()
 
 		shadowMapRenderPass.Execute();
 		shadowCubeMapRenderPass.Execute();
+		geometryRenderPass.Execute();
 
 		object1.Rotate({ 0.0f, 1.0f, 0.0f });
 		object2.Rotate({ 1.0f, 0.0f, 0.0f });
@@ -165,6 +171,7 @@ ClientApplication::ClientApplication()
 		lightBuffer.Update();
 
 		renderer.InitFrame(renderer.GetDefaultViewport(), renderer.GetDefaultScissorRect());
+		renderer.UpdateObjectList(sceneObjects);
 		renderer.RenderObjectList(sceneObjects);
 		renderer.PresentFrame();
 		count += 0.001f;

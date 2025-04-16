@@ -6,7 +6,7 @@
 namespace DX12Engine
 {
 	RenderContext::RenderContext(Application* app, int width, int height)
-		: m_WindowSize(DirectX::XMFLOAT2(width, height)), m_Device(nullptr)
+		: m_WindowSize(DirectX::XMINT2(width, height)), m_Device(nullptr)
 	{
 		m_RenderWindow = std::make_unique<RenderWindow>();
 		HWND windowHandle = m_RenderWindow->Init(app, m_WindowSize);

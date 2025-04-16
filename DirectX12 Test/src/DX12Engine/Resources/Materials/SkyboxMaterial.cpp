@@ -26,9 +26,9 @@ namespace DX12Engine
 	{
 	}
 
-	void SkyboxMaterial::Bind(ID3D12GraphicsCommandList* commandList, int* startIndex)
+	void SkyboxMaterial::Bind(ID3D12GraphicsCommandList* commandList, int* startIndex, bool bindPipelineState)
 	{
-		Material::Bind(commandList, startIndex);
+		Material::Bind(commandList, startIndex, bindPipelineState);
 		if (HasTexture())
 			commandList->SetGraphicsRootDescriptorTable(*startIndex, m_Texture->GetGPUHandle());
 	}

@@ -25,7 +25,8 @@ namespace DX12Engine
                     .SetRasterizerState(CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT))
                     .SetDepthStencilState(CD3DX12_DEPTH_STENCIL_DESC(D3D12_DEFAULT))
                     .SetPrimitiveTopologyType(D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE)
-                    .SetRenderTargetFormats(DXGI_FORMAT_R8G8B8A8_UNORM, DXGI_FORMAT_D24_UNORM_S8_UINT)
+                    .SetRenderTargets({ DXGI_FORMAT_R8G8B8A8_UNORM })
+					.SetDepthStencilFormat(DXGI_FORMAT_D24_UNORM_S8_UINT)
                     .SetSampleDesc(UINT_MAX, 1, 0)
                     .SetVertexShader(vertexShader)
                     .SetPixelShader(pixelShader);
@@ -37,7 +38,8 @@ namespace DX12Engine
                     .SetRasterizerState(CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT))
                     .SetDepthStencilState(CD3DX12_DEPTH_STENCIL_DESC(D3D12_DEFAULT))
                     .SetPrimitiveTopologyType(D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE)
-                    .SetRenderTargetFormats(DXGI_FORMAT_R8G8B8A8_UNORM, DXGI_FORMAT_D24_UNORM_S8_UINT)
+                    .SetRenderTargets({ DXGI_FORMAT_R8G8B8A8_UNORM })
+                    .SetDepthStencilFormat(DXGI_FORMAT_D24_UNORM_S8_UINT)
                     .SetSampleDesc(UINT_MAX, 1, 0);
             }
             
@@ -94,13 +96,21 @@ namespace DX12Engine
             return *this;
         }
 
-        PipelineStateBuilder& SetRenderTargetFormats(DXGI_FORMAT rtvFormat, DXGI_FORMAT dsvFormat) 
+        PipelineStateBuilder& SetRenderTargets(std::vector<DXGI_FORMAT> formats)
         {
-            psoDesc.RTVFormats[0] = rtvFormat;
-            psoDesc.DSVFormat = dsvFormat;
-            psoDesc.NumRenderTargets = 1;
+			for (int i = 0; i < formats.size(); i++)
+			{
+				psoDesc.RTVFormats[i] = formats[i];
+			}
+            psoDesc.NumRenderTargets = formats.size();
             return *this;
         }
+
+		PipelineStateBuilder& SetDepthStencilFormat(DXGI_FORMAT format)
+		{
+			psoDesc.DSVFormat = format;
+			return *this;
+		}
 
         PipelineStateBuilder& SetSampleDesc(UINT mask, UINT count, UINT quality)
         {

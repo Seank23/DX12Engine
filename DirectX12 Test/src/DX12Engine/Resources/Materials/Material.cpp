@@ -27,9 +27,9 @@ namespace DX12Engine
 		BuildPipelineState();
 	}
 
-	void Material::Bind(ID3D12GraphicsCommandList* commandList, int* startIndex)
+	void Material::Bind(ID3D12GraphicsCommandList* commandList, int* startIndex, bool bindPipelineState)
 	{
-		commandList->SetPipelineState(m_PipelineState.Get());
+		if (bindPipelineState) commandList->SetPipelineState(m_PipelineState.Get());
 		commandList->SetGraphicsRootConstantBufferView((*startIndex)++, GetCBVAddress());
 	}
 

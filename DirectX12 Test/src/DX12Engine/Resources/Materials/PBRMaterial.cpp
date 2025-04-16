@@ -60,15 +60,15 @@ namespace DX12Engine
 			return false;
 		}
 	}
-	void PBRMaterial::Bind(ID3D12GraphicsCommandList* commandList, int* startIndex)
+	void PBRMaterial::Bind(ID3D12GraphicsCommandList* commandList, int* startIndex, bool bindPipelineState)
 	{
-		Material::Bind(commandList, startIndex);
+		Material::Bind(commandList, startIndex, bindPipelineState);
 		if (HasTexture(TextureType::Albedo))
 			commandList->SetGraphicsRootDescriptorTable((*startIndex)++, m_AlbedoMap->GetGPUHandle());
-		if (m_EnvironmentMapHandle != nullptr)
-			commandList->SetGraphicsRootDescriptorTable((*startIndex)++, *m_EnvironmentMapHandle);
-		if (m_ShadowMapHandle != nullptr)
-			commandList->SetGraphicsRootDescriptorTable((*startIndex)++, *m_ShadowMapHandle);
+		//if (m_EnvironmentMapHandle != nullptr)
+		//	commandList->SetGraphicsRootDescriptorTable((*startIndex)++, *m_EnvironmentMapHandle);
+		//if (m_ShadowMapHandle != nullptr)
+		//	commandList->SetGraphicsRootDescriptorTable((*startIndex)++, *m_ShadowMapHandle);
 		//if (m_ShadowCubeMapHandle != nullptr)
 		//	commandList->SetGraphicsRootDescriptorTable((*startIndex)++, *m_ShadowCubeMapHandle);
 	}

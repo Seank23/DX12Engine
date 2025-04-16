@@ -5,8 +5,18 @@
 
 namespace DX12Engine
 {
+	enum class RenderTargetType
+	{
+		Albedo,
+		Normal,
+		Material,
+		Position,
+		Depth
+	};
+
 	class RenderObject;
 	class GPUResource;
+	class RenderTexture;
 
 	class RenderPass
 	{
@@ -21,13 +31,15 @@ namespace DX12Engine
 		void SetInputResources(std::vector<GPUResource*> resources) { m_InputResources = resources; }
 		void SetRenderObjects(std::vector<RenderObject*> renderObjects) { m_RenderObjects = renderObjects; }
 
+		virtual RenderTexture* GetRenderTarget(RenderTargetType type) = 0;
+
 	protected:
 		RenderContext& m_RenderContext;
 		CommandQueueManager& m_QueueManager;
 		ID3D12GraphicsCommandList& m_CommandList;
 
 		std::vector<GPUResource*> m_InputResources;
-		std::vector<std::unique_ptr<GPUResource>> m_RenderTargets;
+		std::vector<std::unique_ptr<RenderTexture>> m_RenderTargets;
 		std::vector<RenderObject*> m_RenderObjects;
 	};
 }

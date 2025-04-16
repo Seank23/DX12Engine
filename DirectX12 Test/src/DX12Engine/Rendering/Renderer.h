@@ -6,7 +6,7 @@
 #include "../Buffers/LightBuffer.h"
 #include "../Input/Camera.h"
 #include "../Resources/Skybox.h"
-#include "../Resources/DepthMap.h"
+#include "../Resources/RenderTexture.h"
 
 namespace DX12Engine
 {
@@ -21,12 +21,13 @@ namespace DX12Engine
 		void RenderObjectList(std::vector<RenderObject*> objects);
 		void PresentFrame();
 		bool PollWindow();
+		void UpdateObjectList(std::vector<RenderObject*> objects);
 
 		void SetLightBuffer(LightBuffer* lightBuffer) { m_LightBuffer = lightBuffer; }
 		void SetCamera(Camera* camera) { m_Camera = camera; }
 		void SetSkybox(Skybox* skybox) { m_Skybox = skybox; }
-		void SetShadowMap(DepthMap* shadowMap) { m_ShadowMap = shadowMap; }
-		void SetShadowCubeMap(DepthMap* shadowCubeMap) { m_ShadowCubeMap = shadowCubeMap; }
+		void SetShadowMap(RenderTexture* shadowMap) { m_ShadowMap = shadowMap; }
+		void SetShadowCubeMap(RenderTexture* shadowCubeMap) { m_ShadowCubeMap = shadowCubeMap; }
 
 		D3D12_VIEWPORT GetDefaultViewport();
 		D3D12_RECT GetDefaultScissorRect();
@@ -43,8 +44,8 @@ namespace DX12Engine
 
 		Camera* m_Camera;
 		Skybox* m_Skybox;
-		DepthMap* m_ShadowMap;
-		DepthMap* m_ShadowCubeMap;
+		RenderTexture* m_ShadowMap;
+		RenderTexture* m_ShadowCubeMap;
 	};
 }
 
