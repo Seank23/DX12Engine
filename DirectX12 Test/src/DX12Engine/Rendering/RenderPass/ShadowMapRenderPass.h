@@ -28,7 +28,7 @@ namespace DX12Engine
 
 		void SetLights(std::vector<Light*> lights) { m_Lights = lights; }
 
-		RenderTexture* GetShadowMapOutput() { return static_cast<RenderTexture*>(m_RenderTargets[0].get()); }
+		RenderTexture* GetShadowMapOutput() { return m_RenderTargets[0].get(); }
 
 	private:
 		void RenderShadowMap(RenderTexture* shadowMap, int lightIndex);

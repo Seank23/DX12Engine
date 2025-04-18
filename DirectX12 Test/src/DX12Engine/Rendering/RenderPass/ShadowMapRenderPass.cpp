@@ -66,7 +66,7 @@ namespace DX12Engine
 
 		auto barrier = CD3DX12_RESOURCE_BARRIER::Transition(
 			shadowMap->GetResource(),
-			D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE,
+			shadowMap->GetUsageState(),
 			D3D12_RESOURCE_STATE_DEPTH_WRITE
 		);
 		m_CommandList.ResourceBarrier(1, &barrier);
@@ -92,7 +92,7 @@ namespace DX12Engine
 		}
 		barrier = CD3DX12_RESOURCE_BARRIER::Transition(
 			shadowMap->GetResource(),
-			D3D12_RESOURCE_STATE_DEPTH_WRITE,
+			shadowMap->GetUsageState(),
 			D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE
 		);
 		m_CommandList.ResourceBarrier(1, &barrier);

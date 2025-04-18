@@ -22,6 +22,7 @@
 #include "DX12Engine/Resources/ResourceManager.h"
 #include "DX12Engine/Rendering/RenderPass/ShadowMapRenderPass.h"
 #include "DX12Engine/Rendering/RenderPass/GeometryRenderPass.h"
+#include "DX12Engine/Rendering/RenderPass/LightingRenderPass.h"
 
 ClientApplication::ClientApplication()
 {
@@ -135,7 +136,7 @@ ClientApplication::ClientApplication()
 
 	m_Camera = std::make_unique<DX12Engine::Camera>(1600.0f / 900.0f, 1.0f, 100.0f);
 	m_Camera->SetPosition({ 4.0f, 2.0f, -5.0f });
-	m_Camera->SetRotation(-20.0, 125.0);
+	m_Camera->SetRotation(-20.0f, 125.0f);
 	renderer.SetCamera(m_Camera.get());
 
 	std::vector<DX12Engine::RenderObject*> sceneObjects{ &object1, &object2, &floor };
@@ -153,6 +154,18 @@ ClientApplication::ClientApplication()
 	DX12Engine::GeometryRenderPass geometryRenderPass(*context);
 	geometryRenderPass.SetRenderObjects(sceneObjects);
 	geometryRenderPass.Init();
+	std::vector<DX12Engine::RenderTexture*> gBuffer = {
+		geometryRenderPass.GetRenderTarget(DX12Engine::RenderTargetType::Albedo),
+		geometryRenderPass.GetRenderTarget(DX12Engine::RenderTargetType::Normal),
+		geometryRenderPass.GetRenderTarget(DX12Engine::RenderTargetType::Material),
+		geometryRenderPass.GetRenderTarget(DX12Engine::RenderTargetType::Position),
+		geometryRenderPass.GetRenderTarget(DX12Engine::RenderTargetType::Depth)
+	};
+
+	DX12Engine::LightingRenderPass lightingRenderPass(*context);
+	lightingRenderPass.SetLightBuffer(&lightBuffer);
+	lightingRenderPass.SetInputResources(gBuffer);
+	lightingRenderPass.Init();
 
 	renderer.SetShadowMap(shadowMapRenderPass.GetShadowMapOutput());
 	renderer.SetShadowCubeMap(shadowCubeMapRenderPass.GetShadowMapOutput());
@@ -164,6 +177,7 @@ ClientApplication::ClientApplication()
 		shadowMapRenderPass.Execute();
 		shadowCubeMapRenderPass.Execute();
 		geometryRenderPass.Execute();
+		lightingRenderPass.Execute();
 
 		object1.Rotate({ 0.0f, 1.0f, 0.0f });
 		object2.Rotate({ 1.0f, 0.0f, 0.0f });

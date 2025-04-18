@@ -124,16 +124,9 @@ namespace DX12Engine
         PipelineStateBuilder pipelineStateBuilder;
         RootSignatureBuilder rootSignatureBuilder;
 
-        pipelineStateBuilder = pipelineStateBuilder.AddInputLayout()
+        pipelineStateBuilder = pipelineStateBuilder.ConfigureFromDefault(ResourceManager::GetInstance().GetShader("Geometry_VS"), ResourceManager::GetInstance().GetShader("Geometry_PS"))
             .SetRenderTargets({ DXGI_FORMAT_R8G8B8A8_UNORM, DXGI_FORMAT_R16G16B16A16_FLOAT, DXGI_FORMAT_R16G16B16A16_FLOAT, DXGI_FORMAT_R16G16B16A16_FLOAT })
-            .SetDepthStencilFormat(DXGI_FORMAT_D32_FLOAT)
-            .SetBlendState(CD3DX12_BLEND_DESC(D3D12_DEFAULT))
-            .SetRasterizerState(CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT))
-            .SetDepthStencilState(CD3DX12_DEPTH_STENCIL_DESC(D3D12_DEFAULT))
-            .SetPrimitiveTopologyType(D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE)
-            .SetSampleDesc(UINT_MAX, 1, 0)
-            .SetVertexShader(ResourceManager::GetInstance().GetShader("Geometry_VS"))
-            .SetPixelShader(ResourceManager::GetInstance().GetShader("Geometry_PS"));
+            .SetDepthStencilFormat(DXGI_FORMAT_D32_FLOAT);
 
         DescriptorTableConfig config(5, D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 0);
         rootSignatureBuilder = rootSignatureBuilder.AddConstantBuffer(0)

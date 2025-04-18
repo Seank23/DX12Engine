@@ -21,6 +21,8 @@ namespace DX12Engine
 		m_Shaders.insert({ "ShadowCubeMap_PS", std::make_unique<Shader>(GetShaderPath("ShadowCubeMap_PS.hlsl"), "pixel") });
 		m_Shaders.insert({ "Geometry_VS", std::make_unique<Shader>(GetShaderPath("Geometry_VS.hlsl"), "vertex") });
 		m_Shaders.insert({ "Geometry_PS", std::make_unique<Shader>(GetShaderPath("Geometry_PS.hlsl"), "pixel") });
+		m_Shaders.insert({ "PBRLightingDeferred_VS", std::make_unique<Shader>(GetShaderPath("PBRLightingDeferred_VS.hlsl"), "vertex") });
+		m_Shaders.insert({ "PBRLightingDeferred_PS", std::make_unique<Shader>(GetShaderPath("PBRLightingDeferred_PS.hlsl"), "pixel") });
 	}
 
 	ResourceManager::~ResourceManager()
@@ -440,7 +442,7 @@ namespace DX12Engine
 		srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
 		srvDesc.Texture2D.MipLevels = mipLevels;
 
-		DescriptorHeapHandle srvHandle = m_HeapManager->GetNewSRVDescriptorHeapHandle();
+		DescriptorHeapHandle srvHandle = m_HeapManager->GetRenderHeapHandleBlock(1);
 		m_Device->CreateShaderResourceView(renderTargetResource, &srvDesc, srvHandle.GetCPUHandle());
 
 		return std::make_unique<RenderTexture>(renderTargetResource, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, srvHandle, rtvDescriptors, false);
