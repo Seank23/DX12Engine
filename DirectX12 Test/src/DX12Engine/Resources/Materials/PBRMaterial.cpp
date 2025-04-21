@@ -65,12 +65,6 @@ namespace DX12Engine
 		Material::Bind(commandList, startIndex, bindPipelineState);
 		if (HasTexture(TextureType::Albedo))
 			commandList->SetGraphicsRootDescriptorTable((*startIndex)++, m_AlbedoMap->GetGPUHandle());
-		//if (m_EnvironmentMapHandle != nullptr)
-		//	commandList->SetGraphicsRootDescriptorTable((*startIndex)++, *m_EnvironmentMapHandle);
-		//if (m_ShadowMapHandle != nullptr)
-		//	commandList->SetGraphicsRootDescriptorTable((*startIndex)++, *m_ShadowMapHandle);
-		//if (m_ShadowCubeMapHandle != nullptr)
-		//	commandList->SetGraphicsRootDescriptorTable((*startIndex)++, *m_ShadowCubeMapHandle);
 	}
 
 	void PBRMaterial::SetAlbedo(DirectX::XMFLOAT3 albedo)

@@ -65,9 +65,12 @@ namespace DX12Engine
 
 		m_CommandList.SetGraphicsRootConstantBufferView(0, m_LightBuffer->GetCBVAddress());
 		m_CommandList.SetGraphicsRootConstantBufferView(1, m_LightingPassCB->GetGPUAddress());
-		m_CommandList.SetGraphicsRootDescriptorTable(2, m_InputResources[0]->GetDescriptor()->GetGPUHandle());
-		m_CommandList.SetGraphicsRootDescriptorTable(3, m_InputResources[5]->GetDescriptor()->GetGPUHandle());
-		m_CommandList.SetGraphicsRootDescriptorTable(4, m_InputResources[7]->GetDescriptor()->GetGPUHandle());
+		int startIndex = 2;
+		for (int i = 0; i < m_DescriptorTableConfigs.size(); i++)
+		{
+			int resourceIndex = m_DescriptorTableConfigs[i].BaseShaderRegister;
+			m_CommandList.SetGraphicsRootDescriptorTable(startIndex + i, m_InputResources[resourceIndex]->GetDescriptor()->GetGPUHandle());
+		}
 
 		m_CommandList.IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 		m_CommandList.DrawInstanced(3, 1, 0, 0);
@@ -107,11 +110,8 @@ namespace DX12Engine
 			.SetSampleDesc(UINT_MAX, 1, 0).SetVertexShader(ResourceManager::GetInstance().GetShader("PBRLightingDeferred_VS"))
 			.SetPixelShader(ResourceManager::GetInstance().GetShader("PBRLightingDeferred_PS"));
 
-		DescriptorTableConfig materialTable(5, D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 0);
-		DescriptorTableConfig envTable(2, D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 5);
-		DescriptorTableConfig shadowTable(2, D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 7);
 		rootSignatureBuilder = rootSignatureBuilder.AddConstantBuffer(0).AddConstantBuffer(1)
-			.AddDescriptorTables({ materialTable, envTable, shadowTable })
+			.AddDescriptorTables(m_DescriptorTableConfigs)
 			.AddSampler(0, D3D12_FILTER_ANISOTROPIC)
 			.AddShadowMapSampler(1);
 

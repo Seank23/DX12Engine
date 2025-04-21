@@ -2,6 +2,7 @@
 #include <d3dx12.h>
 #include "../RenderContext.h"
 #include "../../Queues/CommandQueueManager.h"
+#include "../RootSignatureBuilder.h"
 
 namespace DX12Engine
 {
@@ -30,10 +31,16 @@ namespace DX12Engine
 		virtual void Init() = 0;
 		virtual void Execute() = 0;
 
-		void AddInputResources(std::vector<GPUResource*> resources) { m_InputResources.insert(m_InputResources.end(), resources.begin(), resources.end()); }
+		void AddInputResources(std::vector<GPUResource*> resources) 
+		{ 
+			m_InputResources.insert(m_InputResources.end(), resources.begin(), resources.end());
+			m_InputResourceCount += resources.size();
+		}
 		void SetRenderObjects(std::vector<RenderObject*> renderObjects) { m_RenderObjects = renderObjects; }
-
 		virtual RenderTexture* GetRenderTarget(RenderTargetType type) = 0;
+
+		void AddDescriptorTableConfig(DescriptorTableConfig config) { m_DescriptorTableConfigs.push_back(config); }
+		UINT GetInputResourceCount() const { return m_InputResourceCount; }
 
 	protected:
 		RenderContext& m_RenderContext;
@@ -41,7 +48,10 @@ namespace DX12Engine
 		ID3D12GraphicsCommandList& m_CommandList;
 
 		std::vector<GPUResource*> m_InputResources;
+		std::vector<DescriptorTableConfig> m_DescriptorTableConfigs;
 		std::vector<std::unique_ptr<RenderTexture>> m_RenderTargets;
 		std::vector<RenderObject*> m_RenderObjects;
+
+		UINT m_InputResourceCount = 0;
 	};
 }

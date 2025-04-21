@@ -34,13 +34,13 @@ struct PSInput
     float2 texCoord : TEXCOORD0;
 };
 
-Texture2D albedoMap : register(t0);
-Texture2D normalMap : register(t1);
-Texture2D materialMap : register(t2);
-Texture2D positionMap : register(t3);
-Texture2D depthMap : register(t4);
-TextureCube environmentMap : register(t5);
-TextureCube irradianceMap : register(t6);
+TextureCube environmentMap : register(t0);
+TextureCube irradianceMap : register(t1);
+Texture2D albedoMap : register(t2);
+Texture2D normalMap : register(t3);
+Texture2D materialMap : register(t4);
+Texture2D positionMap : register(t5);
+Texture2D depthMap : register(t6);
 Texture2DArray shadowMaps : register(t7);
 TextureCube shadowCubeMap : register(t8);
 SamplerState samp : register(s0);
@@ -118,6 +118,35 @@ float ShadowPCF(int lightIndex, float4 lightSpacePos, float softRadius)
     return shadow + bias;
 }
 
+float PointLightShadowPCF(float3 worldPos, float3 lightPos, float softRadius, float3 normal)
+{
+    float3 texSize;
+    shadowCubeMap.GetDimensions(0, texSize.x, texSize.y, texSize.z);
+    float texelSize = 1.0 / texSize.x;
+    float radius = texelSize * softRadius;
+    
+    float3 lightToFrag = (worldPos - lightPos) + normal * 0.05;
+    float lightDepth = length(lightToFrag) * 0.28;
+    float shadowBias = 0.002;
+    float shadowFactor = 0.0;
+    
+    for (int y = -1; y <= 1; y++)
+    {
+        for (int x = -1; x <= 1; x++)
+        {
+            float shadow = 0.0;
+            float3 transformedUV = normalize(lightToFrag) + float3(x, y, 0) * radius;
+            shadow = shadowCubeMap.Sample(samp, transformedUV).x;
+            if (shadow + shadowBias < lightDepth && shadow < 0.92)
+                shadowFactor += shadow / min(lightDepth * 2.0, 3.0);
+            else
+                shadowFactor += 1.0;
+        }
+    }
+    shadowFactor /= 9.0;
+    return shadowFactor;
+}
+
 float3 GetViewRay(float2 uv)
 {
     float2 ndc = uv * 2.0f - 1.0f;
@@ -170,6 +199,7 @@ float4 main(PSInput input) : SV_TARGET
             float dist = length(Lights[i].Position - worldPos);
             float attenuation = saturate(1.0 - (dist * dist) / (Lights[i].Range * Lights[i].Range));
             finalColor += PBRLighting(albedo, metallic, roughness, ao, worldNormal, V, lightDir, Lights[i]) * attenuation;
+            shadowFactor *= PointLightShadowPCF(worldPos, Lights[i].Position, 3.0, worldNormal);
         }
         else if (Lights[i].Type == 2) // Spot Light
         {

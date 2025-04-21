@@ -11,6 +11,7 @@ namespace DX12Engine
 		~RenderTexture();
 
 		DescriptorHeapHandle GetTextureDescriptor(int index = 0) { return m_TextureDescriptors[index]; }
+		int GetTextureDescriptorCount() { return m_TextureDescriptors.size(); }
 		bool GetIsCubeMap() { return m_IsCubeMap; }
 
 	private:

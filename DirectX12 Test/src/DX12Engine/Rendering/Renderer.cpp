@@ -2,6 +2,11 @@
 #include "../Heaps/DescriptorHeapHandle.h"
 #include "../Heaps/DescriptorHeapManager.h"
 #include "../Resources/ResourceManager.h"
+#include "RenderPass/RenderPass.h"
+#include "RenderPass/ShadowMapRenderPass.h"
+#include "RenderPass/GeometryRenderPass.h"
+#include "RenderPass/LightingRenderPass.h"
+#include "RenderPipelineConfig.h"
 
 namespace DX12Engine
 {
@@ -30,75 +35,6 @@ namespace DX12Engine
 
 	Renderer::~Renderer()
 	{
-	}
-
-	void Renderer::InitFrame(D3D12_VIEWPORT viewport, D3D12_RECT scissorRect)
-	{
-		if (!m_RenderContext->GetUploader().UploadAllPending()) // Upload any pending resources
-			m_QueueManager.GetGraphicsQueue().ResetCommandAllocatorAndList();
-
-		m_CommandList->RSSetViewports(1, &viewport);
-		m_CommandList->RSSetScissorRects(1, &scissorRect);
-
-		auto barrier = m_RenderContext->TransitionRenderTarget(true);
-		m_CommandList->ResourceBarrier(1, &barrier);
-
-		auto rtvHandle = m_RenderContext->GetRTVHandle();
-		auto dsvHandle = m_RenderContext->GetDSVHandle();
-		m_CommandList->OMSetRenderTargets(1, &rtvHandle, FALSE, &dsvHandle);
-
-		const float clearColor[] = { 0.0f, 0.2f, 0.4f, 1.0f };
-		m_CommandList->ClearRenderTargetView(rtvHandle, clearColor, 0, nullptr);
-		m_CommandList->ClearDepthStencilView(dsvHandle, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
-
-		m_CommandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-
-		auto srvHeap = m_RenderHeap.GetHeap();
-		m_CommandList->SetDescriptorHeaps(1, &srvHeap);
-
-		if (m_Skybox != nullptr) RenderSkybox();
-	}
-
-	void Renderer::Render(RenderObject* renderObject)
-	{
-		// Object binding
-		m_CommandList->SetGraphicsRootSignature(renderObject->m_Material->GetRootSignature().Get());
-		m_CommandList->SetGraphicsRootConstantBufferView(0, m_LightBuffer->GetCBVAddress());
-		m_CommandList->SetGraphicsRootConstantBufferView(1, renderObject->GetCBVAddress());
-		// Material binding
-		int startIndex = 2;
-		if (renderObject != m_Skybox)
-		{
-			if (m_Skybox != nullptr)
-			{
-				D3D12_GPU_DESCRIPTOR_HANDLE skyboxHandle = m_Skybox->m_Material->GetTexture()->GetGPUHandle();
-				renderObject->m_Material->SetEnvironmentMapHandle(&skyboxHandle);
-			}
-			if (m_ShadowMap != nullptr)
-			{
-				D3D12_GPU_DESCRIPTOR_HANDLE shadowMapHandle = m_ShadowMap->GetDescriptor()->GetGPUHandle();
-				renderObject->m_Material->SetShadowMapHandle(&shadowMapHandle);
-			}
-			if (m_ShadowCubeMap != nullptr)
-			{
-				D3D12_GPU_DESCRIPTOR_HANDLE shadowCubeMapHandle = m_ShadowCubeMap->GetDescriptor()->GetGPUHandle();
-				renderObject->m_Material->SetShadowCubeMapHandle(&shadowCubeMapHandle);
-			}
-		}
-		renderObject->m_Material->Bind(m_CommandList, &startIndex);
-		// Mesh binding
-		auto vertexBufferView = renderObject->m_VertexBuffer->GetVertexBufferView();
-		auto indexBufferView = renderObject->m_IndexBuffer->GetIndexBufferView();
-		m_CommandList->IASetVertexBuffers(0, 1, &vertexBufferView);
-		m_CommandList->IASetIndexBuffer(&indexBufferView);
-		// Draw
-		m_CommandList->DrawIndexedInstanced(indexBufferView.SizeInBytes / 4, 1, 0, 0, 0);
-	}
-
-	void Renderer::RenderObjectList(std::vector<RenderObject*> objects)
-	{
-		for (RenderObject* obj : objects)
-			Render(obj);
 	}
 
 	void Renderer::PresentFrame(RenderTexture* finalRenderTarget)
@@ -140,6 +76,23 @@ namespace DX12Engine
 		m_QueueManager.WaitForFenceCPUBlocking(fenceVal);
 	}
 
+	std::unique_ptr<RenderPass> Renderer::GetRenderPass(RenderPassType type, int count)
+	{
+		switch (type)
+		{
+		case RenderPassType::ShadowMap:
+			return std::make_unique<ShadowMapRenderPass>(*m_RenderContext, count, false);
+		case RenderPassType::CubeShadowMap:
+			return std::make_unique<ShadowMapRenderPass>(*m_RenderContext, count, true);
+		case RenderPassType::Geometry:
+			return std::make_unique<GeometryRenderPass>(*m_RenderContext);
+		case RenderPassType::Lighting:
+			return std::make_unique<LightingRenderPass>(*m_RenderContext);
+		default:
+			return nullptr;
+		}
+	}
+
 	bool Renderer::PollWindow()
 	{
 		return m_RenderContext->ProcessWindowMessages();
@@ -151,6 +104,120 @@ namespace DX12Engine
 		{
 			obj->UpdateConstantBufferData(m_Camera->GetViewMatrix(), m_Camera->GetProjectionMatrix(), m_Camera->GetPosition());
 		}
+	}
+
+	void Renderer::ExecutePipeline(RenderPipeline pipeline)
+	{
+		for (RenderPass* pass : pipeline.RenderPasses)
+		{
+			pass->Execute();
+		}
+		RenderTexture* finalRenderTarget = pipeline.RenderPasses.back()->GetRenderTarget(DX12Engine::RenderTargetType::Composite);
+		PresentFrame(finalRenderTarget);
+	}
+
+	RenderPipeline Renderer::CreateRenderPipeline(RenderPipelineConfig config)
+	{
+		RenderPipeline pipeline;
+		std::unordered_map<RenderPassType, int> renderPassOrder;
+		int i = 0;
+		try
+		{
+			for (const RenderPassConfig& passConfig : config.Passes)
+			{
+				RenderPass* renderPass = GetRenderPass(passConfig.Type, passConfig.Count).release();
+				renderPassOrder[passConfig.Type] = i;
+				if (renderPass)
+				{
+					// Common input resources
+					for (auto& inputResource : passConfig.InputResources)
+					{
+						switch (inputResource.first)
+						{
+						case InputResourceType::SceneObjects:
+							renderPass->SetRenderObjects(*static_cast<std::vector<RenderObject*>*>(inputResource.second));
+							break;
+						case InputResourceType::RenderTargets_ShadowMap:
+							renderPass->AddDescriptorTableConfig(
+								{ (UINT)static_cast<std::vector<RenderTargetType>*>(inputResource.second)->size(), D3D12_DESCRIPTOR_RANGE_TYPE_SRV, renderPass->GetInputResourceCount() });
+							for (auto& target : *static_cast<std::vector<RenderTargetType>*>(inputResource.second))
+								renderPass->AddInputResources({ pipeline.RenderPasses[renderPassOrder[RenderPassType::ShadowMap]]->GetRenderTarget(target) });
+							break;
+						case InputResourceType::RenderTargets_CubeShadowMap:
+							renderPass->AddDescriptorTableConfig(
+								{ (UINT)static_cast<std::vector<RenderTargetType>*>(inputResource.second)->size(), D3D12_DESCRIPTOR_RANGE_TYPE_SRV, renderPass->GetInputResourceCount() });
+							for (auto& target : *static_cast<std::vector<RenderTargetType>*>(inputResource.second))
+								renderPass->AddInputResources({ pipeline.RenderPasses[renderPassOrder[RenderPassType::CubeShadowMap]]->GetRenderTarget(target) });
+							break;
+						case InputResourceType::RenderTargets_Geometry:
+							renderPass->AddDescriptorTableConfig(
+								{ (UINT)static_cast<std::vector<RenderTargetType>*>(inputResource.second)->size(), D3D12_DESCRIPTOR_RANGE_TYPE_SRV, renderPass->GetInputResourceCount() });
+							for (auto& target : *static_cast<std::vector<RenderTargetType>*>(inputResource.second))
+								renderPass->AddInputResources({ pipeline.RenderPasses[renderPassOrder[RenderPassType::Geometry]]->GetRenderTarget(target) });
+							break;
+						case InputResourceType::RenderTargets_Lighting:
+							renderPass->AddDescriptorTableConfig(
+								{ (UINT)static_cast<std::vector<RenderTargetType>*>(inputResource.second)->size(), D3D12_DESCRIPTOR_RANGE_TYPE_SRV, renderPass->GetInputResourceCount() });
+							for (auto& target : *static_cast<std::vector<RenderTargetType>*>(inputResource.second))
+								renderPass->AddInputResources({ pipeline.RenderPasses[renderPassOrder[RenderPassType::Lighting]]->GetRenderTarget(target) });
+							break;
+						case InputResourceType::ExternalTextures:
+							renderPass->AddDescriptorTableConfig(
+								{ (UINT)static_cast<std::vector<Texture*>*>(inputResource.second)->size(), D3D12_DESCRIPTOR_RANGE_TYPE_SRV, renderPass->GetInputResourceCount() });
+							for (auto& texture : *static_cast<std::vector<Texture*>*>(inputResource.second))
+								renderPass->AddInputResources({ texture });
+							break;
+						}
+					}
+					// Pass-specific input resources
+					switch (passConfig.Type)
+					{
+					case RenderPassType::ShadowMap:
+					case RenderPassType::CubeShadowMap:
+						for (auto& inputResource : passConfig.InputResources)
+						{
+							switch (inputResource.first)
+							{
+
+							case InputResourceType::LightData:
+								static_cast<ShadowMapRenderPass*>(renderPass)->SetLights(*static_cast<std::vector<Light*>*>(inputResource.second));
+								break;
+							}
+						}
+						break;
+					case RenderPassType::Geometry:
+						break;
+					case RenderPassType::Lighting:
+						for (auto& inputResource : passConfig.InputResources)
+						{
+							switch (inputResource.first)
+							{
+							case InputResourceType::LightBuffer:
+								static_cast<LightingRenderPass*>(renderPass)->SetLightBuffer(static_cast<LightBuffer*>(inputResource.second));
+								break;
+							case InputResourceType::Camera:
+								static_cast<LightingRenderPass*>(renderPass)->SetCamera(static_cast<Camera*>(inputResource.second));
+								break;
+							}
+						}
+						break;
+					}
+					renderPass->Init();
+					pipeline.RenderPasses.push_back(renderPass);
+				}
+				i++;
+			}
+		}
+		catch (const std::exception& e)
+		{
+			for (RenderPass* pass : pipeline.RenderPasses)
+			{
+				delete pass;
+			}
+			pipeline.RenderPasses.clear();
+			throw std::runtime_error("Failed to create render pipeline: " + std::string(e.what()));
+		}
+		return pipeline;
 	}
 
 	D3D12_VIEWPORT Renderer::GetDefaultViewport()
@@ -175,11 +242,5 @@ namespace DX12Engine
 		scissorRect.right = static_cast<LONG>(windowSize.x);
 		scissorRect.bottom = static_cast<LONG>(windowSize.y);
 		return scissorRect;
-	}
-
-	void Renderer::RenderSkybox()
-	{
-		m_Skybox->UpdateConstantBufferData(m_Camera->GetViewMatrix(), m_Camera->GetProjectionMatrix(), m_Camera->GetPosition());
-		Render(m_Skybox);
 	}
 }

@@ -5,6 +5,7 @@
 #include "../../Utils/Constants.h"
 #include "../RenderObject.h"
 #include "../../Resources/Light.h"
+#include "../../Utils/EngineUtils.h"
 
 namespace DX12Engine
 {
@@ -53,6 +54,8 @@ namespace DX12Engine
 
 	void ShadowMapRenderPass::RenderShadowMap(RenderTexture* shadowMap, int lightIndex)
 	{
+		EngineUtils::Assert(lightIndex < shadowMap->GetTextureDescriptorCount());
+
 		if (!m_RenderContext.GetUploader().UploadAllPending()) // Upload any pending resources
 			m_QueueManager.GetGraphicsQueue().ResetCommandAllocatorAndList();
 
@@ -104,6 +107,8 @@ namespace DX12Engine
 
 	void ShadowMapRenderPass::RenderShadowCubeMap(RenderTexture* shadowMap, int lightIndex)
 	{
+		EngineUtils::Assert(lightIndex < shadowMap->GetTextureDescriptorCount());
+
 		DirectX::XMVECTOR lightPos = DirectX::XMLoadFloat3(&m_Lights[lightIndex]->GetLightData().Position);
 		DirectX::XMMATRIX lightProj = m_Lights[lightIndex]->GetLightData().ViewProjMatrix;
 		DirectX::XMMATRIX shadowTransforms[6] = {

@@ -12,17 +12,16 @@
 #include "DX12Engine/Rendering/GPUUploader.h"
 #include "DX12Engine/Resources/Materials/BasicMaterial.h"
 #include "DX12Engine/Resources/Materials/PBRMaterial.h"
-#include "DX12Engine/Resources/Materials/SkyboxMaterial.h"
 #include "DX12Engine/Rendering/PipelineStateBuilder.h"
 #include "DX12Engine/Rendering/RootSignatureBuilder.h"
 #include "DX12Engine/Buffers/LightBuffer.h"
 #include "DX12Engine/Resources/Light.h"
-#include "DX12Engine/Resources/Skybox.h"
 #include "DX12Engine/Resources/RenderTexture.h"
 #include "DX12Engine/Resources/ResourceManager.h"
 #include "DX12Engine/Rendering/RenderPass/ShadowMapRenderPass.h"
 #include "DX12Engine/Rendering/RenderPass/GeometryRenderPass.h"
 #include "DX12Engine/Rendering/RenderPass/LightingRenderPass.h"
+#include "DX12Engine/Rendering/RenderPipelineConfig.h"
 
 ClientApplication::ClientApplication()
 {
@@ -67,9 +66,6 @@ ClientApplication::ClientApplication()
 	std::shared_ptr<DX12Engine::Texture> concreteAO = textureLoader.LoadWIC(DX12Engine::ResourceManager::GetResourcePath("clean-concrete-ue\\clean-concrete_ao.png"));
 	textures = { concreteAlbedo.get(), concreteNormal.get(), concreteMetallic.get(), concreteRoughness.get(), concreteAO.get(), };
 	uploader.UploadTextureBatch(textures);
-
-	DX12Engine::Skybox skybox(skyboxCube);
-	renderer.SetSkybox(&skybox);
 
 	std::shared_ptr<DX12Engine::BasicMaterial> basicMaterial = std::make_shared<DX12Engine::BasicMaterial>();
 	basicMaterial->SetTexture(goldAlbedo);
@@ -131,7 +127,7 @@ ClientApplication::ClientApplication()
 	spotLight.SetColor({ 0.9f, 0.5f, 0.0f });
 	spotLight.SetIntensity(1.0f);
 	spotLight.SetSpotAngle(45.0f);
-	//lightBuffer.AddLight(&spotLight);
+	lightBuffer.AddLight(&spotLight);
 	renderer.SetLightBuffer(&lightBuffer);
 
 	m_Camera = std::make_unique<DX12Engine::Camera>(1600.0f / 900.0f, 1.0f, 100.0f);
@@ -141,37 +137,53 @@ ClientApplication::ClientApplication()
 
 	std::vector<DX12Engine::RenderObject*> sceneObjects{ &object1, &object2, &floor };
 
-	DX12Engine::ShadowMapRenderPass shadowMapRenderPass(*context, 2, false);
-	shadowMapRenderPass.SetRenderObjects(sceneObjects);
-	shadowMapRenderPass.SetLights(lightBuffer.GetLightsByType({ DX12Engine::LightType::Directional, DX12Engine::LightType::Spot }));
-	shadowMapRenderPass.Init();
+	auto shadowCastingLights = lightBuffer.GetLightsByType({ DX12Engine::LightType::Directional, DX12Engine::LightType::Spot });
+	auto cubeShadowCastingLights = lightBuffer.GetLightsByType({ DX12Engine::LightType::Point });
 
-	DX12Engine::ShadowMapRenderPass shadowCubeMapRenderPass(*context, 1, true);
-	shadowCubeMapRenderPass.SetRenderObjects(sceneObjects);
-	shadowCubeMapRenderPass.SetLights(lightBuffer.GetLightsByType({ DX12Engine::LightType::Point }));
-	shadowCubeMapRenderPass.Init();
-
-	DX12Engine::GeometryRenderPass geometryRenderPass(*context);
-	geometryRenderPass.SetRenderObjects(sceneObjects);
-	geometryRenderPass.Init();
-	std::vector<DX12Engine::GPUResource*> gBuffer = {
-		geometryRenderPass.GetRenderTarget(DX12Engine::RenderTargetType::Albedo),
-		geometryRenderPass.GetRenderTarget(DX12Engine::RenderTargetType::Normal),
-		geometryRenderPass.GetRenderTarget(DX12Engine::RenderTargetType::Material),
-		geometryRenderPass.GetRenderTarget(DX12Engine::RenderTargetType::Position),
-		geometryRenderPass.GetRenderTarget(DX12Engine::RenderTargetType::Depth),
+	DX12Engine::RenderPipelineConfig pipelineConfig;
+	DX12Engine::RenderPassConfig shadowMapConfig;
+	shadowMapConfig.Type = DX12Engine::RenderPassType::ShadowMap;
+	shadowMapConfig.Count = 2;
+	shadowMapConfig.InputResources[DX12Engine::InputResourceType::SceneObjects] = &sceneObjects;
+	shadowMapConfig.InputResources[DX12Engine::InputResourceType::LightData] = &shadowCastingLights;
+	std::vector<DX12Engine::RenderTargetType> shadowBufferTypes{
+		DX12Engine::RenderTargetType::Depth
 	};
 
-	DX12Engine::LightingRenderPass lightingRenderPass(*context);
-	lightingRenderPass.SetLightBuffer(&lightBuffer);
-	lightingRenderPass.AddInputResources(gBuffer);
-	lightingRenderPass.AddInputResources({ skyboxCube.get(), skyboxIrradiance.get()});
-	lightingRenderPass.AddInputResources({ shadowMapRenderPass.GetRenderTarget(DX12Engine::RenderTargetType::Depth), shadowCubeMapRenderPass.GetRenderTarget(DX12Engine::RenderTargetType::Depth) });
-	lightingRenderPass.SetCamera(m_Camera.get());
-	lightingRenderPass.Init();
+	DX12Engine::RenderPassConfig cubeShadowMapConfig;
+	cubeShadowMapConfig.Type = DX12Engine::RenderPassType::CubeShadowMap;
+	cubeShadowMapConfig.InputResources[DX12Engine::InputResourceType::SceneObjects] = &sceneObjects;
+	cubeShadowMapConfig.InputResources[DX12Engine::InputResourceType::LightData] = &cubeShadowCastingLights;
+	std::vector<DX12Engine::RenderTargetType> cubeShadowBufferTypes{
+		DX12Engine::RenderTargetType::Depth
+	};
 
-	renderer.SetShadowMap(shadowMapRenderPass.GetShadowMapOutput());
-	renderer.SetShadowCubeMap(shadowCubeMapRenderPass.GetShadowMapOutput());
+	DX12Engine::RenderPassConfig geometryConfig;
+	geometryConfig.Type = DX12Engine::RenderPassType::Geometry;
+	geometryConfig.InputResources[DX12Engine::InputResourceType::SceneObjects] = &sceneObjects;
+	std::vector<DX12Engine::RenderTargetType> gBufferTypes{
+		DX12Engine::RenderTargetType::Albedo,
+		DX12Engine::RenderTargetType::Normal,
+		DX12Engine::RenderTargetType::Material,
+		DX12Engine::RenderTargetType::Position,
+		DX12Engine::RenderTargetType::Depth
+	};
+
+	std::vector<DX12Engine::Texture*> lightingExternalTextures{ skyboxCube.get(), skyboxIrradiance.get() };
+	DX12Engine::RenderPassConfig lightingConfig;
+	lightingConfig.Type = DX12Engine::RenderPassType::Lighting;
+	lightingConfig.InputResources[DX12Engine::InputResourceType::LightBuffer] = &lightBuffer;
+	lightingConfig.InputResources[DX12Engine::InputResourceType::Camera] = m_Camera.get();
+	lightingConfig.InputResources[DX12Engine::InputResourceType::ExternalTextures] = &lightingExternalTextures;
+	lightingConfig.InputResources[DX12Engine::InputResourceType::RenderTargets_Geometry] = &gBufferTypes;
+	lightingConfig.InputResources[DX12Engine::InputResourceType::RenderTargets_ShadowMap] = &shadowBufferTypes;
+	lightingConfig.InputResources[DX12Engine::InputResourceType::RenderTargets_CubeShadowMap] = &cubeShadowBufferTypes;
+
+	pipelineConfig.Passes.push_back(shadowMapConfig);
+	pipelineConfig.Passes.push_back(cubeShadowMapConfig);
+	pipelineConfig.Passes.push_back(geometryConfig);
+	pipelineConfig.Passes.push_back(lightingConfig);
+	DX12Engine::RenderPipeline pipeline = renderer.CreateRenderPipeline(pipelineConfig);
 
 	while (renderer.PollWindow())
 	{
@@ -179,18 +191,12 @@ ClientApplication::ClientApplication()
 
 		object1.Rotate({ 0.0f, 1.0f, 0.0f });
 		object2.Rotate({ 1.0f, 0.0f, 0.0f });
-		//lightBuffer.GetLight(1)->SetPosition({ count, 2.0f, -count });
+
 		lightBuffer.Update();
 		renderer.UpdateObjectList(sceneObjects);
 
-		shadowMapRenderPass.Execute();
-		shadowCubeMapRenderPass.Execute();
-		geometryRenderPass.Execute();
-		lightingRenderPass.Execute();
+		renderer.ExecutePipeline(pipeline);
 
-		//renderer.InitFrame(renderer.GetDefaultViewport(), renderer.GetDefaultScissorRect());
-		//renderer.RenderObjectList(sceneObjects);
-		renderer.PresentFrame(lightingRenderPass.GetRenderTarget(DX12Engine::RenderTargetType::Composite));
 		count += 0.001f;
 	}
 }
