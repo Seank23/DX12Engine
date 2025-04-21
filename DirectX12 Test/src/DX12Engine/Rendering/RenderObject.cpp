@@ -50,6 +50,8 @@ namespace DX12Engine
 		m_RenderObjectData.ViewMatrix = viewMatrix;
 		m_RenderObjectData.ProjectionMatrix = projectionMatrix;
 		m_RenderObjectData.MVPMatrix = m_ModelMatrix * viewMatrix * projectionMatrix;
+		m_RenderObjectData.InvViewMatrix = DirectX::XMMatrixInverse(nullptr, viewMatrix);
+		m_RenderObjectData.InvProjectionMatrix = DirectX::XMMatrixInverse(nullptr, projectionMatrix);
 		m_RenderObjectData.CameraPosition = cameraPosition;
 		m_ConstantBuffer->Update(&m_RenderObjectData, sizeof(RenderObjectData));
 	}

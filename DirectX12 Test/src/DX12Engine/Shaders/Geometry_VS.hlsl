@@ -5,6 +5,8 @@ cbuffer ConstantBuffer : register(b0)
     float4x4 ViewMatrix;
     float4x4 ProjectionMatrix;
     float4x4 MVPMatrix;
+    float4x4 InvViewMatrix;
+    float4x4 InvProjectionMatrix;
     float3 CameraPosition;
 };
 

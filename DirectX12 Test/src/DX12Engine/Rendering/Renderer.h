@@ -19,7 +19,7 @@ namespace DX12Engine
 		void InitFrame(D3D12_VIEWPORT viewport, D3D12_RECT scissorRect);
 		void Render(RenderObject* renderObject);
 		void RenderObjectList(std::vector<RenderObject*> objects);
-		void PresentFrame();
+		void PresentFrame(RenderTexture* finalRenderTarget);
 		bool PollWindow();
 		void UpdateObjectList(std::vector<RenderObject*> objects);
 
@@ -46,6 +46,9 @@ namespace DX12Engine
 		Skybox* m_Skybox;
 		RenderTexture* m_ShadowMap;
 		RenderTexture* m_ShadowCubeMap;
+
+		Microsoft::WRL::ComPtr<ID3D12RootSignature> m_RootSignature;
+		Microsoft::WRL::ComPtr<ID3D12PipelineState> m_PipelineState;
 	};
 }
 

@@ -15,10 +15,20 @@ namespace DX12Engine
 		rasterizerDesc.CullMode = D3D12_CULL_MODE_FRONT; // Cull front faces instead of back
 		rasterizerDesc.FillMode = D3D12_FILL_MODE_SOLID;
 
-		PipelineStateBuilder = PipelineStateBuilder.ConfigureFromDefault().SetDepthStencilState(depthDesc).SetRasterizerState(rasterizerDesc)
+		PipelineStateBuilder = PipelineStateBuilder.AddInputLayout()
+			.SetBlendState(CD3DX12_BLEND_DESC(D3D12_DEFAULT))
+			.SetRasterizerState(rasterizerDesc)
+			.SetDepthStencilState(depthDesc)
+			.SetPrimitiveTopologyType(D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE)
+			.SetRenderTargets({ DXGI_FORMAT_R8G8B8A8_UNORM })
+			.SetSampleDesc(UINT_MAX, 1, 0)
 			.SetVertexShader(ResourceManager::GetInstance().GetShader("Skybox_VS"))
 			.SetPixelShader(ResourceManager::GetInstance().GetShader("Skybox_PS"));
-		RootSignatureBuilder = RootSignatureBuilder.ConfigureFromDefault(1);
+
+		DescriptorTableConfig skybox(1, D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 0);
+		RootSignatureBuilder = RootSignatureBuilder.AddConstantBuffer(0).AddConstantBuffer(1)
+			.AddDescriptorTables({ skybox })
+			.AddSampler(0, D3D12_FILTER_ANISOTROPIC);
 		BuildPipelineState();
 	}
 

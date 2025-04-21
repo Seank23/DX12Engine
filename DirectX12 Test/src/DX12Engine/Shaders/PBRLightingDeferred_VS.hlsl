@@ -6,15 +6,15 @@ struct VSOutput
 
 VSOutput main(uint vertexID : SV_VertexID)
 {
-    float2 positions[3] =
+    float3 positions[3] = 
     {
-        float2(-1.0, -1.0),
-        float2(-1.0, 3.0),
-        float2(3.0, -1.0)
+        float3(-1.0, -1.0, 1.0),
+        float3(-1.0, 3.0, 1.0),
+        float3(3.0, -1.0, 1.0)
     };
     VSOutput output;
-    output.position = float4(positions[vertexID], 0.0, 1.0);
-    output.texCoord = (output.position.xy + float2(1.0, 1.0)) * 0.5;
+    output.position = float4(positions[vertexID], 1.0);
+    output.texCoord = output.position.xy * 0.5 + 0.5;
     output.texCoord.y *= -1.0;
     return output;
 }

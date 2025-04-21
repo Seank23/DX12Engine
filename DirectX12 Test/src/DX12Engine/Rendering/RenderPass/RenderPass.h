@@ -11,12 +11,14 @@ namespace DX12Engine
 		Normal,
 		Material,
 		Position,
-		Depth
+		Depth,
+		Composite
 	};
 
 	class RenderObject;
 	class GPUResource;
 	class RenderTexture;
+	class GPUResource;
 
 	class RenderPass
 	{
@@ -28,7 +30,7 @@ namespace DX12Engine
 		virtual void Init() = 0;
 		virtual void Execute() = 0;
 
-		void SetInputResources(std::vector<RenderTexture*> resources) { m_InputResources = resources; }
+		void AddInputResources(std::vector<GPUResource*> resources) { m_InputResources.insert(m_InputResources.end(), resources.begin(), resources.end()); }
 		void SetRenderObjects(std::vector<RenderObject*> renderObjects) { m_RenderObjects = renderObjects; }
 
 		virtual RenderTexture* GetRenderTarget(RenderTargetType type) = 0;
@@ -38,7 +40,7 @@ namespace DX12Engine
 		CommandQueueManager& m_QueueManager;
 		ID3D12GraphicsCommandList& m_CommandList;
 
-		std::vector<RenderTexture*> m_InputResources;
+		std::vector<GPUResource*> m_InputResources;
 		std::vector<std::unique_ptr<RenderTexture>> m_RenderTargets;
 		std::vector<RenderObject*> m_RenderObjects;
 	};

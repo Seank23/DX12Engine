@@ -14,6 +14,8 @@ namespace DX12Engine
 		DirectX::XMMATRIX ViewMatrix;
 		DirectX::XMMATRIX ProjectionMatrix;
 		DirectX::XMMATRIX MVPMatrix;
+		DirectX::XMMATRIX InvViewMatrix;
+		DirectX::XMMATRIX InvProjectionMatrix;
 		DirectX::XMFLOAT3 CameraPosition;
 		float Padding;
 	};

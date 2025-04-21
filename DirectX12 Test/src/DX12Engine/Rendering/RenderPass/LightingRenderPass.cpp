@@ -4,6 +4,8 @@
 #include "../PipelineStateBuilder.h"
 #include "../RootSignatureBuilder.h"
 #include "../../Buffers/LightBuffer.h"
+#include "../../Buffers/ConstantBuffer.h"
+#include "../../Input/Camera.h"
 
 namespace DX12Engine
 {
@@ -24,11 +26,15 @@ namespace DX12Engine
 		m_Viewport = { 0.0f, 0.0f, (float)windowSize.x, (float)windowSize.y, -1.0f, 1.0f };
 		m_ScissorRect = { 0, 0, (LONG)windowSize.x, (LONG)windowSize.y };
 
+		m_LightingPassCB = ResourceManager::GetInstance().CreateConstantBuffer(sizeof(LightingPassData));
+		m_LightingPassData.ScreenSize = DirectX::XMFLOAT2(windowSize.x, windowSize.y);
+
 		CreateLightingPassPSO();
 	}
 
 	void LightingRenderPass::Execute()
 	{
+		UpdateLightingPassCB();
 		RenderTexture* renderTarget = m_RenderTargets[0].get();
 
 		if (!m_RenderContext.GetUploader().UploadAllPending()) // Upload any pending resources
@@ -58,7 +64,10 @@ namespace DX12Engine
 		m_CommandList.SetDescriptorHeaps(1, &srvHeap);
 
 		m_CommandList.SetGraphicsRootConstantBufferView(0, m_LightBuffer->GetCBVAddress());
-		m_CommandList.SetGraphicsRootDescriptorTable(1, m_InputResources[0]->GetDescriptor()->GetGPUHandle());
+		m_CommandList.SetGraphicsRootConstantBufferView(1, m_LightingPassCB->GetGPUAddress());
+		m_CommandList.SetGraphicsRootDescriptorTable(2, m_InputResources[0]->GetDescriptor()->GetGPUHandle());
+		m_CommandList.SetGraphicsRootDescriptorTable(3, m_InputResources[5]->GetDescriptor()->GetGPUHandle());
+		m_CommandList.SetGraphicsRootDescriptorTable(4, m_InputResources[7]->GetDescriptor()->GetGPUHandle());
 
 		m_CommandList.IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 		m_CommandList.DrawInstanced(3, 1, 0, 0);
@@ -77,7 +86,13 @@ namespace DX12Engine
 
 	RenderTexture* LightingRenderPass::GetRenderTarget(RenderTargetType type)
 	{
-		return nullptr;
+		switch (type)
+		{
+		case RenderTargetType::Composite:
+			return m_RenderTargets[0].get();
+		default:
+			return nullptr;
+		}
 	}
 
 	void LightingRenderPass::CreateLightingPassPSO()
@@ -95,7 +110,7 @@ namespace DX12Engine
 		DescriptorTableConfig materialTable(5, D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 0);
 		DescriptorTableConfig envTable(2, D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 5);
 		DescriptorTableConfig shadowTable(2, D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 7);
-		rootSignatureBuilder = rootSignatureBuilder.AddConstantBuffer(0)
+		rootSignatureBuilder = rootSignatureBuilder.AddConstantBuffer(0).AddConstantBuffer(1)
 			.AddDescriptorTables({ materialTable, envTable, shadowTable })
 			.AddSampler(0, D3D12_FILTER_ANISOTROPIC)
 			.AddShadowMapSampler(1);
@@ -103,5 +118,13 @@ namespace DX12Engine
 		m_RootSignature = ResourceManager::GetInstance().CreateRootSignature(rootSignatureBuilder.Build());
 		pipelineStateBuilder = pipelineStateBuilder.SetRootSignature(m_RootSignature.Get());
 		m_PipelineState = ResourceManager::GetInstance().CreatePipelineState(pipelineStateBuilder.Build());
+	}
+
+	void LightingRenderPass::UpdateLightingPassCB()
+	{
+		m_LightingPassData.CameraPosition = DirectX::XMFLOAT4(m_Camera->GetPosition().x, m_Camera->GetPosition().y, m_Camera->GetPosition().z, 1.0f);
+		m_LightingPassData.InvViewMatrix = DirectX::XMMatrixInverse(nullptr, m_Camera->GetViewMatrix());
+		m_LightingPassData.InvProjectionMatrix = DirectX::XMMatrixInverse(nullptr, m_Camera->GetProjectionMatrix());
+		m_LightingPassCB->Update(&m_LightingPassData, sizeof(LightingPassData));
 	}
 }

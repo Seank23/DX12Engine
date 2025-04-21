@@ -1,6 +1,7 @@
 #include "Renderer.h"
 #include "../Heaps/DescriptorHeapHandle.h"
 #include "../Heaps/DescriptorHeapManager.h"
+#include "../Resources/ResourceManager.h"
 
 namespace DX12Engine
 {
@@ -8,6 +9,23 @@ namespace DX12Engine
 		: m_RenderContext(context), m_RenderHeap(context->GetHeapManager().GetRenderPassHeap()), m_QueueManager(context->GetQueueManager())
 	{
 		m_CommandList = m_QueueManager.GetGraphicsQueue().GetCommandList();
+
+		PipelineStateBuilder pipelineStateBuilder;
+		RootSignatureBuilder rootSignatureBuilder;
+
+		pipelineStateBuilder = pipelineStateBuilder.SetBlendState(CD3DX12_BLEND_DESC(D3D12_DEFAULT))
+			.SetRasterizerState(CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT))
+			.SetPrimitiveTopologyType(D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE)
+			.SetRenderTargets({ DXGI_FORMAT_R8G8B8A8_UNORM })
+			.SetSampleDesc(UINT_MAX, 1, 0).SetVertexShader(ResourceManager::GetInstance().GetShader("PBRLightingDeferred_VS"))
+			.SetPixelShader(ResourceManager::GetInstance().GetShader("FinalRender_PS"));
+
+		DescriptorTableConfig descriptorTable(1, D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 0);
+		rootSignatureBuilder = rootSignatureBuilder.AddDescriptorTables({ descriptorTable }).AddSampler(0, D3D12_FILTER_ANISOTROPIC);
+
+		m_RootSignature = ResourceManager::GetInstance().CreateRootSignature(rootSignatureBuilder.Build());
+		pipelineStateBuilder = pipelineStateBuilder.SetRootSignature(m_RootSignature.Get());
+		m_PipelineState = ResourceManager::GetInstance().CreatePipelineState(pipelineStateBuilder.Build());
 	}
 
 	Renderer::~Renderer()
@@ -83,9 +101,37 @@ namespace DX12Engine
 			Render(obj);
 	}
 
-	void Renderer::PresentFrame()
+	void Renderer::PresentFrame(RenderTexture* finalRenderTarget)
 	{
-		auto barrier = m_RenderContext->TransitionRenderTarget(false);
+		if (!m_RenderContext->GetUploader().UploadAllPending()) // Upload any pending resources
+			m_QueueManager.GetGraphicsQueue().ResetCommandAllocatorAndList();
+
+		m_CommandList->SetPipelineState(m_PipelineState.Get());
+		m_CommandList->SetGraphicsRootSignature(m_RootSignature.Get());
+
+		auto viewport = GetDefaultViewport();
+		auto scissorRect = GetDefaultScissorRect();
+		m_CommandList->RSSetViewports(1, &viewport);
+		m_CommandList->RSSetScissorRects(1, &scissorRect);
+
+		auto barrier = m_RenderContext->TransitionRenderTarget(true);
+		m_CommandList->ResourceBarrier(1, &barrier);
+
+		auto rtvHandle = m_RenderContext->GetRTVHandle();
+		m_CommandList->OMSetRenderTargets(1, &rtvHandle, FALSE, nullptr);
+
+		const float clearColor[] = { 0.0f, 0.2f, 0.4f, 1.0f };
+		m_CommandList->ClearRenderTargetView(rtvHandle, clearColor, 0, nullptr);
+
+		auto srvHeap = m_RenderHeap.GetHeap();
+		m_CommandList->SetDescriptorHeaps(1, &srvHeap);
+
+		m_CommandList->SetGraphicsRootDescriptorTable(0, finalRenderTarget->GetDescriptor()->GetGPUHandle());
+
+		m_CommandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+		m_CommandList->DrawInstanced(3, 1, 0, 0);
+
+		barrier = m_RenderContext->TransitionRenderTarget(false);
 		m_CommandList->ResourceBarrier(1, &barrier);
 
 		UINT fenceVal = m_QueueManager.GetGraphicsQueue().ExecuteCommandList();

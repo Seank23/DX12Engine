@@ -131,7 +131,7 @@ ClientApplication::ClientApplication()
 	spotLight.SetColor({ 0.9f, 0.5f, 0.0f });
 	spotLight.SetIntensity(1.0f);
 	spotLight.SetSpotAngle(45.0f);
-	lightBuffer.AddLight(&spotLight);
+	//lightBuffer.AddLight(&spotLight);
 	renderer.SetLightBuffer(&lightBuffer);
 
 	m_Camera = std::make_unique<DX12Engine::Camera>(1600.0f / 900.0f, 1.0f, 100.0f);
@@ -154,17 +154,20 @@ ClientApplication::ClientApplication()
 	DX12Engine::GeometryRenderPass geometryRenderPass(*context);
 	geometryRenderPass.SetRenderObjects(sceneObjects);
 	geometryRenderPass.Init();
-	std::vector<DX12Engine::RenderTexture*> gBuffer = {
+	std::vector<DX12Engine::GPUResource*> gBuffer = {
 		geometryRenderPass.GetRenderTarget(DX12Engine::RenderTargetType::Albedo),
 		geometryRenderPass.GetRenderTarget(DX12Engine::RenderTargetType::Normal),
 		geometryRenderPass.GetRenderTarget(DX12Engine::RenderTargetType::Material),
 		geometryRenderPass.GetRenderTarget(DX12Engine::RenderTargetType::Position),
-		geometryRenderPass.GetRenderTarget(DX12Engine::RenderTargetType::Depth)
+		geometryRenderPass.GetRenderTarget(DX12Engine::RenderTargetType::Depth),
 	};
 
 	DX12Engine::LightingRenderPass lightingRenderPass(*context);
 	lightingRenderPass.SetLightBuffer(&lightBuffer);
-	lightingRenderPass.SetInputResources(gBuffer);
+	lightingRenderPass.AddInputResources(gBuffer);
+	lightingRenderPass.AddInputResources({ skyboxCube.get(), skyboxIrradiance.get()});
+	lightingRenderPass.AddInputResources({ shadowMapRenderPass.GetRenderTarget(DX12Engine::RenderTargetType::Depth), shadowCubeMapRenderPass.GetRenderTarget(DX12Engine::RenderTargetType::Depth) });
+	lightingRenderPass.SetCamera(m_Camera.get());
 	lightingRenderPass.Init();
 
 	renderer.SetShadowMap(shadowMapRenderPass.GetShadowMapOutput());
@@ -174,20 +177,20 @@ ClientApplication::ClientApplication()
 	{
 		m_Camera->ProcessKeyboardInput(0.01f);
 
+		object1.Rotate({ 0.0f, 1.0f, 0.0f });
+		object2.Rotate({ 1.0f, 0.0f, 0.0f });
+		//lightBuffer.GetLight(1)->SetPosition({ count, 2.0f, -count });
+		lightBuffer.Update();
+		renderer.UpdateObjectList(sceneObjects);
+
 		shadowMapRenderPass.Execute();
 		shadowCubeMapRenderPass.Execute();
 		geometryRenderPass.Execute();
 		lightingRenderPass.Execute();
 
-		object1.Rotate({ 0.0f, 1.0f, 0.0f });
-		object2.Rotate({ 1.0f, 0.0f, 0.0f });
-		//lightBuffer.GetLight(1)->SetPosition({ count, 2.0f, -count });
-		lightBuffer.Update();
-
-		renderer.InitFrame(renderer.GetDefaultViewport(), renderer.GetDefaultScissorRect());
-		renderer.UpdateObjectList(sceneObjects);
-		renderer.RenderObjectList(sceneObjects);
-		renderer.PresentFrame();
+		//renderer.InitFrame(renderer.GetDefaultViewport(), renderer.GetDefaultScissorRect());
+		//renderer.RenderObjectList(sceneObjects);
+		renderer.PresentFrame(lightingRenderPass.GetRenderTarget(DX12Engine::RenderTargetType::Composite));
 		count += 0.001f;
 	}
 }
