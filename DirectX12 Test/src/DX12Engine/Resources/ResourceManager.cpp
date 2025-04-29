@@ -19,9 +19,11 @@ namespace DX12Engine
 		m_Shaders.insert({ "ShadowCubeMap_PS", std::make_unique<Shader>(GetShaderPath("ShadowCubeMap_PS.hlsl"), "pixel") });
 		m_Shaders.insert({ "Geometry_VS", std::make_unique<Shader>(GetShaderPath("Geometry_VS.hlsl"), "vertex") });
 		m_Shaders.insert({ "Geometry_PS", std::make_unique<Shader>(GetShaderPath("Geometry_PS.hlsl"), "pixel") });
-		m_Shaders.insert({ "PBRLightingDeferred_VS", std::make_unique<Shader>(GetShaderPath("PBRLightingDeferred_VS.hlsl"), "vertex") });
+		m_Shaders.insert({ "RenderTriangle_VS", std::make_unique<Shader>(GetShaderPath("RenderTriangle_VS.hlsl"), "vertex") });
+		m_Shaders.insert({ "RenderTriangleInvertedY_VS", std::make_unique<Shader>(GetShaderPath("RenderTriangleInvertedY_VS.hlsl"), "vertex") });
 		m_Shaders.insert({ "PBRLightingDeferred_PS", std::make_unique<Shader>(GetShaderPath("PBRLightingDeferred_PS.hlsl"), "pixel") });
 		m_Shaders.insert({ "FinalRender_PS", std::make_unique<Shader>(GetShaderPath("FinalRender_PS.hlsl"), "pixel") });
+		m_Shaders.insert({ "SSRPass_PS", std::make_unique<Shader>(GetShaderPath("SSRPass_PS.hlsl"), "pixel") });
 	}
 
 	ResourceManager::~ResourceManager()

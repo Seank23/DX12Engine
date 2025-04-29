@@ -41,8 +41,45 @@ namespace DX12Engine
 
         // Simple hashing function for PSO description
         size_t HashPSO(const D3D12_GRAPHICS_PIPELINE_STATE_DESC& desc)
+		{
+            std::size_t seed = 0;
+
+            // Shaders
+            if (desc.VS.pShaderBytecode)
+                HashCombine(seed, std::hash<std::string_view>()(
+                    std::string_view((const char*)desc.VS.pShaderBytecode, desc.VS.BytecodeLength)));
+
+            if (desc.PS.pShaderBytecode)
+                HashCombine(seed, std::hash<std::string_view>()(
+                    std::string_view((const char*)desc.PS.pShaderBytecode, desc.PS.BytecodeLength)));
+
+            // Render target formats
+            for (UINT i = 0; i < desc.NumRenderTargets; ++i)
+                HashCombine(seed, desc.RTVFormats[i]);
+
+            // Depth/stencil format
+            HashCombine(seed, desc.DSVFormat);
+
+            // Sample info
+            HashCombine(seed, desc.SampleDesc.Count);
+            HashCombine(seed, desc.SampleDesc.Quality);
+
+            // Rasterizer, blend, and depth-stencil states (can also hash raw memory if structs are POD)
+            HashCombine(seed, std::hash<uint64_t>()(*(const uint64_t*)&desc.RasterizerState));
+            HashCombine(seed, std::hash<uint64_t>()(*(const uint64_t*)&desc.BlendState));
+            HashCombine(seed, std::hash<uint64_t>()(*(const uint64_t*)&desc.DepthStencilState));
+
+            // Topology, node mask, etc.
+            HashCombine(seed, desc.PrimitiveTopologyType);
+            HashCombine(seed, desc.SampleMask);
+            HashCombine(seed, desc.NodeMask);
+
+            return seed;
+        }
+
+        inline void HashCombine(std::size_t& seed, std::size_t hash)
         {
-            return std::hash<size_t>()(reinterpret_cast<size_t>(&desc)); // Can be improved for more uniqueness
+            seed ^= hash + 0x9e3779b9 + (seed << 6) + (seed >> 2);
         }
     };
 }

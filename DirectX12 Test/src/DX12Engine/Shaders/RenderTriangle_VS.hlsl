@@ -15,6 +15,6 @@ VSOutput main(uint vertexID : SV_VertexID)
     VSOutput output;
     output.position = float4(positions[vertexID], 1.0);
     output.texCoord = output.position.xy * 0.5 + 0.5;
-    output.texCoord.y *= -1.0;
+    output.texCoord.y = 1.0 - output.texCoord.y; // Flip Y coordinate
     return output;
 }

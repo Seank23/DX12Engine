@@ -37,12 +37,13 @@ struct PSInput
 TextureCube environmentMap : register(t0);
 TextureCube irradianceMap : register(t1);
 Texture2D albedoMap : register(t2);
-Texture2D normalMap : register(t3);
-Texture2D materialMap : register(t4);
-Texture2D positionMap : register(t5);
-Texture2D depthMap : register(t6);
-Texture2DArray shadowMaps : register(t7);
-TextureCube shadowCubeMap : register(t8);
+Texture2D worldNormalMap : register(t3);
+Texture2D objectNormalMap : register(t4);
+Texture2D materialMap : register(t5);
+Texture2D positionMap : register(t6);
+Texture2D depthMap : register(t7);
+Texture2DArray shadowMaps : register(t8);
+TextureCube shadowCubeMap : register(t9);
 SamplerState samp : register(s0);
 SamplerComparisonState shadowSampler : register(s1);
 
@@ -159,7 +160,8 @@ float3 GetViewRay(float2 uv)
 float4 main(PSInput input) : SV_TARGET
 {
     float3 albedo = albedoMap.Sample(samp, input.texCoord);
-    float3 worldNormal = normalMap.Sample(samp, input.texCoord);
+    float3 worldNormal = worldNormalMap.Sample(samp, input.texCoord);
+    float3 objectNormal = objectNormalMap.Sample(samp, input.texCoord);
     float roughness = materialMap.Sample(samp, input.texCoord).r;
     float metallic = materialMap.Sample(samp, input.texCoord).g;
     float ao = materialMap.Sample(samp, input.texCoord).b;
@@ -170,11 +172,11 @@ float4 main(PSInput input) : SV_TARGET
     
     float3 finalColor = float3(0, 0, 0);
     float shadowFactor = 1.0;
-    float aoFactor = 0.04;
+    float aoFactor = 0.02;
     
     if (depth >= 0.999f)
     {
-        float3 viewRay = GetViewRay(input.position.xy / ScreenSize);
+        float3 viewRay = GetViewRay(input.texCoord);
         float3 worldDir = mul((float3x3)InvViewMatrix, viewRay);
         return float4(environmentMap.Sample(samp, worldDir).rgb, 1.0);
     }
@@ -184,7 +186,7 @@ float4 main(PSInput input) : SV_TARGET
     
     for (int i = 0; i < LightCount; i++)
     {
-        float3 offsetPos = worldPos + worldNormal * aoFactor;
+        float3 offsetPos = worldPos + (objectNormal * 0.04) + (worldNormal * aoFactor);
         float4 lightSpacePosition = mul(Lights[i].ViewProjMatrix, float4(offsetPos, 1.0));
         lightSpacePosition.y *= -1;
         float3 lightDir = normalize(Lights[i].Position - worldPos);

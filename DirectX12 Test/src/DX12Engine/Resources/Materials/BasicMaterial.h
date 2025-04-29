@@ -16,7 +16,7 @@ namespace DX12Engine
 		virtual Texture* GetTexture(TextureType type) override;
 		virtual bool HasTexture(TextureType type) override;
 
-		virtual void Bind(ID3D12GraphicsCommandList* commandList, int* startIndex, bool bindPipelineState = true) override;
+		virtual void Bind(ID3D12GraphicsCommandList* commandList, int* startIndex) override;
 
 	private:
 		BasicMaterialData m_MaterialData;

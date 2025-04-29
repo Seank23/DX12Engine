@@ -12,6 +12,7 @@ namespace DX12Engine
 	class RenderPass;
 	struct RenderPipelineConfig;
 	enum class RenderPassType;
+	enum class RenderTargetType;
 
 	struct RenderPipeline
 	{
@@ -28,6 +29,7 @@ namespace DX12Engine
 		void UpdateObjectList(std::vector<RenderObject*> objects);
 		void ExecutePipeline(RenderPipeline pipeline);
 
+		std::unique_ptr<std::vector<RenderTargetType>> GetTargets(std::vector<RenderTargetType> targets);
 		RenderPipeline CreateRenderPipeline(RenderPipelineConfig config);
 
 		void SetLightBuffer(LightBuffer* lightBuffer) { m_LightBuffer = lightBuffer; }

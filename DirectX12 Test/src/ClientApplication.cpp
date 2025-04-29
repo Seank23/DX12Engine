@@ -25,7 +25,8 @@
 
 ClientApplication::ClientApplication()
 {
-	std::shared_ptr<DX12Engine::RenderContext> context = std::make_shared<DX12Engine::RenderContext>(this, 1920, 1080);
+	DirectX::XMFLOAT2 windowSize = { 1920, 1080 };
+	std::shared_ptr<DX12Engine::RenderContext> context = std::make_shared<DX12Engine::RenderContext>(this, windowSize.x, windowSize.y);
 
 	DX12Engine::Renderer renderer(context);
 
@@ -97,7 +98,7 @@ ClientApplication::ClientApplication()
 	DX12Engine::RenderObject wallBack(floorMesh);
 	object1.SetMaterial(pbrStone);
 	object2.SetMaterial(pbrGold);
-	floor.SetMaterial(pbrConcrete);
+	floor.SetMaterial(pbrGold);
 	wallBack.SetMaterial(pbrConcrete);
 	object1.Move({ -1.5f, 0.0f, 0.0f });
 	object2.Move({ 1.5f, 0.0f, 0.0f });
@@ -127,11 +128,11 @@ ClientApplication::ClientApplication()
 	spotLight.SetColor({ 0.9f, 0.5f, 0.0f });
 	spotLight.SetIntensity(1.0f);
 	spotLight.SetSpotAngle(45.0f);
-	lightBuffer.AddLight(&spotLight);
+	//lightBuffer.AddLight(&spotLight);
 	renderer.SetLightBuffer(&lightBuffer);
 
-	m_Camera = std::make_unique<DX12Engine::Camera>(1600.0f / 900.0f, 1.0f, 100.0f);
-	m_Camera->SetPosition({ 4.0f, 2.0f, -5.0f });
+	m_Camera = std::make_unique<DX12Engine::Camera>(windowSize.x / windowSize.y, 1.0f, 100.0f);
+	m_Camera->SetPosition({ 0.0f, 1.0f, -2.0f });
 	m_Camera->SetRotation(-20.0f, 125.0f);
 	renderer.SetCamera(m_Camera.get());
 
@@ -163,7 +164,8 @@ ClientApplication::ClientApplication()
 	geometryConfig.InputResources[DX12Engine::InputResourceType::SceneObjects] = &sceneObjects;
 	std::vector<DX12Engine::RenderTargetType> gBufferTypes{
 		DX12Engine::RenderTargetType::Albedo,
-		DX12Engine::RenderTargetType::Normal,
+		DX12Engine::RenderTargetType::WorldNormal,
+		DX12Engine::RenderTargetType::ObjectNormal,
 		DX12Engine::RenderTargetType::Material,
 		DX12Engine::RenderTargetType::Position,
 		DX12Engine::RenderTargetType::Depth
@@ -179,10 +181,20 @@ ClientApplication::ClientApplication()
 	lightingConfig.InputResources[DX12Engine::InputResourceType::RenderTargets_ShadowMap] = &shadowBufferTypes;
 	lightingConfig.InputResources[DX12Engine::InputResourceType::RenderTargets_CubeShadowMap] = &cubeShadowBufferTypes;
 
+	std::vector<DX12Engine::RenderTargetType> ssrGBufferTypes{ DX12Engine::RenderTargetType::Albedo, DX12Engine::RenderTargetType::WorldNormal, DX12Engine::RenderTargetType::Material, DX12Engine::RenderTargetType::Position, DX12Engine::RenderTargetType::Depth };
+	std::vector<DX12Engine::RenderTargetType> ssrLightingTypes{ DX12Engine::RenderTargetType::Composite };
+	DX12Engine::RenderPassConfig ssrConfig;
+	ssrConfig.Type = DX12Engine::RenderPassType::ScreenSpaceReflection;
+	ssrConfig.InputResources[DX12Engine::InputResourceType::Camera] = m_Camera.get();
+	ssrConfig.InputResources[DX12Engine::InputResourceType::RenderTargets_Geometry] = &ssrGBufferTypes;
+	ssrConfig.InputResources[DX12Engine::InputResourceType::RenderTargets_Lighting] = &ssrLightingTypes;
+
+
 	pipelineConfig.Passes.push_back(shadowMapConfig);
 	pipelineConfig.Passes.push_back(cubeShadowMapConfig);
 	pipelineConfig.Passes.push_back(geometryConfig);
 	pipelineConfig.Passes.push_back(lightingConfig);
+	pipelineConfig.Passes.push_back(ssrConfig);
 	DX12Engine::RenderPipeline pipeline = renderer.CreateRenderPipeline(pipelineConfig);
 
 	while (renderer.PollWindow())

@@ -11,7 +11,7 @@ namespace DX12Engine
 		CubeShadowMap,
 		Geometry,
 		Lighting,
-		PostProcessing,
+		ScreenSpaceReflection,
 	};
 
 	enum class InputResourceType

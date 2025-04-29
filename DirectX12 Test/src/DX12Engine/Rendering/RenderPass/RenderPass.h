@@ -9,7 +9,8 @@ namespace DX12Engine
 	enum class RenderTargetType
 	{
 		Albedo,
-		Normal,
+		WorldNormal,
+		ObjectNormal,
 		Material,
 		Position,
 		Depth,

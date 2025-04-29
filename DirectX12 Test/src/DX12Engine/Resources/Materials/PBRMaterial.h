@@ -13,7 +13,7 @@ namespace DX12Engine
 		virtual Texture* GetTexture(TextureType type) override;
 		virtual bool HasTexture(TextureType type) override;
 
-		virtual void Bind(ID3D12GraphicsCommandList* commandList, int* startIndex, bool bindPipelineState = true) override;
+		virtual void Bind(ID3D12GraphicsCommandList* commandList, int* startIndex) override;
 
 		void SetAlbedoMap(std::shared_ptr<Texture> albedoMap) { m_AlbedoMap = albedoMap; }
 		void SetNormalMap(std::shared_ptr<Texture> normalMap) { m_NormalMap = normalMap; }

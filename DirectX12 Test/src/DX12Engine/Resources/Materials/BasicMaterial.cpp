@@ -7,7 +7,6 @@ namespace DX12Engine
 		: Material()
 	{
 		SetColor(color);
-		ConfigureFromDefault(ResourceManager::GetInstance().GetShader("BasicLighting_VS"), ResourceManager::GetInstance().GetShader("BasicLighting_PS"));
 	}
 
 	BasicMaterial::~BasicMaterial()
@@ -49,9 +48,9 @@ namespace DX12Engine
 		}
 	}
 
-	void BasicMaterial::Bind(ID3D12GraphicsCommandList* commandList, int* startIndex, bool bindPipelineState)
+	void BasicMaterial::Bind(ID3D12GraphicsCommandList* commandList, int* startIndex)
 	{
-		Material::Bind(commandList, startIndex, bindPipelineState);
+		Material::Bind(commandList, startIndex);
 		if (HasTexture(TextureType::Albedo))
 			commandList->SetGraphicsRootDescriptorTable(*startIndex, m_Texture->GetGPUHandle());
 	}

@@ -4,7 +4,6 @@
 namespace DX12Engine
 {
 	Material::Material()
-		: m_EnvironmentMapHandle(nullptr), m_ShadowMapHandle(nullptr), m_ShadowCubeMapHandle(nullptr)
 	{
 		m_ConstantBuffer = ResourceManager::GetInstance().CreateConstantBuffer(sizeof(MaterialData));
 	}
@@ -13,23 +12,8 @@ namespace DX12Engine
 	{
 	}
 
-	void Material::BuildPipelineState()
+	void Material::Bind(ID3D12GraphicsCommandList* commandList, int* startIndex)
 	{
-		m_RootSignature = ResourceManager::GetInstance().CreateRootSignature(RootSignatureBuilder.Build());
-		PipelineStateBuilder = PipelineStateBuilder.SetRootSignature(m_RootSignature.Get());
-		m_PipelineState = ResourceManager::GetInstance().CreatePipelineState(PipelineStateBuilder.Build());
-	}
-
-	void Material::ConfigureFromDefault(Shader* vertexShader, Shader* pixelShader, int numTextures)
-	{
-		PipelineStateBuilder = PipelineStateBuilder.ConfigureFromDefault().SetVertexShader(vertexShader).SetPixelShader(pixelShader);
-		RootSignatureBuilder = RootSignatureBuilder.ConfigureFromDefault(numTextures);
-		BuildPipelineState();
-	}
-
-	void Material::Bind(ID3D12GraphicsCommandList* commandList, int* startIndex, bool bindPipelineState)
-	{
-		if (bindPipelineState) commandList->SetPipelineState(m_PipelineState.Get());
 		commandList->SetGraphicsRootConstantBufferView((*startIndex)++, GetCBVAddress());
 	}
 

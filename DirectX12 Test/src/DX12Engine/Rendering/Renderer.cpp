@@ -6,6 +6,7 @@
 #include "RenderPass/ShadowMapRenderPass.h"
 #include "RenderPass/GeometryRenderPass.h"
 #include "RenderPass/LightingRenderPass.h"
+#include "RenderPass/SSRRenderPass.h"
 #include "RenderPipelineConfig.h"
 
 namespace DX12Engine
@@ -22,7 +23,7 @@ namespace DX12Engine
 			.SetRasterizerState(CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT))
 			.SetPrimitiveTopologyType(D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE)
 			.SetRenderTargets({ DXGI_FORMAT_R8G8B8A8_UNORM })
-			.SetSampleDesc(UINT_MAX, 1, 0).SetVertexShader(ResourceManager::GetInstance().GetShader("PBRLightingDeferred_VS"))
+			.SetSampleDesc(UINT_MAX, 1, 0).SetVertexShader(ResourceManager::GetInstance().GetShader("RenderTriangle_VS"))
 			.SetPixelShader(ResourceManager::GetInstance().GetShader("FinalRender_PS"));
 
 		DescriptorTableConfig descriptorTable(1, D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 0);
@@ -88,6 +89,8 @@ namespace DX12Engine
 			return std::make_unique<GeometryRenderPass>(*m_RenderContext);
 		case RenderPassType::Lighting:
 			return std::make_unique<LightingRenderPass>(*m_RenderContext);
+		case RenderPassType::ScreenSpaceReflection:
+			return std::make_unique<SSRRenderPass>(*m_RenderContext);
 		default:
 			return nullptr;
 		}
@@ -116,6 +119,11 @@ namespace DX12Engine
 		PresentFrame(finalRenderTarget);
 	}
 
+	std::unique_ptr<std::vector<RenderTargetType>> Renderer::GetTargets(std::vector<RenderTargetType> targets)
+	{
+		return std::make_unique<std::vector<RenderTargetType>>(targets);
+	}
+
 	RenderPipeline Renderer::CreateRenderPipeline(RenderPipelineConfig config)
 	{
 		RenderPipeline pipeline;
@@ -138,34 +146,40 @@ namespace DX12Engine
 							renderPass->SetRenderObjects(*static_cast<std::vector<RenderObject*>*>(inputResource.second));
 							break;
 						case InputResourceType::RenderTargets_ShadowMap:
-							renderPass->AddDescriptorTableConfig(
-								{ (UINT)static_cast<std::vector<RenderTargetType>*>(inputResource.second)->size(), D3D12_DESCRIPTOR_RANGE_TYPE_SRV, renderPass->GetInputResourceCount() });
+							
 							for (auto& target : *static_cast<std::vector<RenderTargetType>*>(inputResource.second))
+							{
+								renderPass->AddDescriptorTableConfig({ 1, D3D12_DESCRIPTOR_RANGE_TYPE_SRV, renderPass->GetInputResourceCount() });
 								renderPass->AddInputResources({ pipeline.RenderPasses[renderPassOrder[RenderPassType::ShadowMap]]->GetRenderTarget(target) });
+							}
 							break;
 						case InputResourceType::RenderTargets_CubeShadowMap:
-							renderPass->AddDescriptorTableConfig(
-								{ (UINT)static_cast<std::vector<RenderTargetType>*>(inputResource.second)->size(), D3D12_DESCRIPTOR_RANGE_TYPE_SRV, renderPass->GetInputResourceCount() });
 							for (auto& target : *static_cast<std::vector<RenderTargetType>*>(inputResource.second))
+							{
+								renderPass->AddDescriptorTableConfig({ 1, D3D12_DESCRIPTOR_RANGE_TYPE_SRV, renderPass->GetInputResourceCount() });
 								renderPass->AddInputResources({ pipeline.RenderPasses[renderPassOrder[RenderPassType::CubeShadowMap]]->GetRenderTarget(target) });
+							}
 							break;
 						case InputResourceType::RenderTargets_Geometry:
-							renderPass->AddDescriptorTableConfig(
-								{ (UINT)static_cast<std::vector<RenderTargetType>*>(inputResource.second)->size(), D3D12_DESCRIPTOR_RANGE_TYPE_SRV, renderPass->GetInputResourceCount() });
 							for (auto& target : *static_cast<std::vector<RenderTargetType>*>(inputResource.second))
+							{
+								renderPass->AddDescriptorTableConfig({ 1, D3D12_DESCRIPTOR_RANGE_TYPE_SRV, renderPass->GetInputResourceCount() });
 								renderPass->AddInputResources({ pipeline.RenderPasses[renderPassOrder[RenderPassType::Geometry]]->GetRenderTarget(target) });
+							}
 							break;
 						case InputResourceType::RenderTargets_Lighting:
-							renderPass->AddDescriptorTableConfig(
-								{ (UINT)static_cast<std::vector<RenderTargetType>*>(inputResource.second)->size(), D3D12_DESCRIPTOR_RANGE_TYPE_SRV, renderPass->GetInputResourceCount() });
 							for (auto& target : *static_cast<std::vector<RenderTargetType>*>(inputResource.second))
+							{
+								renderPass->AddDescriptorTableConfig({ 1, D3D12_DESCRIPTOR_RANGE_TYPE_SRV, renderPass->GetInputResourceCount() });
 								renderPass->AddInputResources({ pipeline.RenderPasses[renderPassOrder[RenderPassType::Lighting]]->GetRenderTarget(target) });
+							}
 							break;
 						case InputResourceType::ExternalTextures:
-							renderPass->AddDescriptorTableConfig(
-								{ (UINT)static_cast<std::vector<Texture*>*>(inputResource.second)->size(), D3D12_DESCRIPTOR_RANGE_TYPE_SRV, renderPass->GetInputResourceCount() });
 							for (auto& texture : *static_cast<std::vector<Texture*>*>(inputResource.second))
+							{
+								renderPass->AddDescriptorTableConfig({ 1, D3D12_DESCRIPTOR_RANGE_TYPE_SRV, renderPass->GetInputResourceCount() });
 								renderPass->AddInputResources({ texture });
+							}
 							break;
 						}
 					}
@@ -197,6 +211,17 @@ namespace DX12Engine
 								break;
 							case InputResourceType::Camera:
 								static_cast<LightingRenderPass*>(renderPass)->SetCamera(static_cast<Camera*>(inputResource.second));
+								break;
+							}
+						}
+						break;
+					case RenderPassType::ScreenSpaceReflection:
+						for (auto& inputResource : passConfig.InputResources)
+						{
+							switch (inputResource.first)
+							{
+							case InputResourceType::Camera:
+								static_cast<SSRRenderPass*>(renderPass)->SetCamera(static_cast<Camera*>(inputResource.second));
 								break;
 							}
 						}

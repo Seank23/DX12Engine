@@ -51,9 +51,22 @@ namespace DX12Engine
         ID3D12Device* m_Device;
 
         // Simple hash function for the root signature
-        size_t HashRootSignature(const D3D12_ROOT_SIGNATURE_DESC& desc) 
+		size_t HashRootSignature(const D3D12_ROOT_SIGNATURE_DESC& desc)
+		{
+			size_t seed = 0;
+			HashCombine(seed, desc.NumParameters);
+			HashCombine(seed, desc.NumStaticSamplers);
+			HashCombine(seed, desc.Flags);
+			for (UINT i = 0; i < desc.NumParameters; ++i)
+			{
+				HashCombine(seed, desc.pParameters[i].ParameterType);
+			}
+			return seed;
+		}
+
+        inline void HashCombine(std::size_t& seed, std::size_t hash)
         {
-            return std::hash<size_t>()(reinterpret_cast<size_t>(&desc)); // Can be improved
+            seed ^= hash + 0x9e3779b9 + (seed << 6) + (seed >> 2);
         }
     };
 }
