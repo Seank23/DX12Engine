@@ -99,6 +99,81 @@ float4 RayCast(in float3 direction, inout float3 hitCoord, out float dDepth)
     return float4(projectedCoord.xy, depth, 1.0);
 }
 
+void ComputePositionAndReflection(float2 texCoord, float3 normalVS, float3 jitter, out float3 positionTS, out float3 reflectedDirTS, out float maxDistance)
+{
+    float sampledDepth = depthMap.Sample(samp, texCoord).r;
+    float4 samplePosCS = float4(texCoord * 2.0 - 1.0, sampledDepth, 1.0);
+    samplePosCS.xy += 0.5 / ScreenSize;
+    samplePosCS.y *= -1;
+    
+    float4 samplePosVS = mul(InvProjectionMatrix, samplePosCS);
+    samplePosVS /= samplePosVS.w;
+    float3 sampleDirVS = normalize(samplePosVS.xyz);
+    float4 reflectedDirVS = float4(reflect(sampleDirVS.xyz, normalVS.xyz), 0.0);
+    reflectedDirVS += float4(jitter, 1.0);
+    
+    float4 reflectedRayEndVS = samplePosVS + reflectedDirVS * 1000;
+    reflectedRayEndVS /= (reflectedRayEndVS.z < 0.0 ? reflectedRayEndVS.z : 1.0);
+    
+    float4 reflectedRayEndCS = mul(ProjectionMatrix, float4(reflectedRayEndVS.xyz, 1.0));
+    reflectedRayEndCS /= reflectedRayEndCS.w;
+    float3 reflectedDirCS = normalize(reflectedRayEndCS.xyz - samplePosCS.xyz);
+    
+    samplePosCS.xy = samplePosCS.xy * float2(0.5, -0.5) + 0.5;
+    reflectedDirCS.xy *= float2(0.5, -0.5);
+    reflectedDirCS *= max(0.1, -samplePosCS.z);
+    
+    positionTS = samplePosCS.xyz;
+    reflectedDirTS = reflectedDirCS;
+    
+    maxDistance = reflectedDirTS.x > 0.0 ? (1.0 - positionTS.x) / reflectedDirTS.x : -positionTS.x / reflectedDirTS.x;
+    maxDistance = min(maxDistance, reflectedDirTS.y < 0.0 ? (-positionTS.y / reflectedDirTS.y) : (1.0 - positionTS.y) / reflectedDirTS.y);
+    maxDistance = min(maxDistance, reflectedDirTS.z < 0.0 ? (-positionTS.z / reflectedDirTS.z) : (1.0 - positionTS.z) / reflectedDirTS.z);
+}
+
+bool FindIntersection(float3 samplePosTS, float3 reflectedDirTS, float maxTraceDistance, out float3 intersectionPosTS)
+{
+    float3 reflectionEndTS = samplePosTS + reflectedDirTS * maxTraceDistance;
+    
+    float3 dPos = reflectionEndTS.xyz - samplePosTS.xyz;
+    int2 sampleScreenPos = int2(samplePosTS.xy * ScreenSize);
+    int2 endPosScreenPos = int2(reflectionEndTS.xy * ScreenSize);
+    int2 dPos2 = endPosScreenPos - sampleScreenPos;
+    int maxDist = max(abs(dPos2.x), abs(dPos2.y));
+    dPos /= maxDist;
+    dPos *= 2.0;
+    
+    float4 rayPosTS = float4(samplePosTS.xyz + dPos, 0.0);
+    float4 rayDirTS = float4(dPos.xyz, 0.0);
+    float4 rayStartPos = rayPosTS;
+    
+    int hitIndex = -1;
+    int maxSteps = 2000;
+    float maxThickness = 0.1;
+    for (int i = 0; i < maxDist && i < maxSteps; i++)
+    {
+        float depth = depthMap.Sample(samp, rayPosTS.xy).r;
+        float thickness = rayPosTS.z - depth;
+        if (thickness > 0.0 && thickness < maxThickness)
+        {
+            hitIndex = i;
+            break;
+        }
+        rayPosTS += rayDirTS;
+    }
+    bool intersected = hitIndex >= 0;
+    intersectionPosTS = rayStartPos.xyz + rayDirTS.xyz * hitIndex;
+    return intersected;
+}
+
+float4 ComputeReflectedColor(bool intersected, float3 intersectionPosTS)
+{
+    
+    float4 ssrColor = intersected ? float4(pipelineOutputMap.Sample(samp, intersectionPosTS.xy).xyz, 1.0)
+                    : float4(0.0, 0.0, 0.0, 1.0);
+    return ssrColor;
+}
+
 float4 main(PSInput input) : SV_TARGET
 {
     float2 texCoord = input.texCoord;
@@ -111,24 +186,15 @@ float4 main(PSInput input) : SV_TARGET
     float3 normalWS = normalMap.Sample(samp, texCoord).xyz;
     float3 normalVS = mul(ViewMatrix, float4(normalWS, 0.0)).xyz;
     float3 positionWS = positionMap.Sample(samp, texCoord).xyz;
-    float3 positionVS = mul(ViewMatrix, float4(positionWS, 1.0)).xyz;
-    
-    float3 reflectedDir = normalize(reflect(-normalize(positionVS), normalize(normalVS)));
-    float3 hitPosition = positionVS;
-    float dDepth = 0.0;
     
     float3 specularColor = lerp(float3(0.04, 0.04, 0.04), albedo, metallic);
     float3 jitter = lerp(float3(0.0, 0.0, 0.0), float3(Hash(positionWS)), specularColor) * 0.05;
     
-    float4 coords = RayCast(jitter + reflectedDir * max(minRayStep, -positionVS.z), hitPosition, dDepth);
-    float2 dCoords = smoothstep(0.2, 0.6, abs(float2(0.5, 0.5) - coords.xy));
-    float screenEdgeFactor = clamp(1.0 - (dCoords.x + dCoords.y), 0.0, 1.0);
-    float multiplier = pow(metallic, 3.0) * screenEdgeFactor * -reflectedDir.z;
+    float3 positionTS, reflectedDirTS, intersectionPosTS;
+    float maxDistance;
+    ComputePositionAndReflection(texCoord, normalVS, jitter, positionTS, reflectedDirTS, maxDistance);
+    bool intersected = FindIntersection(positionTS, reflectedDirTS, maxDistance, intersectionPosTS);
+    float4 ssrColor = ComputeReflectedColor(intersected, intersectionPosTS);
     
-    float3 F0 = lerp(float3(0.04, 0.04, 0.04), albedo, metallic);
-    float3 fresnel = FresnelSchlick(max(dot(normalize(normalVS), normalize(positionVS)), 0.0), F0);
-    
-    float3 SSR = pipelineOutputMap.Sample(samp, coords.xy).xyz * clamp(multiplier, 0.0, 0.9) * fresnel;
-    
-    return float4(sceneColor + SSR, 1.0);
+    return float4(sceneColor + ssrColor.rgb, 1.0);
 }
