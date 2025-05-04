@@ -98,7 +98,7 @@ ClientApplication::ClientApplication()
 	DX12Engine::RenderObject wallBack(floorMesh);
 	object1.SetMaterial(pbrStone);
 	object2.SetMaterial(pbrGold);
-	floor.SetMaterial(pbrGold);
+	floor.SetMaterial(pbrConcrete);
 	wallBack.SetMaterial(pbrConcrete);
 	object1.Move({ -1.5f, 0.0f, 0.0f });
 	object2.Move({ 1.5f, 0.0f, 0.0f });
@@ -203,13 +203,14 @@ ClientApplication::ClientApplication()
 
 		object1.Rotate({ 0.0f, 1.0f, 0.0f });
 		object2.Rotate({ 1.0f, 0.0f, 0.0f });
+		object2.Move({ 0.0f, sin(count) / 200, 0.0f});
 
 		lightBuffer.Update();
 		renderer.UpdateObjectList(sceneObjects);
 
 		renderer.ExecutePipeline(pipeline);
 
-		count += 0.001f;
+		count += 0.01f;
 	}
 }
 
