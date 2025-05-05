@@ -34,7 +34,7 @@ float3 FresnelSchlick(float cosTheta, float3 F0)
     return F0 + (1.0 - F0) * pow(1.0 - cosTheta, 5.0);
 }
 
-void ComputePositionAndReflection(float2 texCoord, float3 normalVS, float3 jitter, out float3 positionTS, out float3 reflectedDirTS, out float3 positionVS, out float maxDistance)
+void ComputePositionAndReflection(float2 texCoord, float3 normalVS, float3 jitter, float roughness, out float3 positionTS, out float3 reflectedDirTS, out float3 positionVS, out float maxDistance)
 {
     float sampledDepth = depthMap.Sample(samp, texCoord).r;
     float4 samplePosCS = float4(texCoord * 2.0 - 1.0, sampledDepth, 1.0);
@@ -45,7 +45,7 @@ void ComputePositionAndReflection(float2 texCoord, float3 normalVS, float3 jitte
     samplePosVS /= samplePosVS.w;
     float3 sampleDirVS = normalize(samplePosVS.xyz);
     float4 reflectedDirVS = float4(reflect(sampleDirVS.xyz, normalVS.xyz), 0.0);
-    reflectedDirVS += float4(jitter, 1.0);
+    reflectedDirVS += float4(jitter * roughness, 1.0);
     
     float4 reflectedRayEndVS = samplePosVS + reflectedDirVS;
     
@@ -76,10 +76,11 @@ bool FindIntersection(float3 samplePosTS, float3 reflectedDirTS, float maxTraceD
     int2 dPos2 = endPosScreenPos - sampleScreenPos;
     int maxDist = max(abs(dPos2.x), abs(dPos2.y));
     dPos /= maxDist;
+    dPos *= 2.0;
     
     int hitIndex = -1;
-    int maxSteps = 2000;
-    float maxThickness = 0.002;
+    int maxSteps = 500;
+    float maxThickness = 0.005;
     int startDist = 1;
     
     float4 rayPosTS = float4(samplePosTS.xyz + dPos, 0.0);
@@ -91,11 +92,9 @@ bool FindIntersection(float3 samplePosTS, float3 reflectedDirTS, float maxTraceD
     {
         float depth = depthMap.Sample(samp, rayPosTS.xy).r;
         float thickness = rayPosTS.z - depth;
-        if (thickness > 0.0 && thickness < maxThickness)
-        {
-            hitIndex = i;
+        hitIndex = (thickness > 0.0 && thickness < maxThickness) ? i : hitIndex;
+        if (hitIndex != -1)
             break;
-        }
         rayPosTS += rayDirTS;
     }
     bool intersected = hitIndex >= startDist;
@@ -121,6 +120,7 @@ float4 main(PSInput input) : SV_TARGET
 {
     float2 texCoord = input.texCoord;
     float3 sceneColor = pipelineOutputMap.Sample(samp, texCoord).xyz;
+    float roughness = materialMap.Sample(samp, texCoord).r;
     float metallic = materialMap.Sample(samp, texCoord).g;
     float albedo = albedoMap.Sample(samp, texCoord).g;
     if (metallic < 0.01)
@@ -131,11 +131,11 @@ float4 main(PSInput input) : SV_TARGET
     float3 positionWS = positionMap.Sample(samp, texCoord).xyz;
     
     float3 specularColor = lerp(float3(0.04, 0.04, 0.04), albedo, metallic);
-    float3 jitter = lerp(float3(0.0, 0.0, 0.0), float3(Hash(positionWS)), specularColor) * 0.05;
+    float3 jitter = lerp(float3(0.0, 0.0, 0.0), float3(Hash(positionWS)), specularColor) * 0.2;
     
     float3 positionTS, reflectedDirTS, positionVS, reflectedDirVS, intersectionPosTS;
     float maxDistance;
-    ComputePositionAndReflection(texCoord, normalVS, jitter, positionTS, reflectedDirTS, positionVS, maxDistance);
+    ComputePositionAndReflection(texCoord, normalVS, jitter, roughness, positionTS, reflectedDirTS, positionVS, maxDistance);
     bool intersected = FindIntersection(positionTS, reflectedDirTS, maxDistance, intersectionPosTS);
     float4 ssrColor = ComputeReflectedColor(intersected, intersectionPosTS, sceneColor, metallic, normalWS, positionVS);
     

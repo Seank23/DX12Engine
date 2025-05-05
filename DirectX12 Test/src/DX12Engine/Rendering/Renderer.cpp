@@ -146,40 +146,24 @@ namespace DX12Engine
 							renderPass->SetRenderObjects(*static_cast<std::vector<RenderObject*>*>(inputResource.second));
 							break;
 						case InputResourceType::RenderTargets_ShadowMap:
-							
 							for (auto& target : *static_cast<std::vector<RenderTargetType>*>(inputResource.second))
-							{
-								renderPass->AddDescriptorTableConfig({ 1, D3D12_DESCRIPTOR_RANGE_TYPE_SRV, renderPass->GetInputResourceCount() });
 								renderPass->AddInputResources({ pipeline.RenderPasses[renderPassOrder[RenderPassType::ShadowMap]]->GetRenderTarget(target) });
-							}
 							break;
 						case InputResourceType::RenderTargets_CubeShadowMap:
 							for (auto& target : *static_cast<std::vector<RenderTargetType>*>(inputResource.second))
-							{
-								renderPass->AddDescriptorTableConfig({ 1, D3D12_DESCRIPTOR_RANGE_TYPE_SRV, renderPass->GetInputResourceCount() });
 								renderPass->AddInputResources({ pipeline.RenderPasses[renderPassOrder[RenderPassType::CubeShadowMap]]->GetRenderTarget(target) });
-							}
 							break;
 						case InputResourceType::RenderTargets_Geometry:
 							for (auto& target : *static_cast<std::vector<RenderTargetType>*>(inputResource.second))
-							{
-								renderPass->AddDescriptorTableConfig({ 1, D3D12_DESCRIPTOR_RANGE_TYPE_SRV, renderPass->GetInputResourceCount() });
 								renderPass->AddInputResources({ pipeline.RenderPasses[renderPassOrder[RenderPassType::Geometry]]->GetRenderTarget(target) });
-							}
 							break;
 						case InputResourceType::RenderTargets_Lighting:
 							for (auto& target : *static_cast<std::vector<RenderTargetType>*>(inputResource.second))
-							{
-								renderPass->AddDescriptorTableConfig({ 1, D3D12_DESCRIPTOR_RANGE_TYPE_SRV, renderPass->GetInputResourceCount() });
 								renderPass->AddInputResources({ pipeline.RenderPasses[renderPassOrder[RenderPassType::Lighting]]->GetRenderTarget(target) });
-							}
 							break;
 						case InputResourceType::ExternalTextures:
 							for (auto& texture : *static_cast<std::vector<Texture*>*>(inputResource.second))
-							{
-								renderPass->AddDescriptorTableConfig({ 1, D3D12_DESCRIPTOR_RANGE_TYPE_SRV, renderPass->GetInputResourceCount() });
 								renderPass->AddInputResources({ texture });
-							}
 							break;
 						}
 					}
