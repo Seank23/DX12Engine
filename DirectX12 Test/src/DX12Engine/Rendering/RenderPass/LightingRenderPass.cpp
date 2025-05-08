@@ -23,6 +23,10 @@ namespace DX12Engine
 		DirectX::XMINT2 windowSize = m_RenderContext.GetWindowSize();
 		m_RenderTargets.emplace_back(ResourceManager::GetInstance().CreateRenderTargetTexture(DirectX::XMINT2(windowSize.x, windowSize.y), DXGI_FORMAT_R8G8B8A8_UNORM));
 
+		ResourceManager::GetInstance().UpdateSRVDescriptors(m_InputResources);
+		ResourceManager::GetInstance().UpdateSRVDescriptors(reinterpret_cast<std::vector<GPUResource*> const&>(m_RenderTargets));
+		AddDescriptorTableConfig({ (UINT)m_InputResources.size(), D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 0});
+
 		m_Viewport = { 0.0f, 0.0f, (float)windowSize.x, (float)windowSize.y, -1.0f, 1.0f };
 		m_ScissorRect = { 0, 0, (LONG)windowSize.x, (LONG)windowSize.y };
 

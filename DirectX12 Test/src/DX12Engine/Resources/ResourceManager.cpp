@@ -253,7 +253,7 @@ namespace DX12Engine
 		DescriptorHeapHandle srvHandle = m_HeapManager->GetNewSRVDescriptorHeapHandle();
 		m_Device->CreateShaderResourceView(textureResource, &srvDesc, srvHandle.GetCPUHandle());
 
-		return std::make_unique<Texture>(textureResource, textureUploadResource, D3D12_RESOURCE_STATE_COPY_DEST, textureData, srvHandle, false);
+		return std::make_unique<Texture>(textureResource, textureUploadResource, D3D12_RESOURCE_STATE_COPY_DEST, textureData, srvHandle, srvDesc, false);
 	}
 
 	std::unique_ptr<Texture> ResourceManager::CreateCubeMap(const DirectX::ScratchImage* imageData)
@@ -319,7 +319,7 @@ namespace DX12Engine
 		DescriptorHeapHandle srvHandle = m_HeapManager->GetNewSRVDescriptorHeapHandle();
 		m_Device->CreateShaderResourceView(textureResource, &srvDesc, srvHandle.GetCPUHandle());
 
-		return std::make_unique<Texture>(textureResource, textureUploadResource, D3D12_RESOURCE_STATE_COPY_DEST, cubemapData, srvHandle, true);
+		return std::make_unique<Texture>(textureResource, textureUploadResource, D3D12_RESOURCE_STATE_COPY_DEST, cubemapData, srvHandle, srvDesc, true);
 	}
 
 	std::unique_ptr<RenderTexture> ResourceManager::CreateDepthMap(DirectX::XMINT3 dimensions, DXGI_FORMAT dsvFormat, DXGI_FORMAT srvFormat, bool isCubeMap)
@@ -391,10 +391,7 @@ namespace DX12Engine
 		srvDesc.Texture2D.MipLevels = 1;
 		if (!isSingleMap) srvDesc.Texture2DArray.ArraySize = arraySize;
 
-		DescriptorHeapHandle srvHandle = m_HeapManager->GetRenderHeapHandleBlock(1);
-		m_Device->CreateShaderResourceView(depthMapResource, &srvDesc, srvHandle.GetCPUHandle());
-
-		return std::make_unique<RenderTexture>(depthMapResource, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, srvHandle, dsvDescriptors, isCubeMap);
+		return std::make_unique<RenderTexture>(depthMapResource, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, dsvDescriptors, srvDesc, isCubeMap);
 	}
 
 	std::unique_ptr<RenderTexture> ResourceManager::CreateRenderTargetTexture(DirectX::XMINT2 dimensions, DXGI_FORMAT format, UINT mipLevels)
@@ -442,10 +439,28 @@ namespace DX12Engine
 		srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
 		srvDesc.Texture2D.MipLevels = mipLevels;
 
-		DescriptorHeapHandle srvHandle = m_HeapManager->GetRenderHeapHandleBlock(1);
-		m_Device->CreateShaderResourceView(renderTargetResource, &srvDesc, srvHandle.GetCPUHandle());
+		return std::make_unique<RenderTexture>(renderTargetResource, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, rtvDescriptors, srvDesc, false);
+	}
 
-		return std::make_unique<RenderTexture>(renderTargetResource, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, srvHandle, rtvDescriptors, false);
+	void ResourceManager::UpdateSRVDescriptors(std::vector<GPUResource*> resources)
+	{
+		DescriptorHeapHandle renderBlockStart = m_HeapManager->GetRenderHeapHandleBlock(resources.size());
+		D3D12_CPU_DESCRIPTOR_HANDLE currentCPUHandle = renderBlockStart.GetCPUHandle();
+		D3D12_GPU_DESCRIPTOR_HANDLE currentGPUHandle = renderBlockStart.GetGPUHandle();
+		UINT descriptorSize = m_HeapManager->GetRenderPassHeap().GetDescriptorSize();
+		for (GPUResource* resource : resources)
+		{
+			D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = resource->GetSRVDesc();
+			m_Device->CreateShaderResourceView(resource->GetResource(), &srvDesc, currentCPUHandle);
+
+			DescriptorHeapHandle currentDescriptor;
+			currentDescriptor.SetCPUHandle(currentCPUHandle);
+			currentDescriptor.SetGPUHandle(currentGPUHandle);
+			resource->SetDescriptor(currentDescriptor);
+
+			currentCPUHandle.ptr += descriptorSize;
+			currentGPUHandle.ptr += descriptorSize;
+		}
 	}
 
 	Microsoft::WRL::ComPtr<ID3D12PipelineState> ResourceManager::CreatePipelineState(const D3D12_GRAPHICS_PIPELINE_STATE_DESC& desc)

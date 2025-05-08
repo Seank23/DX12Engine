@@ -35,14 +35,11 @@ namespace DX12Engine
 		void AddInputResources(std::vector<GPUResource*> resources) 
 		{ 
 			m_InputResources.insert(m_InputResources.end(), resources.begin(), resources.end());
-			AddDescriptorTableConfig({ 1, D3D12_DESCRIPTOR_RANGE_TYPE_SRV, m_InputResourceCount });
-			m_InputResourceCount += resources.size();
 		}
 		void SetRenderObjects(std::vector<RenderObject*> renderObjects) { m_RenderObjects = renderObjects; }
 		virtual RenderTexture* GetRenderTarget(RenderTargetType type) = 0;
 
 		void AddDescriptorTableConfig(DescriptorTableConfig config) { m_DescriptorTableConfigs.push_back(config); }
-		UINT GetInputResourceCount() const { return m_InputResourceCount; }
 
 	protected:
 		RenderContext& m_RenderContext;
@@ -53,7 +50,5 @@ namespace DX12Engine
 		std::vector<DescriptorTableConfig> m_DescriptorTableConfigs;
 		std::vector<std::unique_ptr<RenderTexture>> m_RenderTargets;
 		std::vector<RenderObject*> m_RenderObjects;
-
-		UINT m_InputResourceCount = 0;
 	};
 }
