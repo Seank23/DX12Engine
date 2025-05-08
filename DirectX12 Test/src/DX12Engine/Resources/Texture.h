@@ -5,6 +5,15 @@
 
 namespace DX12Engine
 {
+	enum TextureType
+	{
+		Albedo,
+		Normal,
+		Metallic,
+		Roughness,
+		AOMap
+	};
+
 	class Texture : public GPUResource
 	{
 	public:

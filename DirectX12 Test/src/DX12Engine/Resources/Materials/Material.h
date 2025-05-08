@@ -6,19 +6,11 @@
 #include "../../Rendering/RootSignatureBuilder.h"
 #include "../../Buffers/ConstantBuffer.h"
 #include "./MaterialData.h"
+#include "../Texture.h"
+#include <unordered_map>
 
 namespace DX12Engine
 {
-	class Texture;
-
-	enum TextureType
-	{
-		Albedo,
-		Normal,
-		Metallic,
-		Roughness,
-		AOMap
-	};
 
 	class Material
 	{
@@ -32,6 +24,8 @@ namespace DX12Engine
 		virtual bool HasTexture(TextureType type) = 0;
 
 		virtual void Bind(ID3D12GraphicsCommandList* commandList, int* startIndex);
+
+		virtual void SetAllTextures(std::unordered_map<TextureType, std::shared_ptr<Texture>> textures) = 0;
 
 		PipelineStateBuilder PipelineStateBuilder;
 		RootSignatureBuilder RootSignatureBuilder;

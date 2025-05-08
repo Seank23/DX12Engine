@@ -54,4 +54,17 @@ namespace DX12Engine
 		if (HasTexture(TextureType::Albedo))
 			commandList->SetGraphicsRootDescriptorTable(*startIndex, m_Texture->GetGPUHandle());
 	}
+
+	void BasicMaterial::SetAllTextures(std::unordered_map<TextureType, std::shared_ptr<Texture>> textures)
+	{
+		for (auto& texture : textures)
+		{
+			switch (texture.first)
+			{
+			case TextureType::Albedo:
+				SetTexture(texture.second);
+				break;
+			}
+		}
+	}
 }	

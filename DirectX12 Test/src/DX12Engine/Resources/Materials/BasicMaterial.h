@@ -18,6 +18,8 @@ namespace DX12Engine
 
 		virtual void Bind(ID3D12GraphicsCommandList* commandList, int* startIndex) override;
 
+		virtual void SetAllTextures(std::unordered_map<TextureType, std::shared_ptr<Texture>> textures) override;
+
 	private:
 		BasicMaterialData m_MaterialData;
 		std::shared_ptr<Texture> m_Texture;

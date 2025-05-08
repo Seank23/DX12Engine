@@ -56,6 +56,31 @@ namespace DX12Engine
 			commandList->SetGraphicsRootDescriptorTable((*startIndex)++, m_AlbedoMap->GetGPUHandle());
 	}
 
+	void PBRMaterial::SetAllTextures(std::unordered_map<TextureType, std::shared_ptr<Texture>> textures)
+	{
+		for (auto& texture : textures)
+		{
+			switch (texture.first)
+			{
+			case TextureType::Albedo:
+				SetAlbedoMap(texture.second);
+				break;
+			case TextureType::Normal:
+				SetNormalMap(texture.second);
+				break;
+			case TextureType::Metallic:
+				SetMetallicMap(texture.second);
+				break;
+			case TextureType::Roughness:
+				SetRoughnessMap(texture.second);
+				break;
+			case TextureType::AOMap:
+				SetAOMap(texture.second);
+				break;
+			}
+		}
+	}
+
 	void PBRMaterial::SetAlbedo(DirectX::XMFLOAT3 albedo)
 	{
 		m_MaterialData.Albedo = albedo;

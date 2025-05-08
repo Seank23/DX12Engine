@@ -15,6 +15,8 @@ namespace DX12Engine
 
 		virtual void Bind(ID3D12GraphicsCommandList* commandList, int* startIndex) override;
 
+		virtual void SetAllTextures(std::unordered_map<TextureType, std::shared_ptr<Texture>> textures) override;
+
 		void SetAlbedoMap(std::shared_ptr<Texture> albedoMap) { m_AlbedoMap = albedoMap; }
 		void SetNormalMap(std::shared_ptr<Texture> normalMap) { m_NormalMap = normalMap; }
 		void SetMetallicMap(std::shared_ptr<Texture> metallicMap) { m_MetallicMap = metallicMap; }

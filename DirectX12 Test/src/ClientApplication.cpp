@@ -44,74 +44,32 @@ ClientApplication::ClientApplication()
 	textures = { skyboxCube.get(), skyboxIrradiance.get() };
 	uploader.UploadTextureBatch(textures);
 
-	std::shared_ptr<DX12Engine::Texture> stoneAlbedo = textureLoader.LoadWIC(DX12Engine::ResourceManager::GetResourcePath("dark-worn-stone-ue\\dark-worn-stonework_albedo.png"));
-	std::shared_ptr<DX12Engine::Texture> stoneNormal = textureLoader.LoadWIC(DX12Engine::ResourceManager::GetResourcePath("dark-worn-stone-ue\\dark-worn-stonework_normal-dx.png"));
-	std::shared_ptr<DX12Engine::Texture> stoneMetallic = textureLoader.LoadWIC(DX12Engine::ResourceManager::GetResourcePath("dark-worn-stone-ue\\dark-worn-stonework_metallic.png"));
-	std::shared_ptr<DX12Engine::Texture> stoneRoughness = textureLoader.LoadWIC(DX12Engine::ResourceManager::GetResourcePath("dark-worn-stone-ue\\dark-worn-stonework_roughness.png"));
-	std::shared_ptr<DX12Engine::Texture> stoneAO = textureLoader.LoadWIC(DX12Engine::ResourceManager::GetResourcePath("dark-worn-stone-ue\\dark-worn-stonework_ao.png"));
-	textures = { stoneAlbedo.get(), stoneNormal.get(), stoneMetallic.get(), stoneRoughness.get(), stoneAO.get() };
-	uploader.UploadTextureBatch(textures);
+	auto brickTextures = textureLoader.LoadMaterial(DX12Engine::ResourceManager::GetResourcePath("dark-worn-stone-ue"));
+	uploader.UploadTextureBatch(DX12Engine::TextureLoader::GetTextureArray(brickTextures));
+	auto goldTextures = textureLoader.LoadMaterial(DX12Engine::ResourceManager::GetResourcePath("hammered-gold-ue"));
+	uploader.UploadTextureBatch(DX12Engine::TextureLoader::GetTextureArray(goldTextures));
+	auto concreteTextures = textureLoader.LoadMaterial(DX12Engine::ResourceManager::GetResourcePath("clean-concrete-ue"));
+	uploader.UploadTextureBatch(DX12Engine::TextureLoader::GetTextureArray(concreteTextures));
+	auto wornMetalTextures = textureLoader.LoadMaterial(DX12Engine::ResourceManager::GetResourcePath("worn-shiny-metal-ue"));
+	uploader.UploadTextureBatch(DX12Engine::TextureLoader::GetTextureArray(wornMetalTextures));
 
-	std::shared_ptr<DX12Engine::Texture> goldAlbedo = textureLoader.LoadWIC(DX12Engine::ResourceManager::GetResourcePath("hammered-gold-ue\\hammered-gold_albedo.png"));
-	std::shared_ptr<DX12Engine::Texture> goldNormal = textureLoader.LoadWIC(DX12Engine::ResourceManager::GetResourcePath("hammered-gold-ue\\hammered-gold_normal-dx.png"));
-	std::shared_ptr<DX12Engine::Texture> goldMetallic = textureLoader.LoadWIC(DX12Engine::ResourceManager::GetResourcePath("hammered-gold-ue\\hammered-gold_metallic.png"));
-	std::shared_ptr<DX12Engine::Texture> goldRoughness = textureLoader.LoadWIC(DX12Engine::ResourceManager::GetResourcePath("hammered-gold-ue\\hammered-gold_roughness.png"));
-	std::shared_ptr<DX12Engine::Texture> goldAO = textureLoader.LoadWIC(DX12Engine::ResourceManager::GetResourcePath("hammered-gold-ue\\hammered-gold_ao.png"));
-	textures = { goldAlbedo.get(), goldNormal.get(), goldMetallic.get(), goldRoughness.get(), goldAO.get(), };
-	uploader.UploadTextureBatch(textures);
-
-	std::shared_ptr<DX12Engine::Texture> concreteAlbedo = textureLoader.LoadWIC(DX12Engine::ResourceManager::GetResourcePath("clean-concrete-ue\\clean-concrete_albedo.png"));
-	std::shared_ptr<DX12Engine::Texture> concreteNormal = textureLoader.LoadWIC(DX12Engine::ResourceManager::GetResourcePath("clean-concrete-ue\\clean-concrete_normal-dx.png"));
-	std::shared_ptr<DX12Engine::Texture> concreteMetallic = textureLoader.LoadWIC(DX12Engine::ResourceManager::GetResourcePath("clean-concrete-ue\\clean-concrete_metallic.png"));
-	std::shared_ptr<DX12Engine::Texture> concreteRoughness = textureLoader.LoadWIC(DX12Engine::ResourceManager::GetResourcePath("clean-concrete-ue\\clean-concrete_roughness.png"));
-	std::shared_ptr<DX12Engine::Texture> concreteAO = textureLoader.LoadWIC(DX12Engine::ResourceManager::GetResourcePath("clean-concrete-ue\\clean-concrete_ao.png"));
-	textures = { concreteAlbedo.get(), concreteNormal.get(), concreteMetallic.get(), concreteRoughness.get(), concreteAO.get(), };
-	uploader.UploadTextureBatch(textures);
-
-	std::shared_ptr<DX12Engine::Texture> wornMetalAlbedo = textureLoader.LoadWIC(DX12Engine::ResourceManager::GetResourcePath("worn-shiny-metal-ue\\worn-shiny-metal-albedo.png"));
-	std::shared_ptr<DX12Engine::Texture> wornMetalNormal = textureLoader.LoadWIC(DX12Engine::ResourceManager::GetResourcePath("worn-shiny-metal-ue\\worn-shiny-metal-Normal-dx.png"));
-	std::shared_ptr<DX12Engine::Texture> wornMetalMetallic = textureLoader.LoadWIC(DX12Engine::ResourceManager::GetResourcePath("worn-shiny-metal-ue\\worn-shiny-metal-Metallic.png"));
-	std::shared_ptr<DX12Engine::Texture> wornMetalRoughness = textureLoader.LoadWIC(DX12Engine::ResourceManager::GetResourcePath("worn-shiny-metal-ue\\worn-shiny-metal-Roughness.png"));
-	std::shared_ptr<DX12Engine::Texture> wornMetalAO = textureLoader.LoadWIC(DX12Engine::ResourceManager::GetResourcePath("worn-shiny-metal-ue\\worn-shiny-metal-ao.png"));
-	textures = { wornMetalAlbedo.get(), wornMetalNormal.get(), wornMetalMetallic.get(), wornMetalRoughness.get(), wornMetalAO.get(), };
-	uploader.UploadTextureBatch(textures);
-
-	std::shared_ptr<DX12Engine::PBRMaterial> pbrStone = std::make_shared<DX12Engine::PBRMaterial>();
-	pbrStone->SetAlbedoMap(stoneAlbedo);
-	pbrStone->SetNormalMap(stoneNormal);
-	pbrStone->SetMetallicMap(stoneMetallic);
-	pbrStone->SetRoughnessMap(stoneRoughness);
-	pbrStone->SetAOMap(stoneAO);
-
+	std::shared_ptr<DX12Engine::PBRMaterial> pbrBrick = std::make_shared<DX12Engine::PBRMaterial>();
+	pbrBrick->SetAllTextures(brickTextures);
 	std::shared_ptr<DX12Engine::PBRMaterial> pbrGold = std::make_shared<DX12Engine::PBRMaterial>();
-	pbrGold->SetAlbedoMap(goldAlbedo);
-	pbrGold->SetNormalMap(goldNormal);
-	pbrGold->SetMetallicMap(goldMetallic);
-	pbrGold->SetRoughnessMap(goldRoughness);
-	pbrGold->SetAOMap(goldAO);
-
+	pbrGold->SetAllTextures(goldTextures);
 	std::shared_ptr<DX12Engine::PBRMaterial> pbrConcrete = std::make_shared<DX12Engine::PBRMaterial>();
-	pbrConcrete->SetAlbedoMap(concreteAlbedo);
-	pbrConcrete->SetNormalMap(concreteNormal);
-	pbrConcrete->SetMetallicMap(concreteMetallic);
-	pbrConcrete->SetRoughnessMap(concreteRoughness);
-	pbrConcrete->SetAOMap(concreteAO);
-
+	pbrConcrete->SetAllTextures(concreteTextures);
 	std::shared_ptr<DX12Engine::PBRMaterial> pbrWornMetal = std::make_shared<DX12Engine::PBRMaterial>();
-	pbrWornMetal->SetAlbedoMap(wornMetalAlbedo);
-	pbrWornMetal->SetNormalMap(wornMetalNormal);
-	pbrWornMetal->SetMetallicMap(wornMetalMetallic);
-	pbrWornMetal->SetRoughnessMap(wornMetalRoughness);
-	pbrWornMetal->SetAOMap(wornMetalAO);
+	pbrWornMetal->SetAllTextures(wornMetalTextures);
 
 	DX12Engine::RenderObject object1(mesh);
 	DX12Engine::RenderObject object2(mesh2);
 	DX12Engine::RenderObject floor(floorMesh);
 	DX12Engine::RenderObject wallBack(floorMesh);
-	object1.SetMaterial(pbrStone);
+	object1.SetMaterial(pbrBrick);
 	object2.SetMaterial(pbrGold);
 	floor.SetMaterial(pbrWornMetal);
-	wallBack.SetMaterial(pbrConcrete);
+	wallBack.SetMaterial(pbrWornMetal);
 	object1.Move({ -1.5f, 0.0f, 0.0f });
 	object2.Move({ 1.5f, 0.0f, 0.0f });
 	floor.Move({ 0.0f, -1.0f, 0.0f });
