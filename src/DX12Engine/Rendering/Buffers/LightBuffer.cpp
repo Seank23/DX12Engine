@@ -1,5 +1,6 @@
 #include "LightBuffer.h"
-#include "../Resources/ResourceManager.h"
+#include "../../Resources/ResourceManager.h"
+#include "../../Utils/EngineUtils.h"
 
 namespace DX12Engine
 {
@@ -23,12 +24,17 @@ namespace DX12Engine
 		m_ConstantBuffer->Update(&m_LightsBufferData, sizeof(LightBufferData));
 	}
 
-	void LightBuffer::AddLight(Light* light)
+	void LightBuffer::AddLight(std::shared_ptr<Light> light)
 	{
 		m_Lights.push_back(light);
 		m_LightsByTypeMap[light->GetType()].push_back(m_LightsBufferData.LightCount);
 		m_LightsBufferData.Lights[m_LightsBufferData.LightCount++] = light->GetLightData();
 		Update();
+	}
+
+	std::vector<Light*> LightBuffer::GetAllLights()
+	{
+		return EngineUtils::VectorSharedPtrToPtrs(m_Lights);
 	}
 
 	std::vector<Light*> LightBuffer::GetLightsByType(std::vector<LightType> types)
@@ -38,7 +44,7 @@ namespace DX12Engine
 		{
 			std::vector indices = m_LightsByTypeMap[type];
 			for (int index : indices)
-				lightsByType.push_back(m_Lights[index]);
+				lightsByType.push_back(m_Lights[index].get());
 		}
 		return lightsByType;
 	}

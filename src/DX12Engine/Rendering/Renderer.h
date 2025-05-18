@@ -2,8 +2,8 @@
 #include "RenderContext.h"
 #include "RenderObject.h"
 #include "../Resources/Texture.h"
-#include "../Heaps/RenderPassDescriptorHeap.h"
-#include "../Buffers/LightBuffer.h"
+#include "Heaps/RenderPassDescriptorHeap.h"
+#include "Buffers/LightBuffer.h"
 #include "../Input/Camera.h"
 #include "../Resources/RenderTexture.h"
 
@@ -26,7 +26,7 @@ namespace DX12Engine
 		~Renderer();
 
 		bool PollWindow();
-		void UpdateObjectList(std::vector<RenderObject*> objects);
+		void UpdateObjectList(std::vector<std::shared_ptr<RenderObject>> objects);
 		void ExecutePipeline(RenderPipeline pipeline);
 
 		std::unique_ptr<std::vector<RenderTargetType>> GetTargets(std::vector<RenderTargetType> targets);

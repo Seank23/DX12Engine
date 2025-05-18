@@ -1,6 +1,6 @@
 #pragma once
 #include "d3dx12.h"
-#include "../Heaps/DescriptorHeapHandle.h"
+#include "../Rendering/Heaps/DescriptorHeapHandle.h"
 
 namespace DX12Engine
 {

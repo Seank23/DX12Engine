@@ -30,5 +30,17 @@ namespace DX12Engine
 			UINT alignmentCount = ceil((float)value / placement);
 			return alignmentCount * placement;
 		}
+
+		template<typename T>
+		static std::vector<T*> VectorSharedPtrToPtrs(const std::vector<std::shared_ptr<T>>& vec)
+		{
+			std::vector<T*> result;
+			result.reserve(vec.size());
+			for (const auto& item : vec)
+			{
+				result.push_back(item.get());
+			}
+			return result;
+		}
 	};
 }

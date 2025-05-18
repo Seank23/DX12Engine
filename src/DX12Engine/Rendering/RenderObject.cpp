@@ -3,6 +3,11 @@
 
 namespace DX12Engine
 {
+	RenderObject::RenderObject()
+		: m_ModelMatrix(DirectX::XMMatrixIdentity()), m_Position({ 0.0f, 0.0f, 0.0f }), m_Scale({ 1.0f, 1.0f, 1.0f }), m_Rotation(DirectX::XMQuaternionIdentity())
+	{
+	}
+
 	RenderObject::RenderObject(Mesh mesh)
 		: m_ModelMatrix(DirectX::XMMatrixIdentity()), m_Position({ 0.0f, 0.0f, 0.0f }), m_Scale({ 1.0f, 1.0f, 1.0f }), m_Rotation(DirectX::XMQuaternionIdentity())
 	{

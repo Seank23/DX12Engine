@@ -1,5 +1,5 @@
 #pragma once
-#include "../Queues/CommandQueueManager.h"
+#include "Queues/CommandQueueManager.h"
 #include "../Resources/Texture.h"
 #include "../Resources/UploadResourceWrapper.h"
 

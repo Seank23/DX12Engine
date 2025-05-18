@@ -1,6 +1,6 @@
 #include "Renderer.h"
-#include "../Heaps/DescriptorHeapHandle.h"
-#include "../Heaps/DescriptorHeapManager.h"
+#include "Heaps/DescriptorHeapHandle.h"
+#include "Heaps/DescriptorHeapManager.h"
 #include "../Resources/ResourceManager.h"
 #include "RenderPass/RenderPass.h"
 #include "RenderPass/ShadowMapRenderPass.h"
@@ -101,9 +101,9 @@ namespace DX12Engine
 		return m_RenderContext->ProcessWindowMessages();
 	}
 
-	void Renderer::UpdateObjectList(std::vector<RenderObject*> objects)
+	void Renderer::UpdateObjectList(std::vector<std::shared_ptr<RenderObject>> objects)
 	{
-		for (RenderObject* obj : objects)
+		for (std::shared_ptr<RenderObject> obj : objects)
 		{
 			obj->UpdateConstantBufferData(m_Camera->GetViewMatrix(), m_Camera->GetProjectionMatrix(), m_Camera->GetPosition());
 		}
@@ -143,7 +143,7 @@ namespace DX12Engine
 						switch (inputResource.first)
 						{
 						case InputResourceType::SceneObjects:
-							renderPass->SetRenderObjects(*static_cast<std::vector<RenderObject*>*>(inputResource.second));
+							renderPass->SetRenderObjects(*static_cast<std::vector<std::shared_ptr<RenderObject>>*>(inputResource.second));
 							break;
 						case InputResourceType::RenderTargets_ShadowMap:
 							for (auto& target : *static_cast<std::vector<RenderTargetType>*>(inputResource.second))
@@ -162,7 +162,7 @@ namespace DX12Engine
 								renderPass->AddInputResources({ pipeline.RenderPasses[renderPassOrder[RenderPassType::Lighting]]->GetRenderTarget(target) });
 							break;
 						case InputResourceType::ExternalTextures:
-							for (auto& texture : *static_cast<std::vector<Texture*>*>(inputResource.second))
+							for (auto& texture : *static_cast<std::vector<std::shared_ptr<Texture>>*>(inputResource.second))
 								renderPass->AddInputResources({ texture });
 							break;
 						}

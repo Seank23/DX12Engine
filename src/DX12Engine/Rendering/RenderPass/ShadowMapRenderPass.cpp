@@ -81,7 +81,7 @@ namespace DX12Engine
 
 		m_CommandList.IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
-		for (RenderObject* object : m_RenderObjects)
+		for (std::shared_ptr<RenderObject> object : m_RenderObjects)
 		{
 			DirectX::XMMATRIX mvpMatrix = DirectX::XMMatrixMultiply(object->GetModelMatrix(), m_Lights[lightIndex]->GetViewProjMatrix());
 			m_ShadowMapData.LightMVPMatrix = mvpMatrix;
@@ -149,7 +149,7 @@ namespace DX12Engine
 
 			m_CommandList.IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
-			for (RenderObject* object : m_RenderObjects)
+			for (std::shared_ptr<RenderObject> object : m_RenderObjects)
 			{
 				DirectX::XMMATRIX mvpMatrix = DirectX::XMMatrixMultiply(object->GetModelMatrix(), lightViewProj);
 				m_ShadowMapData.LightMVPMatrix = mvpMatrix;

@@ -1,7 +1,7 @@
 #pragma once
 #include <d3dx12.h>
 #include "../RenderContext.h"
-#include "../../Queues/CommandQueueManager.h"
+#include "../Queues/CommandQueueManager.h"
 #include "../RootSignatureBuilder.h"
 
 namespace DX12Engine
@@ -36,7 +36,11 @@ namespace DX12Engine
 		{ 
 			m_InputResources.insert(m_InputResources.end(), resources.begin(), resources.end());
 		}
-		void SetRenderObjects(std::vector<RenderObject*> renderObjects) { m_RenderObjects = renderObjects; }
+		void AddInputResources(std::vector<std::shared_ptr<GPUResource>> resources)
+		{
+			m_InputResources.insert(m_InputResources.end(), resources.begin(), resources.end());
+		}
+		void SetRenderObjects(std::vector<std::shared_ptr<RenderObject>> renderObjects) { m_RenderObjects = renderObjects; }
 		virtual RenderTexture* GetRenderTarget(RenderTargetType type) = 0;
 
 		void AddDescriptorTableConfig(DescriptorTableConfig config) { m_DescriptorTableConfigs.push_back(config); }
@@ -46,9 +50,9 @@ namespace DX12Engine
 		CommandQueueManager& m_QueueManager;
 		ID3D12GraphicsCommandList& m_CommandList;
 
-		std::vector<GPUResource*> m_InputResources;
+		std::vector<std::shared_ptr<GPUResource>> m_InputResources;
 		std::vector<DescriptorTableConfig> m_DescriptorTableConfigs;
 		std::vector<std::unique_ptr<RenderTexture>> m_RenderTargets;
-		std::vector<RenderObject*> m_RenderObjects;
+		std::vector<std::shared_ptr<RenderObject>> m_RenderObjects;
 	};
 }

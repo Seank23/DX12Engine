@@ -1,7 +1,7 @@
 #include "GPUUploader.h"
 #include "../Utils/Constants.h"
 #include "./RenderContext.h"
-#include "../Heaps/RenderPassDescriptorHeap.h"
+#include "Heaps/RenderPassDescriptorHeap.h"
 
 namespace DX12Engine
 {

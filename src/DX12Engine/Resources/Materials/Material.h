@@ -4,7 +4,7 @@
 #include <DirectXMath.h>
 #include "../../Rendering/PipelineStateBuilder.h" 
 #include "../../Rendering/RootSignatureBuilder.h"
-#include "../../Buffers/ConstantBuffer.h"
+#include "../../Rendering/Buffers/ConstantBuffer.h"
 #include "./MaterialData.h"
 #include "../Texture.h"
 #include <unordered_map>

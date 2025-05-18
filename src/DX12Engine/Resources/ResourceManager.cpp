@@ -1,5 +1,5 @@
 #include "ResourceManager.h"
-#include "../Heaps/DescriptorHeapManager.h"
+#include "../Rendering/Heaps/DescriptorHeapManager.h"
 #include "../Utils/EngineUtils.h"
 #include "../Utils/Constants.h"
 #include "UploadResourceWrapper.h"

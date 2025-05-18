@@ -3,8 +3,9 @@
 #include "../RenderContext.h"
 #include "../PipelineStateBuilder.h"
 #include "../RootSignatureBuilder.h"
-#include "../../Buffers/ConstantBuffer.h"
+#include "../Buffers/ConstantBuffer.h"
 #include "../../Input/Camera.h"
+#include "../../Utils/EngineUtils.h"
 
 namespace DX12Engine
 {
@@ -22,7 +23,7 @@ namespace DX12Engine
 		DirectX::XMINT2 windowSize = m_RenderContext.GetWindowSize();
 		m_RenderTargets.emplace_back(ResourceManager::GetInstance().CreateRenderTargetTexture(DirectX::XMINT2(windowSize.x, windowSize.y), DXGI_FORMAT_R8G8B8A8_UNORM));
 
-		ResourceManager::GetInstance().UpdateSRVDescriptors(m_InputResources);
+		ResourceManager::GetInstance().UpdateSRVDescriptors(EngineUtils::VectorSharedPtrToPtrs(m_InputResources));
 		ResourceManager::GetInstance().UpdateSRVDescriptors(reinterpret_cast<std::vector<GPUResource*> const&>(m_RenderTargets));
 		AddDescriptorTableConfig({ (UINT)m_InputResources.size(), D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 0 });
 

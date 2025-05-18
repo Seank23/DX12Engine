@@ -10,13 +10,13 @@
 #include <memory>
 #include <DirectXTex.h>
 
-#include "../Buffers/VertexBuffer.h"
-#include "../Buffers/IndexBuffer.h"
-#include "../Buffers/ConstantBuffer.h"
+#include "../Rendering/Buffers/VertexBuffer.h"
+#include "../Rendering/Buffers/IndexBuffer.h"
+#include "../Rendering/Buffers/ConstantBuffer.h"
 #include "../Resources/Mesh.h"
 #include "../Resources/Texture.h"
 #include "../Resources/RenderTexture.h"
-#include "../Heaps/DescriptorHeapManager.h"
+#include "../Rendering/Heaps/DescriptorHeapManager.h"
 #include "../Rendering/RenderContext.h"
 #include "../Rendering/GPUUploader.h"
 #include "../Rendering/PipelineStateCache.h"

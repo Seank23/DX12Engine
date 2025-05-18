@@ -1,5 +1,5 @@
 #pragma once
-#include "../Resources/GPUResource.h"
+#include "../../Resources/GPUResource.h"
 #include "../Heaps/DescriptorHeapHandle.h"
 
 namespace DX12Engine

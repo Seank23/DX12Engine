@@ -1,7 +1,7 @@
 #pragma once
 #include "RenderWindow.h"
-#include "../Queues/CommandQueueManager.h"
-#include "../Heaps/DescriptorHeapManager.h"
+#include "Queues/CommandQueueManager.h"
+#include "Heaps/DescriptorHeapManager.h"
 #include "../Resources/Shader.h"
 #include "../Rendering/GPUUploader.h"
 #include "../Application.h"

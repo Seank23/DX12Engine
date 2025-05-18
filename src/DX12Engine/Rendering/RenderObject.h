@@ -1,8 +1,8 @@
 #pragma once
 #include "../Resources/Mesh.h"
-#include "../Buffers/VertexBuffer.h"
-#include "../Buffers/IndexBuffer.h"
-#include "../Buffers/ConstantBuffer.h"
+#include "../Rendering/Buffers/VertexBuffer.h"
+#include "../Rendering/Buffers/IndexBuffer.h"
+#include "../Rendering/Buffers/ConstantBuffer.h"
 #include "../Resources/Materials/Material.h"
 
 namespace DX12Engine
@@ -26,7 +26,7 @@ namespace DX12Engine
 		friend class Renderer;
 		friend class ProceduralRenderer;
 
-		RenderObject() = default;
+		RenderObject();
 		RenderObject(Mesh mesh);
 		~RenderObject();
 
