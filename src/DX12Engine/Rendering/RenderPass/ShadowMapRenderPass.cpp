@@ -3,7 +3,7 @@
 #include "../../Resources/RenderTexture.h"
 #include "../../Resources/ResourceManager.h"
 #include "../../Utils/Constants.h"
-#include "../RenderObject.h"
+#include "../../Entity/RenderComponent.h"
 #include "../../Resources/Light.h"
 #include "../../Utils/EngineUtils.h"
 
@@ -81,7 +81,7 @@ namespace DX12Engine
 
 		m_CommandList.IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
-		for (std::shared_ptr<RenderObject> object : m_RenderObjects)
+		for (RenderComponent* object : m_RenderObjects)
 		{
 			DirectX::XMMATRIX mvpMatrix = DirectX::XMMatrixMultiply(object->GetModelMatrix(), m_Lights[lightIndex]->GetViewProjMatrix());
 			m_ShadowMapData.LightMVPMatrix = mvpMatrix;
@@ -149,7 +149,7 @@ namespace DX12Engine
 
 			m_CommandList.IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
-			for (std::shared_ptr<RenderObject> object : m_RenderObjects)
+			for (RenderComponent* object : m_RenderObjects)
 			{
 				DirectX::XMMATRIX mvpMatrix = DirectX::XMMatrixMultiply(object->GetModelMatrix(), lightViewProj);
 				m_ShadowMapData.LightMVPMatrix = mvpMatrix;

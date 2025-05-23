@@ -1,6 +1,5 @@
 #pragma once
 #include "RenderContext.h"
-#include "RenderObject.h"
 #include "../Resources/Texture.h"
 #include "Heaps/RenderPassDescriptorHeap.h"
 #include "Buffers/LightBuffer.h"
@@ -10,6 +9,7 @@
 namespace DX12Engine
 {
 	class RenderPass;
+	class GameObject;
 	struct RenderPipelineConfig;
 	enum class RenderPassType;
 	enum class RenderTargetType;
@@ -26,7 +26,7 @@ namespace DX12Engine
 		~Renderer();
 
 		bool PollWindow();
-		void UpdateObjectList(std::vector<std::shared_ptr<RenderObject>> objects);
+		void UpdateObjectList(std::vector<std::shared_ptr<GameObject>> objects);
 		void ExecutePipeline(RenderPipeline pipeline);
 
 		std::unique_ptr<std::vector<RenderTargetType>> GetTargets(std::vector<RenderTargetType> targets);

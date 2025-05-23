@@ -1,4 +1,5 @@
 #pragma once
+#include "Component.h"
 #include "../Resources/Mesh.h"
 #include "../Rendering/Buffers/VertexBuffer.h"
 #include "../Rendering/Buffers/IndexBuffer.h"
@@ -7,7 +8,7 @@
 
 namespace DX12Engine
 {
-	struct RenderObjectData
+	struct RenderComponentData
 	{
 		DirectX::XMMATRIX ModelMatrix;
 		DirectX::XMMATRIX NormalMatrix;
@@ -20,15 +21,16 @@ namespace DX12Engine
 		float Padding;
 	};
 
-	class RenderObject
+	class GameObject;
+
+	class RenderComponent : public Component
 	{
 	public:
 		friend class Renderer;
 		friend class ProceduralRenderer;
 
-		RenderObject();
-		RenderObject(Mesh mesh);
-		~RenderObject();
+		RenderComponent(GameObject* parent);
+		~RenderComponent();
 
 		void SetMesh(Mesh mesh);
 		void SetModelMatrix(DirectX::XMMATRIX modelMatrix) { m_ModelMatrix = modelMatrix; }	
@@ -53,7 +55,7 @@ namespace DX12Engine
 		std::unique_ptr<VertexBuffer> m_VertexBuffer;
 		std::unique_ptr<IndexBuffer> m_IndexBuffer;
 		std::unique_ptr<ConstantBuffer> m_ConstantBuffer;
-		RenderObjectData m_RenderObjectData;
+		RenderComponentData m_RenderObjectData;
 		DirectX::XMMATRIX m_ModelMatrix;
 		std::shared_ptr<Material> m_Material;
 

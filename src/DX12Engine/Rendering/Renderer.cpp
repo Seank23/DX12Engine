@@ -8,6 +8,8 @@
 #include "RenderPass/LightingRenderPass.h"
 #include "RenderPass/SSRRenderPass.h"
 #include "RenderPipelineConfig.h"
+#include "../Entity/GameObject.h"
+#include "../Entity/RenderComponent.h"
 
 namespace DX12Engine
 {
@@ -101,11 +103,11 @@ namespace DX12Engine
 		return m_RenderContext->ProcessWindowMessages();
 	}
 
-	void Renderer::UpdateObjectList(std::vector<std::shared_ptr<RenderObject>> objects)
+	void Renderer::UpdateObjectList(std::vector<std::shared_ptr<GameObject>> objects)
 	{
-		for (std::shared_ptr<RenderObject> obj : objects)
+		for (std::shared_ptr<GameObject> obj : objects)
 		{
-			obj->UpdateConstantBufferData(m_Camera->GetViewMatrix(), m_Camera->GetProjectionMatrix(), m_Camera->GetPosition());
+			obj->GetComponent<RenderComponent>()->UpdateConstantBufferData(m_Camera->GetViewMatrix(), m_Camera->GetProjectionMatrix(), m_Camera->GetPosition());
 		}
 	}
 
@@ -143,7 +145,7 @@ namespace DX12Engine
 						switch (inputResource.first)
 						{
 						case InputResourceType::SceneObjects:
-							renderPass->SetRenderObjects(*static_cast<std::vector<std::shared_ptr<RenderObject>>*>(inputResource.second));
+							renderPass->SetRenderObjects(*static_cast<std::vector<RenderComponent*>*>(inputResource.second));
 							break;
 						case InputResourceType::RenderTargets_ShadowMap:
 							for (auto& target : *static_cast<std::vector<RenderTargetType>*>(inputResource.second))

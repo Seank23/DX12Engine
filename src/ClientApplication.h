@@ -6,6 +6,7 @@
 #include "DX12Engine/Rendering/Buffers/LightBuffer.h"
 #include "DX12Engine/Rendering/Renderer.h"
 #include "DX12Engine/Rendering/RenderContext.h"
+#include "DX12Engine/Entity/GameObject.h"
 
 class ClientApplication : public DX12Engine::Application
 {
@@ -29,6 +30,6 @@ private:
 	std::unique_ptr<DX12Engine::LightBuffer> m_LightBuffer;
 	DX12Engine::RenderPipeline m_RenderPipeline;
 
-	std::vector<std::shared_ptr<DX12Engine::RenderObject>> m_SceneObjects;
+	DX12Engine::GameObjectContainer m_SceneObjects;
 };
 

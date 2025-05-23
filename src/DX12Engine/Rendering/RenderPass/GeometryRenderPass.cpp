@@ -1,7 +1,7 @@
 #include "GeometryRenderPass.h"
 #include "../../Resources/ResourceManager.h"
 #include "../RenderContext.h"
-#include "../RenderObject.h"
+#include "../../Entity/RenderComponent.h"
 
 namespace DX12Engine
 {
@@ -74,7 +74,7 @@ namespace DX12Engine
         auto srvHeap = m_RenderContext.GetHeapManager().GetRenderPassHeap().GetHeap();
         m_CommandList.SetDescriptorHeaps(1, &srvHeap);
 
-        for (std::shared_ptr<RenderObject> object : m_RenderObjects)
+        for (RenderComponent* object : m_RenderObjects)
         {
             m_CommandList.SetGraphicsRootConstantBufferView(0, object->GetCBVAddress());
             int startIndex = 1;

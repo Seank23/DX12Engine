@@ -4,7 +4,7 @@
 #include "DX12Engine/Resources/Shader.h"
 #include "DX12Engine/IO/ModelLoader.h"
 #include "DX12Engine/Resources/Mesh.h"
-#include "DX12Engine/Rendering/RenderObject.h"
+#include "DX12Engine/Entity/RenderComponent.h"
 #include "DX12Engine/IO/TextureLoader.h"
 #include "DX12Engine/Resources/Texture.h"
 #include "DX12Engine/Rendering/GPUUploader.h"
@@ -66,24 +66,24 @@ void ClientApplication::Init(std::shared_ptr<DX12Engine::RenderContext> renderCo
 	std::shared_ptr<DX12Engine::PBRMaterial> pbrWornMetal = std::make_shared<DX12Engine::PBRMaterial>();
 	pbrWornMetal->SetAllTextures(wornMetalTextures);
 
-	std::shared_ptr<DX12Engine::RenderObject> object1 = std::make_shared<DX12Engine::RenderObject>(mesh);
-	std::shared_ptr<DX12Engine::RenderObject> object2 = std::make_shared<DX12Engine::RenderObject>(mesh2);
-	std::shared_ptr<DX12Engine::RenderObject> floor = std::make_shared<DX12Engine::RenderObject>(floorMesh);
-	//std::shared_ptr<DX12Engine::RenderObject> wallBack = std::make_shared<DX12Engine::RenderObject>(floorMesh);
-	object1->SetMaterial(pbrBrick);
-	object2->SetMaterial(pbrGold);
-	floor->SetMaterial(pbrWornMetal);
-	//wallBack->SetMaterial(pbrWornMetal);
-	object1->Move({ -1.5f, 0.0f, 0.0f });
-	object2->Move({ 1.5f, 0.0f, 0.0f });
-	floor->Move({ 0.0f, -1.0f, 0.0f });
-	//wallBack->Move({ 0.0f, 4.0f, 5.0f });
-	//wallBack->Rotate({ -90.0f, 0.0f, 0.0f });
-
-	m_SceneObjects.push_back(object1);
-	m_SceneObjects.push_back(object2);
-	m_SceneObjects.push_back(floor);
-	//m_SceneObjects.push_back(wallBack);
+	std::shared_ptr<DX12Engine::GameObject> cube = std::make_shared<DX12Engine::GameObject>();
+	DX12Engine::RenderComponent* cubeRenderComp = cube->CreateComponent<DX12Engine::RenderComponent>();
+	cubeRenderComp->SetMesh(mesh);
+	cubeRenderComp->SetMaterial(pbrBrick);
+	cubeRenderComp->Move({ -1.5f, 0.0f, 0.0f });
+	m_SceneObjects.Add(cube);
+	std::shared_ptr<DX12Engine::GameObject> ball = std::make_shared<DX12Engine::GameObject>();
+	DX12Engine::RenderComponent* ballRenderComp = ball->CreateComponent<DX12Engine::RenderComponent>();
+	ballRenderComp->SetMesh(mesh2);
+	ballRenderComp->SetMaterial(pbrGold);
+	ballRenderComp->Move({ 1.5f, 0.0f, 0.0f });
+	m_SceneObjects.Add(ball);
+	std::shared_ptr<DX12Engine::GameObject> floor = std::make_shared<DX12Engine::GameObject>();
+	DX12Engine::RenderComponent* floorRenderComp = floor->CreateComponent<DX12Engine::RenderComponent>();
+	floorRenderComp->SetMesh(floorMesh);
+	floorRenderComp->SetMaterial(pbrWornMetal);
+	floorRenderComp->Move({ 0.0f, -1.0f, 0.0f });
+	m_SceneObjects.Add(floor);
 
 	m_LightBuffer = std::make_unique<DX12Engine::LightBuffer>();
 	std::shared_ptr<DX12Engine::Light> sunLight = std::make_shared<DX12Engine::Light>();
@@ -117,11 +117,13 @@ void ClientApplication::Init(std::shared_ptr<DX12Engine::RenderContext> renderCo
 	auto shadowCastingLights = m_LightBuffer->GetLightsByType({ DX12Engine::LightType::Directional, DX12Engine::LightType::Spot });
 	auto cubeShadowCastingLights = m_LightBuffer->GetLightsByType({ DX12Engine::LightType::Point });
 
+	std::vector<DX12Engine::RenderComponent*> renderComponents = m_SceneObjects.GetAllComponents<DX12Engine::RenderComponent>();
+
 	DX12Engine::RenderPipelineConfig pipelineConfig;
 	DX12Engine::RenderPassConfig shadowMapConfig;
 	shadowMapConfig.Type = DX12Engine::RenderPassType::ShadowMap;
 	shadowMapConfig.Count = 2;
-	shadowMapConfig.InputResources[DX12Engine::InputResourceType::SceneObjects] = &m_SceneObjects;
+	shadowMapConfig.InputResources[DX12Engine::InputResourceType::SceneObjects] = &renderComponents;
 	shadowMapConfig.InputResources[DX12Engine::InputResourceType::LightData] = &shadowCastingLights;
 	std::vector<DX12Engine::RenderTargetType> shadowBufferTypes{
 		DX12Engine::RenderTargetType::Depth
@@ -129,7 +131,7 @@ void ClientApplication::Init(std::shared_ptr<DX12Engine::RenderContext> renderCo
 
 	DX12Engine::RenderPassConfig cubeShadowMapConfig;
 	cubeShadowMapConfig.Type = DX12Engine::RenderPassType::CubeShadowMap;
-	cubeShadowMapConfig.InputResources[DX12Engine::InputResourceType::SceneObjects] = &m_SceneObjects;
+	cubeShadowMapConfig.InputResources[DX12Engine::InputResourceType::SceneObjects] = &renderComponents;
 	cubeShadowMapConfig.InputResources[DX12Engine::InputResourceType::LightData] = &cubeShadowCastingLights;
 	std::vector<DX12Engine::RenderTargetType> cubeShadowBufferTypes{
 		DX12Engine::RenderTargetType::Depth
@@ -137,7 +139,7 @@ void ClientApplication::Init(std::shared_ptr<DX12Engine::RenderContext> renderCo
 
 	DX12Engine::RenderPassConfig geometryConfig;
 	geometryConfig.Type = DX12Engine::RenderPassType::Geometry;
-	geometryConfig.InputResources[DX12Engine::InputResourceType::SceneObjects] = &m_SceneObjects;
+	geometryConfig.InputResources[DX12Engine::InputResourceType::SceneObjects] = &renderComponents;
 	std::vector<DX12Engine::RenderTargetType> gBufferTypes{
 		DX12Engine::RenderTargetType::Albedo,
 		DX12Engine::RenderTargetType::WorldNormal,
@@ -177,12 +179,12 @@ void ClientApplication::Update(float ts, float elapsed)
 {
 	m_Camera->ProcessKeyboardInput(0.01f);
 
-	m_SceneObjects[0]->Rotate({0.0f, 1.0f, 0.0f});
-	m_SceneObjects[1]->Rotate({ 1.0f, 0.0f, 0.0f });
-	m_SceneObjects[1]->Move({ 0.0f, sin(elapsed) * ts, 0.0f });
+	m_SceneObjects.Objects[0]->GetComponent<DX12Engine::RenderComponent>()->Rotate({0.0f, 1.0f, 0.0f});
+	m_SceneObjects.Objects[1]->GetComponent<DX12Engine::RenderComponent>()->Rotate({ 1.0f, 0.0f, 0.0f });
+	m_SceneObjects.Objects[1]->GetComponent<DX12Engine::RenderComponent>()->Move({ 0.0f, sin(elapsed) * ts, 0.0f });
 
 	m_LightBuffer->Update();
-	m_Renderer->UpdateObjectList(m_SceneObjects);
+	m_Renderer->UpdateObjectList(m_SceneObjects.Objects);
 
 	m_Renderer->ExecutePipeline(m_RenderPipeline);
 }
