@@ -1,14 +1,17 @@
 #pragma once
 #include "Component.h"
 #include <vector>
+#include <unordered_map>
+#include <string>
 #include <memory>
+#include <DirectXMath.h>
 
 namespace DX12Engine
 {
 	class GameObject
 	{
 	public:
-		GameObject() = default;
+		GameObject();
 		~GameObject() = default;
 
 		template<typename T>
@@ -33,8 +36,23 @@ namespace DX12Engine
 			return nullptr;
 		}
 
+		virtual void Init();
+		virtual void Update(float ts, float elapsed);
+
+		void Move(DirectX::XMFLOAT3 movement);
+		void Scale(DirectX::XMFLOAT3 scale);
+		void Rotate(DirectX::XMFLOAT3 rotation);
+
+		DirectX::XMVECTOR GetPosition() const { return m_Position; }
+		DirectX::XMVECTOR GetScale() const { return m_Scale; }
+		DirectX::XMVECTOR GetRotation() const { return m_Rotation; }
+
 	private:
 		std::vector<std::unique_ptr<Component>> m_Components;
+
+		DirectX::XMVECTOR m_Position;
+		DirectX::XMVECTOR m_Scale;
+		DirectX::XMVECTOR m_Rotation;
 	};
 
 	struct GameObjectContainer
@@ -43,19 +61,48 @@ namespace DX12Engine
 		std::vector<T*> GetAllComponents()
 		{
 			std::vector<T*> components;
-			for (std::shared_ptr<GameObject> obj : Objects)
+			auto values = GetAll();
+			for (std::shared_ptr<GameObject> obj : values)
 			{
 				components.push_back(obj->GetComponent<T>());
 			}
 			return components;
 		}
 
-		void Add(std::shared_ptr<GameObject> gameObject)
+		void Add(std::string name, std::shared_ptr<GameObject> gameObject)
 		{
-			Objects.push_back(gameObject);
+			Objects[name] = gameObject;
 		}
 
-		std::vector<std::shared_ptr<GameObject>> Objects;
+		std::shared_ptr<GameObject> Get(std::string name)
+		{
+			auto it = Objects.find(name);
+			if (it != Objects.end())
+			{
+				return it->second;
+			}
+			return nullptr;
+		}
+
+		std::vector<std::shared_ptr<GameObject>> GetAll()
+		{
+			std::vector<std::shared_ptr<GameObject>> values;
+			for (auto& obj : Objects)
+			{
+				values.push_back(obj.second);
+			}
+			return values;
+		}
+
+		void Update(float ts, float elapsed)
+		{
+			for (auto& obj : Objects)
+			{
+				obj.second->Update(ts, elapsed);
+			}
+		}
+
+		std::unordered_map<std::string, std::shared_ptr<GameObject>> Objects;
 	};
 }
 

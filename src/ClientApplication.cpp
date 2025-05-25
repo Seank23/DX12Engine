@@ -67,23 +67,23 @@ void ClientApplication::Init(std::shared_ptr<DX12Engine::RenderContext> renderCo
 	pbrWornMetal->SetAllTextures(wornMetalTextures);
 
 	std::shared_ptr<DX12Engine::GameObject> cube = std::make_shared<DX12Engine::GameObject>();
+	cube->Move({ -1.5f, 0.0f, 0.0f });
 	DX12Engine::RenderComponent* cubeRenderComp = cube->CreateComponent<DX12Engine::RenderComponent>();
 	cubeRenderComp->SetMesh(mesh);
 	cubeRenderComp->SetMaterial(pbrBrick);
-	cubeRenderComp->Move({ -1.5f, 0.0f, 0.0f });
-	m_SceneObjects.Add(cube);
+	m_SceneObjects.Add("Cube", cube);
 	std::shared_ptr<DX12Engine::GameObject> ball = std::make_shared<DX12Engine::GameObject>();
+	ball->Move({ 1.5f, 0.0f, 0.0f });
 	DX12Engine::RenderComponent* ballRenderComp = ball->CreateComponent<DX12Engine::RenderComponent>();
 	ballRenderComp->SetMesh(mesh2);
 	ballRenderComp->SetMaterial(pbrGold);
-	ballRenderComp->Move({ 1.5f, 0.0f, 0.0f });
-	m_SceneObjects.Add(ball);
+	m_SceneObjects.Add("Ball", ball);
 	std::shared_ptr<DX12Engine::GameObject> floor = std::make_shared<DX12Engine::GameObject>();
+	floor->Move({ 0.0f, -1.0f, 0.0f });
 	DX12Engine::RenderComponent* floorRenderComp = floor->CreateComponent<DX12Engine::RenderComponent>();
 	floorRenderComp->SetMesh(floorMesh);
 	floorRenderComp->SetMaterial(pbrWornMetal);
-	floorRenderComp->Move({ 0.0f, -1.0f, 0.0f });
-	m_SceneObjects.Add(floor);
+	m_SceneObjects.Add("Floor", floor);
 
 	m_LightBuffer = std::make_unique<DX12Engine::LightBuffer>();
 	std::shared_ptr<DX12Engine::Light> sunLight = std::make_shared<DX12Engine::Light>();
@@ -179,12 +179,13 @@ void ClientApplication::Update(float ts, float elapsed)
 {
 	m_Camera->ProcessKeyboardInput(0.01f);
 
-	m_SceneObjects.Objects[0]->GetComponent<DX12Engine::RenderComponent>()->Rotate({0.0f, 1.0f, 0.0f});
-	m_SceneObjects.Objects[1]->GetComponent<DX12Engine::RenderComponent>()->Rotate({ 1.0f, 0.0f, 0.0f });
-	m_SceneObjects.Objects[1]->GetComponent<DX12Engine::RenderComponent>()->Move({ 0.0f, sin(elapsed) * ts, 0.0f });
+	m_SceneObjects.Get("Cube")->Rotate({0.0f, 1.0f, 0.0f});
+	m_SceneObjects.Get("Ball")->Rotate({1.0f, 0.0f, 0.0f});
+	m_SceneObjects.Get("Ball")->Move({0.0f, sin(elapsed) * ts, 0.0f});
 
+	m_SceneObjects.Update(ts, elapsed);
 	m_LightBuffer->Update();
-	m_Renderer->UpdateObjectList(m_SceneObjects.Objects);
+	m_Renderer->UpdateObjectList(m_SceneObjects.GetAll());
 
 	m_Renderer->ExecutePipeline(m_RenderPipeline);
 }

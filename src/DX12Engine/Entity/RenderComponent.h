@@ -32,13 +32,11 @@ namespace DX12Engine
 		RenderComponent(GameObject* parent);
 		~RenderComponent();
 
-		void SetMesh(Mesh mesh);
-		void SetModelMatrix(DirectX::XMMATRIX modelMatrix) { m_ModelMatrix = modelMatrix; }	
-		void SetMaterial(std::shared_ptr<Material> material) { m_Material = material; }
+		virtual void Init() override;
+		virtual void Update(float ts, float elapsed) override;
 
-		void Move(DirectX::XMFLOAT3 movement);
-		void Scale(DirectX::XMFLOAT3 newScale);
-		void Rotate(DirectX::XMFLOAT3 rotation);
+		void SetMesh(Mesh mesh);
+		void SetMaterial(std::shared_ptr<Material> material) { m_Material = material; }
 
 		Material* GetMaterial() { return m_Material.get(); }	
 		DirectX::XMMATRIX GetModelMatrix() { return m_ModelMatrix; }
@@ -58,9 +56,5 @@ namespace DX12Engine
 		RenderComponentData m_RenderObjectData;
 		DirectX::XMMATRIX m_ModelMatrix;
 		std::shared_ptr<Material> m_Material;
-
-		DirectX::XMVECTOR m_Position;
-		DirectX::XMVECTOR m_Scale;
-		DirectX::XMVECTOR m_Rotation;
 	};
 }
