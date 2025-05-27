@@ -21,18 +21,19 @@ namespace DX12Engine
 			component->Update(ts, elapsed);
 	}
 
-	void GameObject::Move(DirectX::XMFLOAT3 movement)
+	void GameObject::Move(DirectX::XMVECTOR movement)
 	{
-		m_Position = DirectX::XMVectorAdd(m_Position, DirectX::XMLoadFloat3(&movement));
+		m_Position = DirectX::XMVectorAdd(m_Position, movement);
 	}
 
-	void GameObject::Scale(DirectX::XMFLOAT3 scale)
+	void GameObject::Scale(DirectX::XMVECTOR scale)
 	{
-		m_Scale = DirectX::XMLoadFloat3(&scale);
+		m_Scale = scale;
 	}
 
 	void GameObject::Rotate(DirectX::XMFLOAT3 rotation)
 	{
+
 		DirectX::XMFLOAT3 toRadians({ DirectX::XMConvertToRadians(rotation.x), DirectX::XMConvertToRadians(rotation.y), DirectX::XMConvertToRadians(rotation.z) });
 		DirectX::XMVECTOR quaternion = DirectX::XMQuaternionRotationRollPitchYawFromVector(DirectX::XMLoadFloat3(&toRadians));
 		m_Rotation = DirectX::XMQuaternionMultiply(m_Rotation, quaternion);

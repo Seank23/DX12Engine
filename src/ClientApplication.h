@@ -7,6 +7,7 @@
 #include "DX12Engine/Rendering/Renderer.h"
 #include "DX12Engine/Rendering/RenderContext.h"
 #include "DX12Engine/Entity/GameObject.h"
+#include "DX12Engine/Physics/PhysicsEngine.h"
 
 class ClientApplication : public DX12Engine::Application
 {
@@ -31,5 +32,7 @@ private:
 	DX12Engine::RenderPipeline m_RenderPipeline;
 
 	DX12Engine::GameObjectContainer m_SceneObjects;
+
+	DX12Engine::PhysicsEngine m_PhysicsEngine;
 };
 

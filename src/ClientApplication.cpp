@@ -5,6 +5,7 @@
 #include "DX12Engine/IO/ModelLoader.h"
 #include "DX12Engine/Resources/Mesh.h"
 #include "DX12Engine/Entity/RenderComponent.h"
+#include "DX12Engine/Entity/PhysicsComponent.h"
 #include "DX12Engine/IO/TextureLoader.h"
 #include "DX12Engine/Resources/Texture.h"
 #include "DX12Engine/Rendering/GPUUploader.h"
@@ -67,22 +68,30 @@ void ClientApplication::Init(std::shared_ptr<DX12Engine::RenderContext> renderCo
 	pbrWornMetal->SetAllTextures(wornMetalTextures);
 
 	std::shared_ptr<DX12Engine::GameObject> cube = std::make_shared<DX12Engine::GameObject>();
-	cube->Move({ -1.5f, 0.0f, 0.0f });
+	cube->Move({ -1.5f, 4.0f, 0.0f });
 	DX12Engine::RenderComponent* cubeRenderComp = cube->CreateComponent<DX12Engine::RenderComponent>();
 	cubeRenderComp->SetMesh(mesh);
 	cubeRenderComp->SetMaterial(pbrBrick);
+	DX12Engine::PhysicsComponent* cubePhysicsComp = cube->CreateComponent<DX12Engine::PhysicsComponent>();
+	cubePhysicsComp->SetMass(5.0f);
 	m_SceneObjects.Add("Cube", cube);
+
 	std::shared_ptr<DX12Engine::GameObject> ball = std::make_shared<DX12Engine::GameObject>();
-	ball->Move({ 1.5f, 0.0f, 0.0f });
+	ball->Move({ 1.5f, 4.0f, 0.0f });
 	DX12Engine::RenderComponent* ballRenderComp = ball->CreateComponent<DX12Engine::RenderComponent>();
 	ballRenderComp->SetMesh(mesh2);
 	ballRenderComp->SetMaterial(pbrGold);
+	DX12Engine::PhysicsComponent* ballPhysicsComp = ball->CreateComponent<DX12Engine::PhysicsComponent>();
+	ballPhysicsComp->SetMass(2.0f);
 	m_SceneObjects.Add("Ball", ball);
+
 	std::shared_ptr<DX12Engine::GameObject> floor = std::make_shared<DX12Engine::GameObject>();
 	floor->Move({ 0.0f, -1.0f, 0.0f });
 	DX12Engine::RenderComponent* floorRenderComp = floor->CreateComponent<DX12Engine::RenderComponent>();
 	floorRenderComp->SetMesh(floorMesh);
 	floorRenderComp->SetMaterial(pbrWornMetal);
+	DX12Engine::PhysicsComponent* floorPhysicsComp = floor->CreateComponent<DX12Engine::PhysicsComponent>();
+	floorPhysicsComp->SetIsStatic(true);
 	m_SceneObjects.Add("Floor", floor);
 
 	m_LightBuffer = std::make_unique<DX12Engine::LightBuffer>();
@@ -110,8 +119,8 @@ void ClientApplication::Init(std::shared_ptr<DX12Engine::RenderContext> renderCo
 	m_Renderer->SetLightBuffer(m_LightBuffer.get());
 
 	m_Camera = std::make_unique<DX12Engine::Camera>(windowSize.x / windowSize.y, 1.0f, 100.0f);
-	m_Camera->SetPosition({ 0.0f, 1.0f, -2.0f });
-	m_Camera->SetRotation(-20.0f, 125.0f);
+	m_Camera->SetPosition({ 5.0f, 1.0f, -8.0f });
+	m_Camera->SetRotation(5.0f, 125.0f);
 	m_Renderer->SetCamera(m_Camera.get());
 
 	auto shadowCastingLights = m_LightBuffer->GetLightsByType({ DX12Engine::LightType::Directional, DX12Engine::LightType::Spot });
@@ -173,6 +182,10 @@ void ClientApplication::Init(std::shared_ptr<DX12Engine::RenderContext> renderCo
 	pipelineConfig.Passes.push_back(lightingConfig);
 	pipelineConfig.Passes.push_back(ssrConfig);
 	m_RenderPipeline = m_Renderer->CreateRenderPipeline(pipelineConfig);
+
+	m_PhysicsEngine.SetComponents(m_SceneObjects.GetAllComponents<DX12Engine::PhysicsComponent>());
+	m_SceneObjects.Get("Cube")->GetComponent<DX12Engine::PhysicsComponent>()->ApplyForce(DX12Engine::Force{ { 500.0, 1000.0f, 0.0f } });
+	m_SceneObjects.Get("Ball")->GetComponent<DX12Engine::PhysicsComponent>()->ApplyForce(DX12Engine::Force{ { -200.0, 500.0f, 0.0f } });
 }
 
 void ClientApplication::Update(float ts, float elapsed)
@@ -181,8 +194,8 @@ void ClientApplication::Update(float ts, float elapsed)
 
 	m_SceneObjects.Get("Cube")->Rotate({0.0f, 1.0f, 0.0f});
 	m_SceneObjects.Get("Ball")->Rotate({1.0f, 0.0f, 0.0f});
-	m_SceneObjects.Get("Ball")->Move({0.0f, sin(elapsed) * ts, 0.0f});
 
+	m_PhysicsEngine.Update(ts, elapsed);
 	m_SceneObjects.Update(ts, elapsed);
 	m_LightBuffer->Update();
 	m_Renderer->UpdateObjectList(m_SceneObjects.GetAll());

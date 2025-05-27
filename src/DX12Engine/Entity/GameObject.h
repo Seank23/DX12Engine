@@ -39,8 +39,8 @@ namespace DX12Engine
 		virtual void Init();
 		virtual void Update(float ts, float elapsed);
 
-		void Move(DirectX::XMFLOAT3 movement);
-		void Scale(DirectX::XMFLOAT3 scale);
+		void Move(DirectX::XMVECTOR movement);
+		void Scale(DirectX::XMVECTOR scale);
 		void Rotate(DirectX::XMFLOAT3 rotation);
 
 		DirectX::XMVECTOR GetPosition() const { return m_Position; }
