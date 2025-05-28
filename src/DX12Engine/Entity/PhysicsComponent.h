@@ -9,6 +9,7 @@ namespace DX12Engine
 	{
 		DirectX::XMVECTOR Magnitude;
 		float Duration = 0.05f;
+		DirectX::XMVECTOR Point;
 	};
 
 	class PhysicsComponent : public Component
@@ -28,8 +29,16 @@ namespace DX12Engine
 		void SetIsStatic(bool isStatic) { m_IsStatic = isStatic; }
 
 	private:
+		void EvaluateForces(float ts);
+		void UpdateInertiaTensor();
+
 		DirectX::XMVECTOR m_Velocity;
+		DirectX::XMVECTOR m_AngularVelocity;
 		DirectX::XMVECTOR m_Acceleration;
+		DirectX::XMVECTOR m_Torque;
+		DirectX::XMMATRIX m_InverseInertiaTensor;
+		DirectX::XMMATRIX m_LocalInertiaTensor;
+
 		float m_Mass;
 		bool m_IsStatic;
 

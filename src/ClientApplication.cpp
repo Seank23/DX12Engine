@@ -73,7 +73,7 @@ void ClientApplication::Init(std::shared_ptr<DX12Engine::RenderContext> renderCo
 	cubeRenderComp->SetMesh(mesh);
 	cubeRenderComp->SetMaterial(pbrBrick);
 	DX12Engine::PhysicsComponent* cubePhysicsComp = cube->CreateComponent<DX12Engine::PhysicsComponent>();
-	cubePhysicsComp->SetMass(5.0f);
+	cubePhysicsComp->SetMass(8.0f);
 	m_SceneObjects.Add("Cube", cube);
 
 	std::shared_ptr<DX12Engine::GameObject> ball = std::make_shared<DX12Engine::GameObject>();
@@ -82,7 +82,7 @@ void ClientApplication::Init(std::shared_ptr<DX12Engine::RenderContext> renderCo
 	ballRenderComp->SetMesh(mesh2);
 	ballRenderComp->SetMaterial(pbrGold);
 	DX12Engine::PhysicsComponent* ballPhysicsComp = ball->CreateComponent<DX12Engine::PhysicsComponent>();
-	ballPhysicsComp->SetMass(2.0f);
+	ballPhysicsComp->SetMass(4.0f);
 	m_SceneObjects.Add("Ball", ball);
 
 	std::shared_ptr<DX12Engine::GameObject> floor = std::make_shared<DX12Engine::GameObject>();
@@ -184,16 +184,13 @@ void ClientApplication::Init(std::shared_ptr<DX12Engine::RenderContext> renderCo
 	m_RenderPipeline = m_Renderer->CreateRenderPipeline(pipelineConfig);
 
 	m_PhysicsEngine.SetComponents(m_SceneObjects.GetAllComponents<DX12Engine::PhysicsComponent>());
-	m_SceneObjects.Get("Cube")->GetComponent<DX12Engine::PhysicsComponent>()->ApplyForce(DX12Engine::Force{ { 500.0, 1000.0f, 0.0f } });
-	m_SceneObjects.Get("Ball")->GetComponent<DX12Engine::PhysicsComponent>()->ApplyForce(DX12Engine::Force{ { -200.0, 500.0f, 0.0f } });
+	m_SceneObjects.Get("Cube")->GetComponent<DX12Engine::PhysicsComponent>()->ApplyForce(DX12Engine::Force{ { 500.0, 1000.0f, 0.0f }, 0.05f, { -1.5f, 3.9f, 0.1f } });
+	m_SceneObjects.Get("Ball")->GetComponent<DX12Engine::PhysicsComponent>()->ApplyForce(DX12Engine::Force{ { -200.0, 500.0f, 0.0f }, 0.05f, { 1.5f, 3.7f, -0.2f } });
 }
 
 void ClientApplication::Update(float ts, float elapsed)
 {
 	m_Camera->ProcessKeyboardInput(0.01f);
-
-	m_SceneObjects.Get("Cube")->Rotate({0.0f, 1.0f, 0.0f});
-	m_SceneObjects.Get("Ball")->Rotate({1.0f, 0.0f, 0.0f});
 
 	m_PhysicsEngine.Update(ts, elapsed);
 	m_SceneObjects.Update(ts, elapsed);

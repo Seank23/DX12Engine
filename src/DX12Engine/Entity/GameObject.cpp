@@ -18,7 +18,10 @@ namespace DX12Engine
 	void GameObject::Update(float ts, float elapsed)
 	{
 		for (const auto& component : m_Components)
-			component->Update(ts, elapsed);
+		{
+			if (!component->ShouldSkipUpdate())
+				component->Update(ts, elapsed);
+		}
 	}
 
 	void GameObject::Move(DirectX::XMVECTOR movement)

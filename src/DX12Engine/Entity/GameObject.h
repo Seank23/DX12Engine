@@ -43,6 +43,8 @@ namespace DX12Engine
 		void Scale(DirectX::XMVECTOR scale);
 		void Rotate(DirectX::XMFLOAT3 rotation);
 
+		void SetRotationQuaternion(DirectX::XMVECTOR rotation) { m_Rotation = rotation; }
+
 		DirectX::XMVECTOR GetPosition() const { return m_Position; }
 		DirectX::XMVECTOR GetScale() const { return m_Scale; }
 		DirectX::XMVECTOR GetRotation() const { return m_Rotation; }

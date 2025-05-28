@@ -4,6 +4,7 @@
 #include <memory>
 #include "../Entity/PhysicsComponent.h"
 
+constexpr auto SIMULATION_RATE = 1.0f / 3;
 constexpr auto APPLY_GRAVITY = 1;
 constexpr auto GRAVITY = 9.81f;
 
