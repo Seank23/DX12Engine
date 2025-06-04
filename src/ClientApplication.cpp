@@ -68,30 +68,33 @@ void ClientApplication::Init(std::shared_ptr<DX12Engine::RenderContext> renderCo
 	pbrWornMetal->SetAllTextures(wornMetalTextures);
 
 	std::shared_ptr<DX12Engine::GameObject> cube = std::make_shared<DX12Engine::GameObject>();
+	cube->SetMesh(mesh);
 	cube->Move({ -1.5f, 4.0f, 0.0f });
 	DX12Engine::RenderComponent* cubeRenderComp = cube->CreateComponent<DX12Engine::RenderComponent>();
-	cubeRenderComp->SetMesh(mesh);
 	cubeRenderComp->SetMaterial(pbrBrick);
 	DX12Engine::PhysicsComponent* cubePhysicsComp = cube->CreateComponent<DX12Engine::PhysicsComponent>();
 	cubePhysicsComp->SetMass(8.0f);
+	cubePhysicsComp->SetCollisionMeshType(DX12Engine::CollisionMeshType::Box);
 	m_SceneObjects.Add("Cube", cube);
 
 	std::shared_ptr<DX12Engine::GameObject> ball = std::make_shared<DX12Engine::GameObject>();
+	ball->SetMesh(mesh2);
 	ball->Move({ 1.5f, 4.0f, 0.0f });
 	DX12Engine::RenderComponent* ballRenderComp = ball->CreateComponent<DX12Engine::RenderComponent>();
-	ballRenderComp->SetMesh(mesh2);
 	ballRenderComp->SetMaterial(pbrGold);
 	DX12Engine::PhysicsComponent* ballPhysicsComp = ball->CreateComponent<DX12Engine::PhysicsComponent>();
 	ballPhysicsComp->SetMass(4.0f);
+	ballPhysicsComp->SetCollisionMeshType(DX12Engine::CollisionMeshType::Sphere);
 	m_SceneObjects.Add("Ball", ball);
 
 	std::shared_ptr<DX12Engine::GameObject> floor = std::make_shared<DX12Engine::GameObject>();
+	floor->SetMesh(floorMesh);
 	floor->Move({ 0.0f, -1.0f, 0.0f });
 	DX12Engine::RenderComponent* floorRenderComp = floor->CreateComponent<DX12Engine::RenderComponent>();
-	floorRenderComp->SetMesh(floorMesh);
 	floorRenderComp->SetMaterial(pbrWornMetal);
 	DX12Engine::PhysicsComponent* floorPhysicsComp = floor->CreateComponent<DX12Engine::PhysicsComponent>();
 	floorPhysicsComp->SetIsStatic(true);
+	floorPhysicsComp->SetCollisionMeshType(DX12Engine::CollisionMeshType::Box);
 	m_SceneObjects.Add("Floor", floor);
 
 	m_LightBuffer = std::make_unique<DX12Engine::LightBuffer>();

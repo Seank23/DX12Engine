@@ -5,6 +5,7 @@
 #include <string>
 #include <memory>
 #include <DirectXMath.h>
+#include "../Resources/Mesh.h"
 
 namespace DX12Engine
 {
@@ -39,22 +40,31 @@ namespace DX12Engine
 		virtual void Init();
 		virtual void Update(float ts, float elapsed);
 
+		void SetMesh(Mesh mesh);
+
 		void Move(DirectX::XMVECTOR movement);
 		void Scale(DirectX::XMVECTOR scale);
 		void Rotate(DirectX::XMFLOAT3 rotation);
 
-		void SetRotationQuaternion(DirectX::XMVECTOR rotation) { m_Rotation = rotation; }
+		void SetRotationQuaternion(DirectX::XMVECTOR rotation);
 
 		DirectX::XMVECTOR GetPosition() const { return m_Position; }
 		DirectX::XMVECTOR GetScale() const { return m_Scale; }
 		DirectX::XMVECTOR GetRotation() const { return m_Rotation; }
+		DirectX::XMMATRIX GetModelMatrix() const { return m_ModelMatrix; }
+		Mesh* GetMesh() { return &m_Mesh; }
 
 	private:
+		void UpdateModelMatrix();
+
 		std::vector<std::unique_ptr<Component>> m_Components;
 
 		DirectX::XMVECTOR m_Position;
 		DirectX::XMVECTOR m_Scale;
 		DirectX::XMVECTOR m_Rotation;
+
+		Mesh m_Mesh;
+		DirectX::XMMATRIX m_ModelMatrix;
 	};
 
 	struct GameObjectContainer

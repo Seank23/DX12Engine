@@ -1,6 +1,7 @@
 #include <stdexcept>
 #include <string>
 #include <comdef.h>
+#include <DirectXMath.h>
 
 namespace DX12Engine
 {
@@ -41,6 +42,11 @@ namespace DX12Engine
 				result.push_back(item.get());
 			}
 			return result;
+		}
+
+		static DirectX::XMFLOAT3 ConvertToXMFLOAT3(const DirectX::XMVECTOR& vec)
+		{
+			return DirectX::XMFLOAT3(DirectX::XMVectorGetX(vec), DirectX::XMVectorGetY(vec), DirectX::XMVectorGetZ(vec));
 		}
 	};
 }

@@ -35,26 +35,26 @@ namespace DX12Engine
 		virtual void Init() override;
 		virtual void Update(float ts, float elapsed) override;
 
-		void SetMesh(Mesh mesh);
+		virtual void OnMeshChanged(Mesh* newMesh) override;
+		virtual void OnTransformChanged(TransformType type) override;
+
 		void SetMaterial(std::shared_ptr<Material> material) { m_Material = material; }
 
 		Material* GetMaterial() { return m_Material.get(); }	
-		DirectX::XMMATRIX GetModelMatrix() { return m_ModelMatrix; }
 		D3D12_GPU_VIRTUAL_ADDRESS GetCBVAddress() { return m_ConstantBuffer->GetGPUAddress(); }
 
 		D3D12_VERTEX_BUFFER_VIEW GetVertexBufferView() { return m_VertexBuffer->GetVertexBufferView(); }
 		D3D12_INDEX_BUFFER_VIEW GetIndexBufferView() { return m_IndexBuffer->GetIndexBufferView(); }
 
+		DirectX::XMMATRIX GetModelMatrix();
+
 	private:
 		void UpdateConstantBufferData(DirectX::XMMATRIX viewMatrix, DirectX::XMMATRIX projectionMatrix, DirectX::XMFLOAT3 cameraPosition);
-		void UpdateModelMatrix();
 
-		Mesh m_Mesh;
 		std::unique_ptr<VertexBuffer> m_VertexBuffer;
 		std::unique_ptr<IndexBuffer> m_IndexBuffer;
 		std::unique_ptr<ConstantBuffer> m_ConstantBuffer;
 		RenderComponentData m_RenderObjectData;
-		DirectX::XMMATRIX m_ModelMatrix;
 		std::shared_ptr<Material> m_Material;
 	};
 }

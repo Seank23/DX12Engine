@@ -5,15 +5,13 @@
 namespace DX12Engine
 {
 	RenderComponent::RenderComponent(GameObject* parent)
-		: Component(parent, ComponentType::Render),
-		m_ModelMatrix(DirectX::XMMatrixIdentity())
+		: Component(parent, ComponentType::Render)
 	{
+		OnMeshChanged(parent->GetMesh());
 	}
 
 	RenderComponent::~RenderComponent()
 	{
-		m_Mesh.Reset();
-		m_ModelMatrix = DirectX::XMMatrixIdentity();
 	}
 
 	void RenderComponent::Init()
@@ -22,32 +20,38 @@ namespace DX12Engine
 
 	void RenderComponent::Update(float ts, float elapsed)
 	{
-		UpdateModelMatrix();
 	}
 
-	void RenderComponent::SetMesh(Mesh mesh)
+	void RenderComponent::OnMeshChanged(Mesh* newMesh)
 	{
-		m_Mesh = mesh;
-		m_VertexBuffer = ResourceManager::GetInstance().CreateVertexBuffer(mesh.Vertices);
-		m_IndexBuffer = ResourceManager::GetInstance().CreateIndexBuffer(mesh.Indices);
-		m_ConstantBuffer = ResourceManager::GetInstance().CreateConstantBuffer(sizeof(RenderComponentData));
+		if (newMesh)
+		{
+			m_VertexBuffer = ResourceManager::GetInstance().CreateVertexBuffer(newMesh->Vertices);
+			m_IndexBuffer = ResourceManager::GetInstance().CreateIndexBuffer(newMesh->Indices);
+			m_ConstantBuffer = ResourceManager::GetInstance().CreateConstantBuffer(sizeof(RenderComponentData));
+		}
+	}
+
+	void RenderComponent::OnTransformChanged(TransformType type)
+	{
+	}
+
+	DirectX::XMMATRIX RenderComponent::GetModelMatrix()
+	{
+		return m_Parent->GetModelMatrix();
 	}
 
 	void RenderComponent::UpdateConstantBufferData(DirectX::XMMATRIX viewMatrix, DirectX::XMMATRIX projectionMatrix, DirectX::XMFLOAT3 cameraPosition)
 	{
-		m_RenderObjectData.ModelMatrix = m_ModelMatrix;
-		m_RenderObjectData.NormalMatrix = DirectX::XMMatrixTranspose(DirectX::XMMatrixInverse(nullptr, m_ModelMatrix));
+		DirectX::XMMATRIX modelMatrix = m_Parent->GetModelMatrix();
+		m_RenderObjectData.ModelMatrix = modelMatrix;
+		m_RenderObjectData.NormalMatrix = DirectX::XMMatrixTranspose(DirectX::XMMatrixInverse(nullptr, modelMatrix));
 		m_RenderObjectData.ViewMatrix = viewMatrix;
 		m_RenderObjectData.ProjectionMatrix = projectionMatrix;
-		m_RenderObjectData.MVPMatrix = m_ModelMatrix * viewMatrix * projectionMatrix;
+		m_RenderObjectData.MVPMatrix = modelMatrix * viewMatrix * projectionMatrix;
 		m_RenderObjectData.InvViewMatrix = DirectX::XMMatrixInverse(nullptr, viewMatrix);
 		m_RenderObjectData.InvProjectionMatrix = DirectX::XMMatrixInverse(nullptr, projectionMatrix);
 		m_RenderObjectData.CameraPosition = cameraPosition;
 		m_ConstantBuffer->Update(&m_RenderObjectData, sizeof(RenderComponentData));
-	}
-
-	void RenderComponent::UpdateModelMatrix()
-	{
-		m_ModelMatrix = DirectX::XMMatrixRotationQuaternion(m_Parent->GetRotation()) * DirectX::XMMatrixTranslationFromVector(m_Parent->GetPosition()) * DirectX::XMMatrixScalingFromVector(m_Parent->GetScale());
 	}
 }
