@@ -73,7 +73,7 @@ void ClientApplication::Init(std::shared_ptr<DX12Engine::RenderContext> renderCo
 	DX12Engine::RenderComponent* cubeRenderComp = cube->CreateComponent<DX12Engine::RenderComponent>();
 	cubeRenderComp->SetMaterial(pbrBrick);
 	DX12Engine::PhysicsComponent* cubePhysicsComp = cube->CreateComponent<DX12Engine::PhysicsComponent>();
-	cubePhysicsComp->SetMass(8.0f);
+	cubePhysicsComp->SetMass(6.0f);
 	cubePhysicsComp->SetCollisionMeshType(DX12Engine::CollisionMeshType::Box);
 	m_SceneObjects.Add("Cube", cube);
 
@@ -94,7 +94,7 @@ void ClientApplication::Init(std::shared_ptr<DX12Engine::RenderContext> renderCo
 	floorRenderComp->SetMaterial(pbrWornMetal);
 	DX12Engine::PhysicsComponent* floorPhysicsComp = floor->CreateComponent<DX12Engine::PhysicsComponent>();
 	floorPhysicsComp->SetIsStatic(true);
-	floorPhysicsComp->SetCollisionMeshType(DX12Engine::CollisionMeshType::Box);
+	floorPhysicsComp->SetCollisionMeshType(DX12Engine::CollisionMeshType::Plane);
 	m_SceneObjects.Add("Floor", floor);
 
 	m_LightBuffer = std::make_unique<DX12Engine::LightBuffer>();
@@ -122,8 +122,8 @@ void ClientApplication::Init(std::shared_ptr<DX12Engine::RenderContext> renderCo
 	m_Renderer->SetLightBuffer(m_LightBuffer.get());
 
 	m_Camera = std::make_unique<DX12Engine::Camera>(windowSize.x / windowSize.y, 1.0f, 100.0f);
-	m_Camera->SetPosition({ 5.0f, 1.0f, -8.0f });
-	m_Camera->SetRotation(5.0f, 125.0f);
+	m_Camera->SetPosition({ 5.0f, 1.0f, -12.0f });
+	m_Camera->SetRotation(5.0f, 115.0f);
 	m_Renderer->SetCamera(m_Camera.get());
 
 	auto shadowCastingLights = m_LightBuffer->GetLightsByType({ DX12Engine::LightType::Directional, DX12Engine::LightType::Spot });
@@ -193,7 +193,7 @@ void ClientApplication::Init(std::shared_ptr<DX12Engine::RenderContext> renderCo
 
 void ClientApplication::Update(float ts, float elapsed)
 {
-	m_Camera->ProcessKeyboardInput(0.01f);
+	m_Camera->ProcessKeyboardInput(ts);
 
 	m_PhysicsEngine.Update(ts, elapsed);
 	m_SceneObjects.Update(ts, elapsed);

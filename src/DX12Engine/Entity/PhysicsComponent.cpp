@@ -84,40 +84,18 @@ namespace DX12Engine
 
 	void PhysicsComponent::OnTransformChanged(TransformType type)
 	{
-		/*if (type == TransformType::Position)
-		{
-			DirectX::XMFLOAT3 position = EngineUtils::ConvertToXMFLOAT3(m_Parent->GetPosition());
-			m_BoundingBox.MinPoint = { position.x - m_BoundingBox.Dimensions.x / 2.0f, position.y - m_BoundingBox.Dimensions.y / 2.0f, position.z - m_BoundingBox.Dimensions.z / 2.0f };
-			m_BoundingBox.MaxPoint = { position.x + m_BoundingBox.Dimensions.x / 2.0f, position.y + m_BoundingBox.Dimensions.y / 2.0f, position.z + m_BoundingBox.Dimensions.z / 2.0f };
-			switch (m_CollisionMesh.Type)
-			{
-			case CollisionMeshType::Box:
-			{
-				m_CollisionMesh.OBBData.Center = m_Parent->GetPosition();
-				break;
-			}
-			case CollisionMeshType::Sphere:
-				m_CollisionMesh.SphereData.Center = m_Parent->GetPosition();
-				break;
-			case CollisionMeshType::Plane:
-				m_CollisionMesh.PlaneData.Center = m_Parent->GetPosition();
-				break;
-			}
-		}*/
-		//if (type == TransformType::Rotation)
-		//{
-		std::vector<DirectX::XMVECTOR> transformedVertices;
-		DirectX::XMMATRIX modelMatrix = m_Parent->GetModelMatrix();
-		for (auto& vertex : m_BoundingBox.Vertices)
-			transformedVertices.push_back(DirectX::XMVector3Transform(vertex, modelMatrix));
-		std::vector<DirectX::XMVECTOR> updatedVertices = GetBoundingBoxVertices(transformedVertices);
-		m_BoundingBox.MinPoint = { DirectX::XMVectorGetX(updatedVertices[0]), DirectX::XMVectorGetY(updatedVertices[0]), DirectX::XMVectorGetZ(updatedVertices[0]) };
-		m_BoundingBox.MaxPoint = { DirectX::XMVectorGetX(updatedVertices[6]), DirectX::XMVectorGetY(updatedVertices[6]), DirectX::XMVectorGetZ(updatedVertices[6]) };
-
 		switch (m_CollisionMesh.Type)
 		{
 		case CollisionMeshType::Box:
 		{
+			std::vector<DirectX::XMVECTOR> transformedVertices;
+			DirectX::XMMATRIX modelMatrix = m_Parent->GetModelMatrix();
+			for (auto& vertex : m_BoundingBox.Vertices)
+				transformedVertices.push_back(DirectX::XMVector3Transform(vertex, modelMatrix));
+			std::vector<DirectX::XMVECTOR> updatedVertices = GetBoundingBoxVertices(transformedVertices);
+			m_BoundingBox.MinPoint = { DirectX::XMVectorGetX(updatedVertices[0]), DirectX::XMVectorGetY(updatedVertices[0]), DirectX::XMVectorGetZ(updatedVertices[0]) };
+			m_BoundingBox.MaxPoint = { DirectX::XMVectorGetX(updatedVertices[6]), DirectX::XMVectorGetY(updatedVertices[6]), DirectX::XMVectorGetZ(updatedVertices[6]) };
+
 			DirectX::XMVECTOR right = DirectX::XMVector3Normalize(modelMatrix.r[0]);
 			DirectX::XMVECTOR up = DirectX::XMVector3Normalize(modelMatrix.r[1]);
 			DirectX::XMVECTOR forward = DirectX::XMVector3Normalize(modelMatrix.r[2]);
@@ -137,14 +115,28 @@ namespace DX12Engine
 			break;
 		}
 		case CollisionMeshType::Sphere:
+		{
+			DirectX::XMFLOAT3 position = EngineUtils::ConvertToXMFLOAT3(m_Parent->GetPosition());
+			m_BoundingBox.MinPoint = { position.x - m_BoundingBox.Dimensions.x / 2.0f, position.y - m_BoundingBox.Dimensions.y / 2.0f, position.z - m_BoundingBox.Dimensions.z / 2.0f };
+			m_BoundingBox.MaxPoint = { position.x + m_BoundingBox.Dimensions.x / 2.0f, position.y + m_BoundingBox.Dimensions.y / 2.0f, position.z + m_BoundingBox.Dimensions.z / 2.0f };
 			m_CollisionMesh.SphereData.Center = m_Parent->GetPosition();
 			break;
+		}
 		case CollisionMeshType::Plane:
-			m_CollisionMesh.PlaneData.Center = m_Parent->GetPosition();
-			m_CollisionMesh.PlaneData.Normal = DirectX::XMVector3Normalize(m_Parent->GetRotation());
+		{
+			std::vector<DirectX::XMVECTOR> transformedVertices;
+			DirectX::XMMATRIX modelMatrix = m_Parent->GetModelMatrix();
+			for (auto& vertex : m_BoundingBox.Vertices)
+				transformedVertices.push_back(DirectX::XMVector3Transform(vertex, modelMatrix));
+			std::vector<DirectX::XMVECTOR> updatedVertices = GetBoundingBoxVertices(transformedVertices);
+			m_BoundingBox.MinPoint = { DirectX::XMVectorGetX(updatedVertices[0]), DirectX::XMVectorGetY(updatedVertices[0]), DirectX::XMVectorGetZ(updatedVertices[0]) };
+			m_BoundingBox.MaxPoint = { DirectX::XMVectorGetX(updatedVertices[6]), DirectX::XMVectorGetY(updatedVertices[6]), DirectX::XMVectorGetZ(updatedVertices[6]) };
+			m_CollisionMesh.PlaneData.Center = { DirectX::XMVectorGetX(m_Parent->GetPosition()), m_BoundingBox.MaxPoint.y, DirectX::XMVectorGetZ(m_Parent->GetPosition()) };
+			//m_CollisionMesh.PlaneData.Normal = DirectX::XMVector3Normalize(m_Parent->GetRotation());
+			m_CollisionMesh.PlaneData.Normal = { 0.0f, 1.0f, 0.0f, 0.0f };
 			break;
 		}
-		//}
+		}
 	}
 
 	void PhysicsComponent::ApplyForce(Force force)

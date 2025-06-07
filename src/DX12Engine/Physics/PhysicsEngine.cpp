@@ -1,6 +1,7 @@
 #include "PhysicsEngine.h"
 #include <iostream>
 #include "../Entity/GameObject.h"
+#include <algorithm>
 
 namespace DX12Engine
 {
@@ -14,15 +15,15 @@ namespace DX12Engine
 					component->m_Acceleration = DirectX::XMVECTOR({ 0.0f, -GRAVITY, 0.0f });
 		}
 
-		std::vector<Contact> contacts;
+		std::vector<ContactManifold> contacts;
 		for (int i = 0; i < m_Components.size(); i++)
 		{
 			for (int j = i + 1; j < m_Components.size(); j++)
 			{
-				Contact contact;
+				ContactManifold contact;
 				if (CheckCollision(m_Components[i], m_Components[j], &contact))
 				{
-					std::cout << "Collision detected between component " << i << " and component " << j << std::endl;
+					//std::cout << "Collision detected between component " << i << " and component " << j << std::endl;
 					contacts.push_back(contact);
 				}
 			}
@@ -38,24 +39,28 @@ namespace DX12Engine
 			component->Update(ts, elapsed);
 	}
 
-	bool PhysicsEngine::CheckCollision(PhysicsComponent* a, PhysicsComponent* b, Contact* outContact)
+	bool PhysicsEngine::CheckCollision(PhysicsComponent* a, PhysicsComponent* b, ContactManifold* outContact)
 	{
 		if (a->GetBoundingBox().Intersects(b->GetBoundingBox()))
 		{
 			if (a->GetCollisionMesh().Intersects(b->GetCollisionMesh(), outContact))
 			{
-				outContact->A = a;
-				outContact->B = b;
+				outContact->A = b->m_InvMass == 0.0f ? b : a;
+				outContact->B = b->m_InvMass == 0.0f ? a : b;
 				return true;
 			}
 		}
 		return false;
 	}
 
-	void PhysicsEngine::PositionalCorrection(Contact& contact)
+	void PhysicsEngine::PositionalCorrection(ContactManifold& contact)
 	{
-		const float percent = 0.1f;
-		const float slop = 0.1f;
+		DirectX::XMVECTOR normalToUp = DirectX::XMVector3Dot(contact.Normal, { 0.0f, 1.0f, 0.0f });
+		float areaFactor = (DirectX::XMVectorGetX(normalToUp) + DirectX::XMVectorGetY(normalToUp)) / 2.0f;
+		areaFactor = std::clamp(areaFactor, 0.1f, 1.0f);
+
+		const float percent = areaFactor;
+		const float slop = std::lerp(0.4f, 0.01f, areaFactor);
 		float correctionMagnitude = ((std::max)(contact.PenetrationDepth - slop, 0.0f) / (contact.A->m_InvMass + contact.B->m_InvMass)) * percent;
 
 		DirectX::XMVECTOR correction = DirectX::XMVectorScale(contact.Normal, correctionMagnitude);
@@ -63,29 +68,31 @@ namespace DX12Engine
 		if (contact.B->m_InvMass > 0.0f) contact.B->m_Parent->Move(DirectX::XMVectorMultiply(correction, DirectX::XMVectorReplicate(contact.B->m_InvMass)));
 	}
 
-	void PhysicsEngine::ResolveCollision(Contact& contact)
+
+	void PhysicsEngine::ResolveCollision(ContactManifold& contact)
 	{
 		PhysicsComponent* a = contact.A;
 		PhysicsComponent* b = contact.B;
 
-		DirectX::XMVECTOR ra = DirectX::XMVectorSubtract(contact.Point, a->GetPosition());
-		DirectX::XMVECTOR rb = DirectX::XMVectorSubtract(contact.Point, b->GetPosition());
+		DirectX::XMVECTOR contactPoint = contact.Contacts[0]->Point;
+		DirectX::XMVECTOR ra = DirectX::XMVectorSubtract(contactPoint, a->GetPosition());
+		DirectX::XMVECTOR rb = DirectX::XMVectorSubtract(contactPoint, b->GetPosition());
 
 		DirectX::XMVECTOR velA = DirectX::XMVectorAdd(a->m_Velocity, DirectX::XMVector3Cross(a->m_AngularVelocity, ra));
 		DirectX::XMVECTOR velB = DirectX::XMVectorAdd(b->m_Velocity, DirectX::XMVector3Cross(b->m_AngularVelocity, rb));
 		DirectX::XMVECTOR relativeVelocity = DirectX::XMVectorSubtract(velB, velA);
 
 		float velocityAlongNormal = DirectX::XMVectorGetX(DirectX::XMVector3Dot(relativeVelocity, contact.Normal));
-		//if (velocityAlongNormal < 0.0f)
-		//{
-			float restitution = 0.5f;
+		if (velocityAlongNormal < 0.1f)
+		{
+			float restitution = 2.0f;
 			float impulseMagnitude = -(1.0f + restitution) * velocityAlongNormal;
 			impulseMagnitude /= (a->m_InvMass + b->m_InvMass);
 			DirectX::XMVECTOR impulse = DirectX::XMVectorScale(contact.Normal, impulseMagnitude);
-			if (a->m_InvMass > 0.0f && abs(DirectX::XMVectorGetY(a->m_Velocity)) < 0.01f && contact.PenetrationDepth > 0.1f)
-				a->ApplyForce(Force{ DirectX::XMVectorNegate(impulse), 0.05f, contact.Point });
-			if (b->m_InvMass > 0.0f && abs(DirectX::XMVectorGetY(b->m_Velocity)) < 0.01f && contact.PenetrationDepth > 0.1f)
-				b->ApplyForce(Force{ impulse, 0.05f, contact.Point });
-		//}
+			if (a->m_InvMass > 0.0f)
+				a->ApplyForce(Force{ DirectX::XMVectorNegate(impulse), 0.01f, contactPoint });
+			if (b->m_InvMass > 0.0f)
+				b->ApplyForce(Force{ impulse, 0.01f, contactPoint });
+		}
 	}
 }

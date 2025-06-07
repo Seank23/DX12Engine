@@ -63,8 +63,8 @@ namespace DX12Engine
 	{
 		m_Rotation = rotation;
 		UpdateModelMatrix();
-		//for (const auto& component : m_Components)
-		//	component->OnTransformChanged(TransformType::Rotation);
+		for (const auto& component : m_Components)
+			component->OnTransformChanged(TransformType::Rotation);
 	}
 
 	void GameObject::UpdateModelMatrix()

@@ -37,13 +37,27 @@ namespace DX12Engine
         DirectX::XMVECTOR Normal;
     };
 
-	struct Contact
+	struct ContactPoint
 	{
-        PhysicsComponent* A = nullptr;
-        PhysicsComponent* B = nullptr;
 		DirectX::XMVECTOR Point;
 		DirectX::XMVECTOR Normal;
 		float PenetrationDepth;
+	};
+
+	struct ContactManifold
+	{
+		std::vector<std::shared_ptr<ContactPoint>> Contacts;
+        DirectX::XMVECTOR Normal = DirectX::XMVectorZero();
+		float PenetrationDepth = 0.0f;
+		PhysicsComponent* A = nullptr;
+		PhysicsComponent* B = nullptr;
+
+		void AddContact(std::shared_ptr<ContactPoint> contact)
+		{
+			Contacts.push_back(contact);
+			Normal = DirectX::XMVector3Normalize(DirectX::XMVectorAdd(Normal, contact->Normal));
+			PenetrationDepth += contact->PenetrationDepth;
+		}
 	};
 
     struct CollisionMesh
@@ -53,24 +67,28 @@ namespace DX12Engine
 		Sphere SphereData;
 		Plane PlaneData;
 
-		bool Intersects(CollisionMesh& other, Contact* outContact)
+		bool Intersects(CollisionMesh& other, ContactManifold* outContact)
 		{
 			if (Type == CollisionMeshType::Box && other.Type == CollisionMeshType::Box)
-			{
 				return OBBvsOBB(OBBData, other.OBBData, outContact);
-			}
 			else if (Type == CollisionMeshType::Sphere && other.Type == CollisionMeshType::Box)
-			{
 				return SphereVsOBB(SphereData, other.OBBData, outContact);
-			}
 			else if (Type == CollisionMeshType::Box && other.Type == CollisionMeshType::Sphere)
-			{
 				return SphereVsOBB(other.SphereData, OBBData, outContact);
-			}
+            else if (Type == CollisionMeshType::Sphere && other.Type == CollisionMeshType::Sphere)
+                return SphereVsSphere(SphereData, other.SphereData, outContact);
+            else if (Type == CollisionMeshType::Plane && other.Type == CollisionMeshType::Sphere)
+                return SphereVsPlane(other.SphereData, PlaneData, outContact);
+            else if (Type == CollisionMeshType::Sphere && other.Type == CollisionMeshType::Plane)
+                return SphereVsPlane(SphereData, other.PlaneData, outContact);
+            else if (Type == CollisionMeshType::Plane && other.Type == CollisionMeshType::Box)
+                return OBBVsPlane(other.OBBData, PlaneData, outContact);
+            else if (Type == CollisionMeshType::Box && other.Type == CollisionMeshType::Plane)
+                return OBBVsPlane(OBBData, other.PlaneData, outContact);
 			return false;
 		}
 
-		bool OBBvsOBB(OBB& a, OBB& b, Contact* contact = nullptr)
+		bool OBBvsOBB(OBB& a, OBB& b, ContactManifold* contact = nullptr)
 		{
             constexpr float EPSILON = 1e-6f;
             float minOverlap = FLT_MAX;
@@ -122,17 +140,18 @@ namespace DX12Engine
                 }
             }
 
+            std::shared_ptr<ContactPoint> contactPoint = std::make_shared<ContactPoint>();
+			contactPoint->Normal = smallestAxis;
+			contactPoint->PenetrationDepth = minOverlap;
+			contactPoint->Point = DirectX::XMVectorAdd(a.Center, DirectX::XMVectorScale(smallestAxis, 0.5f * minOverlap));
+
             if (contact) 
-            {
-                contact->Normal = smallestAxis;
-                contact->PenetrationDepth = minOverlap;
-                contact->Point = DirectX::XMVectorAdd(a.Center, DirectX::XMVectorScale(smallestAxis, 0.5f * minOverlap)); // Approximate
-            }
+				contact->AddContact(contactPoint);
 
             return true;
 		}
 
-        bool SphereVsOBB(Sphere& sphere, OBB& obb, Contact* contact = nullptr) 
+        bool SphereVsOBB(Sphere& sphere, OBB& obb, ContactManifold* contact = nullptr)
         {
             DirectX::XMVECTOR d = DirectX::XMVectorSubtract(sphere.Center, obb.Center);
             DirectX::XMVECTOR closest = obb.Center;
@@ -149,17 +168,19 @@ namespace DX12Engine
             if (distSq > sphere.Radius * sphere.Radius)
                 return false;
 
-            if (contact) {
-                float dist = sqrtf(distSq);
-                contact->Normal = dist > 1e-5f ? DirectX::XMVectorScale(diff, 1.0f / dist) : DirectX::XMVectorSet(0, 1, 0, 0);
-                contact->PenetrationDepth = sphere.Radius - dist;
-                contact->Point = closest;
-            }
+            float dist = sqrtf(distSq);
+            std::shared_ptr<ContactPoint> contactPoint = std::make_shared<ContactPoint>();
+            contactPoint->Normal = dist > 1e-5f ? DirectX::XMVectorScale(diff, 1.0f / dist) : DirectX::XMVectorSet(0, 1, 0, 0);
+            contactPoint->PenetrationDepth = sphere.Radius - dist;
+            contactPoint->Point = closest;
+
+            if (contact)
+                contact->AddContact(contactPoint);
 
             return true;
         }
 
-        bool SphereVsSphere(Sphere& a, Sphere& b, Contact& contact)
+        bool SphereVsSphere(Sphere& a, Sphere& b, ContactManifold* contact = nullptr)
         {
             DirectX::XMVECTOR delta = DirectX::XMVectorSubtract(b.Center, a.Center);
             float distSq = DirectX::XMVectorGetX(DirectX::XMVector3LengthSq(delta));
@@ -171,14 +192,18 @@ namespace DX12Engine
             float dist = sqrtf(distSq);
             DirectX::XMVECTOR normal = dist > 1e-5f ? DirectX::XMVectorScale(delta, 1.0f / dist) : DirectX::XMVectorSet(0, 1, 0, 0);
 
-            contact.Normal = normal;
-            contact.PenetrationDepth = rSum - dist;
-            contact.Point = DirectX::XMVectorAdd(a.Center, DirectX::XMVectorScale(normal, a.Radius));
+            std::shared_ptr<ContactPoint> contactPoint = std::make_shared<ContactPoint>();
+            contactPoint->Normal = normal;
+            contactPoint->PenetrationDepth = rSum - dist;
+            contactPoint->Point = DirectX::XMVectorAdd(a.Center, DirectX::XMVectorScale(normal, a.Radius));
+
+            if (contact)
+                contact->AddContact(contactPoint);
 
             return true;
         }
 
-        bool OBBVsPlane(OBB& obb, Plane& plane, Contact& contact)
+        bool OBBVsPlane(OBB& obb, Plane& plane, ContactManifold* contact = nullptr)
         {
             float r = 0.0f;
             for (int i = 0; i < 3; ++i)
@@ -193,23 +218,31 @@ namespace DX12Engine
             if (dist > r)
                 return false;
 
-            contact.Normal = plane.Normal;
-            contact.PenetrationDepth = r - dist;
-            contact.Point = DirectX::XMVectorSubtract(obb.Center, DirectX::XMVectorScale(plane.Normal, dist));
+            std::shared_ptr<ContactPoint> contactPoint = std::make_shared<ContactPoint>();
+            contactPoint->Normal = plane.Normal;
+            contactPoint->PenetrationDepth = r - dist;
+            contactPoint->Point = DirectX::XMVectorSubtract(obb.Center, DirectX::XMVectorScale(plane.Normal, dist));
+
+            if (contact)
+                contact->AddContact(contactPoint);
 
             return true;
         }
 
-		bool SphereVsPlane(Sphere& sphere, Plane& plane, Contact& contact)
+		bool SphereVsPlane(Sphere& sphere, Plane& plane, ContactManifold* contact = nullptr)
 		{
 			float dist = DirectX::XMVectorGetX(DirectX::XMVector3Dot(DirectX::XMVectorSubtract(sphere.Center, plane.Center), plane.Normal));
 
 			if (dist > sphere.Radius)
 				return false;
 
-			contact.Normal = plane.Normal;
-			contact.PenetrationDepth = sphere.Radius - dist;
-			contact.Point = DirectX::XMVectorSubtract(sphere.Center, DirectX::XMVectorScale(plane.Normal, dist));
+            std::shared_ptr<ContactPoint> contactPoint = std::make_shared<ContactPoint>();
+            contactPoint->Normal = plane.Normal;
+            contactPoint->PenetrationDepth = sphere.Radius - dist;
+            contactPoint->Point = DirectX::XMVectorSubtract(sphere.Center, DirectX::XMVectorScale(plane.Normal, dist));
+
+            if (contact)
+                contact->AddContact(contactPoint);
 
 			return true;
 		}
