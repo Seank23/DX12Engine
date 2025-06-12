@@ -187,8 +187,8 @@ void ClientApplication::Init(std::shared_ptr<DX12Engine::RenderContext> renderCo
 	m_RenderPipeline = m_Renderer->CreateRenderPipeline(pipelineConfig);
 
 	m_PhysicsEngine.SetComponents(m_SceneObjects.GetAllComponents<DX12Engine::PhysicsComponent>());
-	m_SceneObjects.Get("Cube")->GetComponent<DX12Engine::PhysicsComponent>()->ApplyForce(DX12Engine::Force{ { 500.0, 1000.0f, 0.0f }, 0.05f, { -1.5f, 3.9f, 0.1f } });
-	m_SceneObjects.Get("Ball")->GetComponent<DX12Engine::PhysicsComponent>()->ApplyForce(DX12Engine::Force{ { -200.0, 500.0f, 0.0f }, 0.05f, { 1.5f, 3.7f, -0.2f } });
+	m_SceneObjects.Get("Cube")->GetComponent<DX12Engine::PhysicsComponent>()->ApplyForce(DX12Engine::Force{ { 150.0, 500.0f, 0.0f }, 0.05f, { -1.5f, 3.9f, 0.1f } });
+	m_SceneObjects.Get("Ball")->GetComponent<DX12Engine::PhysicsComponent>()->ApplyForce(DX12Engine::Force{ { -150.0, 250.0f, 0.0f }, 0.05f, { 1.5f, 3.7f, -0.2f } });
 }
 
 void ClientApplication::Update(float ts, float elapsed)

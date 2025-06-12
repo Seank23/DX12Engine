@@ -46,17 +46,17 @@ namespace DX12Engine
 
 	struct ContactManifold
 	{
-		std::vector<std::shared_ptr<ContactPoint>> Contacts;
+		std::vector<ContactPoint> Contacts;
         DirectX::XMVECTOR Normal = DirectX::XMVectorZero();
 		float PenetrationDepth = 0.0f;
 		PhysicsComponent* A = nullptr;
 		PhysicsComponent* B = nullptr;
 
-		void AddContact(std::shared_ptr<ContactPoint> contact)
+		void AddContact(const ContactPoint& contact)
 		{
-			Contacts.push_back(contact);
-			Normal = DirectX::XMVector3Normalize(DirectX::XMVectorAdd(Normal, contact->Normal));
-			PenetrationDepth += contact->PenetrationDepth;
+			Contacts.emplace_back(contact);
+			Normal = DirectX::XMVector3Normalize(DirectX::XMVectorAdd(Normal, contact.Normal));
+			PenetrationDepth += contact.PenetrationDepth;
 		}
 	};
 
@@ -82,13 +82,29 @@ namespace DX12Engine
             else if (Type == CollisionMeshType::Sphere && other.Type == CollisionMeshType::Plane)
                 return SphereVsPlane(SphereData, other.PlaneData, outContact);
             else if (Type == CollisionMeshType::Plane && other.Type == CollisionMeshType::Box)
-                return OBBVsPlane(other.OBBData, PlaneData, outContact);
+                return BoxVsPlaneContacts(other.OBBData, PlaneData, outContact);
             else if (Type == CollisionMeshType::Box && other.Type == CollisionMeshType::Plane)
-                return OBBVsPlane(OBBData, other.PlaneData, outContact);
+                return BoxVsPlaneContacts(OBBData, other.PlaneData, outContact);
 			return false;
 		}
 
-		bool OBBvsOBB(OBB& a, OBB& b, ContactManifold* contact = nullptr)
+        bool BoxVsPlaneContacts(OBB& box, const Plane& plane, ContactManifold* outManifold) 
+        {
+            if (OBBVsPlane(box, plane, outManifold))
+            {
+                int refFace = GetReferenceFaceIndex(box, plane.Normal);
+
+                std::vector<DirectX::XMVECTOR> faceVerts;
+                GetBoxFaceVertices(box, refFace, faceVerts);
+
+                ClipFaceAgainstPlane(faceVerts, plane, *outManifold);
+                outManifold->PenetrationDepth /= outManifold->Contacts.size();
+                return true;
+            }
+            return false;
+        }
+
+		bool OBBvsOBB(const OBB& a, const OBB& b, ContactManifold* contact = nullptr)
 		{
             constexpr float EPSILON = 1e-6f;
             float minOverlap = FLT_MAX;
@@ -140,10 +156,10 @@ namespace DX12Engine
                 }
             }
 
-            std::shared_ptr<ContactPoint> contactPoint = std::make_shared<ContactPoint>();
-			contactPoint->Normal = smallestAxis;
-			contactPoint->PenetrationDepth = minOverlap;
-			contactPoint->Point = DirectX::XMVectorAdd(a.Center, DirectX::XMVectorScale(smallestAxis, 0.5f * minOverlap));
+            ContactPoint contactPoint;
+			contactPoint.Normal = smallestAxis;
+			contactPoint.PenetrationDepth = minOverlap;
+			contactPoint.Point = DirectX::XMVectorAdd(a.Center, DirectX::XMVectorScale(smallestAxis, 0.5f * minOverlap));
 
             if (contact) 
 				contact->AddContact(contactPoint);
@@ -151,12 +167,13 @@ namespace DX12Engine
             return true;
 		}
 
-        bool SphereVsOBB(Sphere& sphere, OBB& obb, ContactManifold* contact = nullptr)
+        bool SphereVsOBB(const Sphere& sphere, const OBB& obb, ContactManifold* contact = nullptr)
         {
             DirectX::XMVECTOR d = DirectX::XMVectorSubtract(sphere.Center, obb.Center);
             DirectX::XMVECTOR closest = obb.Center;
 
-            for (int i = 0; i < 3; ++i) {
+            for (int i = 0; i < 3; ++i) 
+            {
                 float dist = DirectX::XMVectorGetX(DirectX::XMVector3Dot(d, obb.Axis[i]));
                 float clamped = (std::max)(-DirectX::XMVectorGetByIndex(obb.Extents, i), (std::min)(dist, DirectX::XMVectorGetByIndex(obb.Extents, i)));
                 closest = DirectX::XMVectorAdd(closest, DirectX::XMVectorScale(obb.Axis[i], clamped));
@@ -169,10 +186,10 @@ namespace DX12Engine
                 return false;
 
             float dist = sqrtf(distSq);
-            std::shared_ptr<ContactPoint> contactPoint = std::make_shared<ContactPoint>();
-            contactPoint->Normal = dist > 1e-5f ? DirectX::XMVectorScale(diff, 1.0f / dist) : DirectX::XMVectorSet(0, 1, 0, 0);
-            contactPoint->PenetrationDepth = sphere.Radius - dist;
-            contactPoint->Point = closest;
+            ContactPoint contactPoint;
+            contactPoint.Normal = dist > 1e-5f ? DirectX::XMVectorScale(diff, 1.0f / dist) : DirectX::XMVectorSet(0, 1, 0, 0);
+            contactPoint.PenetrationDepth = sphere.Radius - dist;
+            contactPoint.Point = closest;
 
             if (contact)
                 contact->AddContact(contactPoint);
@@ -180,7 +197,7 @@ namespace DX12Engine
             return true;
         }
 
-        bool SphereVsSphere(Sphere& a, Sphere& b, ContactManifold* contact = nullptr)
+        bool SphereVsSphere(const Sphere& a, const Sphere& b, ContactManifold* contact = nullptr)
         {
             DirectX::XMVECTOR delta = DirectX::XMVectorSubtract(b.Center, a.Center);
             float distSq = DirectX::XMVectorGetX(DirectX::XMVector3LengthSq(delta));
@@ -192,10 +209,10 @@ namespace DX12Engine
             float dist = sqrtf(distSq);
             DirectX::XMVECTOR normal = dist > 1e-5f ? DirectX::XMVectorScale(delta, 1.0f / dist) : DirectX::XMVectorSet(0, 1, 0, 0);
 
-            std::shared_ptr<ContactPoint> contactPoint = std::make_shared<ContactPoint>();
-            contactPoint->Normal = normal;
-            contactPoint->PenetrationDepth = rSum - dist;
-            contactPoint->Point = DirectX::XMVectorAdd(a.Center, DirectX::XMVectorScale(normal, a.Radius));
+            ContactPoint contactPoint;
+            contactPoint.Normal = normal;
+            contactPoint.PenetrationDepth = rSum - dist;
+            contactPoint.Point = DirectX::XMVectorAdd(a.Center, DirectX::XMVectorScale(normal, a.Radius));
 
             if (contact)
                 contact->AddContact(contactPoint);
@@ -203,7 +220,7 @@ namespace DX12Engine
             return true;
         }
 
-        bool OBBVsPlane(OBB& obb, Plane& plane, ContactManifold* contact = nullptr)
+        bool OBBVsPlane(OBB& obb, const Plane& plane, ContactManifold* contact = nullptr)
         {
             float r = 0.0f;
             for (int i = 0; i < 3; ++i)
@@ -218,10 +235,10 @@ namespace DX12Engine
             if (dist > r)
                 return false;
 
-            std::shared_ptr<ContactPoint> contactPoint = std::make_shared<ContactPoint>();
-            contactPoint->Normal = plane.Normal;
-            contactPoint->PenetrationDepth = r - dist;
-            contactPoint->Point = DirectX::XMVectorSubtract(obb.Center, DirectX::XMVectorScale(plane.Normal, dist));
+            ContactPoint contactPoint;
+            contactPoint.Normal = plane.Normal;
+            contactPoint.PenetrationDepth = r - dist;
+            contactPoint.Point = DirectX::XMVectorSubtract(obb.Center, DirectX::XMVectorScale(plane.Normal, dist));
 
             if (contact)
                 contact->AddContact(contactPoint);
@@ -229,22 +246,103 @@ namespace DX12Engine
             return true;
         }
 
-		bool SphereVsPlane(Sphere& sphere, Plane& plane, ContactManifold* contact = nullptr)
+		bool SphereVsPlane(const Sphere& sphere, const Plane& plane, ContactManifold* contact = nullptr)
 		{
 			float dist = DirectX::XMVectorGetX(DirectX::XMVector3Dot(DirectX::XMVectorSubtract(sphere.Center, plane.Center), plane.Normal));
 
 			if (dist > sphere.Radius)
 				return false;
 
-            std::shared_ptr<ContactPoint> contactPoint = std::make_shared<ContactPoint>();
-            contactPoint->Normal = plane.Normal;
-            contactPoint->PenetrationDepth = sphere.Radius - dist;
-            contactPoint->Point = DirectX::XMVectorSubtract(sphere.Center, DirectX::XMVectorScale(plane.Normal, dist));
+            ContactPoint contactPoint;
+            contactPoint.Normal = plane.Normal;
+            contactPoint.PenetrationDepth = sphere.Radius - dist;
+            contactPoint.Point = DirectX::XMVectorSubtract(sphere.Center, DirectX::XMVectorScale(plane.Normal, dist));
 
             if (contact)
                 contact->AddContact(contactPoint);
 
 			return true;
 		}
+
+        int GetReferenceFaceIndex(const OBB& box, const DirectX::XMVECTOR& planeNormal) 
+        {
+            DirectX::XMVECTOR right = box.Axis[0];
+            DirectX::XMVECTOR up = box.Axis[1];
+            DirectX::XMVECTOR forward = box.Axis[2];
+
+            DirectX::XMVECTOR axes[3] = { right, up, forward };
+            float maxDot = -FLT_MAX;
+            int bestAxis = 0;
+
+            for (int i = 0; i < 3; ++i) 
+            {
+                float dot = fabsf(DirectX::XMVectorGetX(DirectX::XMVector3Dot(axes[i], planeNormal)));
+                if (dot > maxDot) 
+                {
+                    maxDot = dot;
+                    bestAxis = i;
+                }
+            }
+            return bestAxis;
+        }
+
+        void GetBoxFaceVertices(const OBB& box, int faceIndex, std::vector<DirectX::XMVECTOR>& outVerts) 
+        {
+            DirectX::XMVECTOR center = box.Center;
+            DirectX::XMVECTOR ex = DirectX::XMVectorReplicate(DirectX::XMVectorGetX(box.Extents));
+            DirectX::XMVECTOR ey = DirectX::XMVectorReplicate(DirectX::XMVectorGetY(box.Extents));
+            DirectX::XMVECTOR ez = DirectX::XMVectorReplicate(DirectX::XMVectorGetZ(box.Extents));
+
+            DirectX::XMVECTOR right = box.Axis[0];
+            DirectX::XMVECTOR up = box.Axis[1];
+            DirectX::XMVECTOR fwd = box.Axis[2];
+
+            DirectX::XMVECTOR normal, axisA, axisB;
+            if (faceIndex == 0) 
+            {
+                normal = right;
+                axisA = up;
+                axisB = fwd;
+                ex = DirectX::XMVectorNegate(ex);
+            }
+            else if (faceIndex == 1) 
+            {
+                normal = up;
+                axisA = right;
+                axisB = fwd;
+                ey = DirectX::XMVectorNegate(ey);
+            }
+            else 
+            {
+                normal = fwd;
+                axisA = right;
+                axisB = up;
+                ez = DirectX::XMVectorNegate(ez);
+            }
+
+            DirectX::XMVECTOR faceCenter = DirectX::XMVectorAdd(center, DirectX::XMVectorScale(normal, box.Extents.m128_f32[faceIndex]));
+
+            outVerts.clear();
+            outVerts.push_back(DirectX::XMVectorAdd(faceCenter, DirectX::XMVectorAdd(DirectX::XMVectorMultiply(axisA, box.Extents), DirectX::XMVectorMultiply(axisB, box.Extents))));
+            outVerts.push_back(DirectX::XMVectorSubtract(faceCenter, DirectX::XMVectorAdd(DirectX::XMVectorMultiply(axisA, box.Extents), DirectX::XMVectorMultiply(axisB, box.Extents))));
+            outVerts.push_back(DirectX::XMVectorSubtract(faceCenter, DirectX::XMVectorSubtract(DirectX::XMVectorMultiply(axisA, box.Extents), DirectX::XMVectorMultiply(axisB, box.Extents))));
+            outVerts.push_back(DirectX::XMVectorAdd(faceCenter, DirectX::XMVectorSubtract(DirectX::XMVectorMultiply(axisA, box.Extents), DirectX::XMVectorMultiply(axisB, box.Extents))));
+        }
+
+        void ClipFaceAgainstPlane(const std::vector<DirectX::XMVECTOR>& faceVerts, const Plane& plane, ContactManifold& outManifold) 
+        {
+            for (const auto& v : faceVerts) 
+            {
+                float dist = DirectX::XMVectorGetX(DirectX::XMVector3Dot(plane.Normal, DirectX::XMVectorSubtract(v, plane.Center)));
+                if (dist <= 0.0f) 
+                {
+                    ContactPoint contact;
+                    contact.Point = v;
+                    contact.Normal = plane.Normal;
+                    contact.PenetrationDepth = -dist;
+                    outManifold.AddContact(contact);
+                }
+            }
+        }
     };
 }

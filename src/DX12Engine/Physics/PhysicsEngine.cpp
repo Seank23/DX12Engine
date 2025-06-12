@@ -12,7 +12,7 @@ namespace DX12Engine
 		for (const auto& component : m_Components)
 		{
 			if (!component->m_IsStatic && APPLY_GRAVITY)
-					component->m_Acceleration = DirectX::XMVECTOR({ 0.0f, -GRAVITY, 0.0f });
+				component->m_Acceleration = DirectX::XMVECTOR({ 0.0f, -GRAVITY, 0.0f });
 		}
 
 		std::vector<ContactManifold> contacts;
@@ -31,8 +31,11 @@ namespace DX12Engine
 
 		for (auto& contact : contacts)
 		{
-			PositionalCorrection(contact);
-			ResolveCollision(contact);
+			if (contact.Contacts.size() > 0)
+			{
+				PositionalCorrection(contact);
+				ResolveCollision(contact);
+			}
 		}
 
 		for (const auto& component : m_Components)
@@ -55,17 +58,18 @@ namespace DX12Engine
 
 	void PhysicsEngine::PositionalCorrection(ContactManifold& contact)
 	{
-		DirectX::XMVECTOR normalToUp = DirectX::XMVector3Dot(contact.Normal, { 0.0f, 1.0f, 0.0f });
-		float areaFactor = (DirectX::XMVectorGetX(normalToUp) + DirectX::XMVectorGetY(normalToUp)) / 2.0f;
-		areaFactor = std::clamp(areaFactor, 0.1f, 1.0f);
+		const float percent = 0.08f;
+		const float slop = 0.01f;
 
-		const float percent = areaFactor;
-		const float slop = std::lerp(0.4f, 0.01f, areaFactor);
-		float correctionMagnitude = ((std::max)(contact.PenetrationDepth - slop, 0.0f) / (contact.A->m_InvMass + contact.B->m_InvMass)) * percent;
+		float penetration = contact.PenetrationDepth - slop;
+		if (penetration > 0.0f) {
+			DirectX::XMVECTOR correctionDir = contact.Normal;
+			float totalInverseMass = contact.A->m_InvMass + contact.B->m_InvMass;
+			DirectX::XMVECTOR correction = DirectX::XMVectorScale(correctionDir, (penetration / totalInverseMass) * percent);
 
-		DirectX::XMVECTOR correction = DirectX::XMVectorScale(contact.Normal, correctionMagnitude);
-		if (contact.A->m_InvMass > 0.0f) contact.A->m_Parent->Move(DirectX::XMVectorNegate(DirectX::XMVectorMultiply(correction, DirectX::XMVectorReplicate(contact.A->m_InvMass))));
-		if (contact.B->m_InvMass > 0.0f) contact.B->m_Parent->Move(DirectX::XMVectorMultiply(correction, DirectX::XMVectorReplicate(contact.B->m_InvMass)));
+			contact.A->m_Parent->Move(DirectX::XMVectorNegate(DirectX::XMVectorMultiply(correction, DirectX::XMVectorReplicate(contact.A->m_InvMass))));
+			contact.B->m_Parent->Move(DirectX::XMVectorMultiply(correction, DirectX::XMVectorReplicate(contact.B->m_InvMass)));
+		}
 	}
 
 
@@ -74,7 +78,7 @@ namespace DX12Engine
 		PhysicsComponent* a = contact.A;
 		PhysicsComponent* b = contact.B;
 
-		DirectX::XMVECTOR contactPoint = contact.Contacts[0]->Point;
+		DirectX::XMVECTOR contactPoint = contact.Contacts[0].Point;
 		DirectX::XMVECTOR ra = DirectX::XMVectorSubtract(contactPoint, a->GetPosition());
 		DirectX::XMVECTOR rb = DirectX::XMVectorSubtract(contactPoint, b->GetPosition());
 
@@ -85,7 +89,7 @@ namespace DX12Engine
 		float velocityAlongNormal = DirectX::XMVectorGetX(DirectX::XMVector3Dot(relativeVelocity, contact.Normal));
 		if (velocityAlongNormal < 0.1f)
 		{
-			float restitution = 2.0f;
+			float restitution = 50.0f;
 			float impulseMagnitude = -(1.0f + restitution) * velocityAlongNormal;
 			impulseMagnitude /= (a->m_InvMass + b->m_InvMass);
 			DirectX::XMVECTOR impulse = DirectX::XMVectorScale(contact.Normal, impulseMagnitude);
