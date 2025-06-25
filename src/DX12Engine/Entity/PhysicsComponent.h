@@ -29,6 +29,7 @@ namespace DX12Engine
 		virtual void OnTransformChanged(TransformType type) override;
 
 		void ApplyForce(Force force);
+		void ApplyTorque(DirectX::XMVECTOR torque);
 
 		void SetMass(float mass);
 		void SetIsStatic(bool isStatic);
@@ -55,6 +56,7 @@ namespace DX12Engine
 		float m_Mass;
 		float m_InvMass;
 		bool m_IsStatic;
+		float m_AngularDamping = 0.1f;
 
 		std::vector<Force> m_Forces;
 

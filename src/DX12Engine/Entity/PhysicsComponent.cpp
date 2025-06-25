@@ -40,6 +40,7 @@ namespace DX12Engine
 		{
 			DirectX::XMVECTOR angularAccceleration = DirectX::XMVector3Transform(m_Torque, m_InverseInertiaTensor);
 			m_AngularVelocity = DirectX::XMVectorAdd(m_AngularVelocity, DirectX::XMVectorScale(angularAccceleration, ts));
+			m_AngularVelocity = DirectX::XMVectorScale(m_AngularVelocity, std::powf(1.0f - m_AngularDamping, ts));
 			UpdateInertiaTensor();
 
 			DirectX::XMVECTOR rotation = m_Parent->GetRotation();
@@ -145,6 +146,14 @@ namespace DX12Engine
 			m_Forces.push_back(force);
 	}
 
+	void PhysicsComponent::ApplyTorque(DirectX::XMVECTOR torque)
+	{
+		if (!m_IsStatic)
+		{
+			m_Torque = DirectX::XMVectorAdd(m_Torque, torque);
+		}
+	}
+
 	void PhysicsComponent::SetMass(float mass)
 	{
 		m_Mass = mass;
@@ -232,6 +241,5 @@ namespace DX12Engine
 	void PhysicsComponent::UpdateCollisionMesh()
 	{
 		OnTransformChanged(TransformType::Position);
-		OnTransformChanged(TransformType::Rotation);
 	}
 }

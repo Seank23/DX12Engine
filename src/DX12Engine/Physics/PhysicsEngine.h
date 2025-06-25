@@ -24,6 +24,7 @@ namespace DX12Engine
 		bool CheckCollision(PhysicsComponent* a, PhysicsComponent* b, ContactManifold* outContact);
 		void PositionalCorrection(ContactManifold& contact);
 		void ResolveCollision(ContactManifold& contact);
+		DirectX::XMVECTOR CalculateContactTangent(DirectX::XMVECTOR normal);
 
 		std::vector<PhysicsComponent*> m_Components;
 	};
