@@ -31,7 +31,7 @@ namespace DX12Engine
 
     void PhysicsComponent::Update(float ts, float elapsed)
     {
-		if (m_IsStatic) return;
+		if (m_IsStatic || ShouldRest(ts)) return;
 
 		EvaluateForces(ts);
 		m_Velocity = DirectX::XMVectorAdd(m_Velocity, DirectX::XMVectorScale(m_Acceleration, ts));
@@ -195,7 +195,7 @@ namespace DX12Engine
 	{
 		for (Force& force : m_Forces)
 		{
-			if (force.Duration > 0.0f)
+			if (force.Duration >= 0.0f)
 			{
 				m_Acceleration = DirectX::XMVectorAdd(m_Acceleration, DirectX::XMVectorScale(force.Magnitude, 1.0f / m_Mass));
 				force.Duration -= ts;
@@ -241,5 +241,34 @@ namespace DX12Engine
 	void PhysicsComponent::UpdateCollisionMesh()
 	{
 		OnTransformChanged(TransformType::Position);
+	}
+
+	bool PhysicsComponent::ShouldRest(float ts)
+	{
+		if (m_Forces.size() > 0 || !DirectX::XMVector3Equal(m_Torque, DirectX::XMVectorZero()))
+			return false;
+
+		const float sleepLinearThreshold = 0.01f;
+		const float sleepAngularThreshold = 0.01f;
+		const float sleepTimeThreshold = 1.0f;
+
+		float timeBelowThreshold = 0.0f;
+
+		if (DirectX::XMVectorGetX(DirectX::XMVector3Length(m_Velocity)) < sleepLinearThreshold &&
+			DirectX::XMVectorGetX(DirectX::XMVector3Length(m_AngularVelocity)) < sleepAngularThreshold)
+		{
+			timeBelowThreshold += ts;
+			if (timeBelowThreshold >= sleepTimeThreshold)
+			{
+				m_Velocity = DirectX::XMVectorZero();
+				m_AngularVelocity = DirectX::XMVectorZero();
+				return true;
+			}
+		}
+		else
+		{
+			timeBelowThreshold = 0.0f;
+			return false;
+		}
 	}
 }

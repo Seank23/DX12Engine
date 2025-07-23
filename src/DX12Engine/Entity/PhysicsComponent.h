@@ -45,6 +45,7 @@ namespace DX12Engine
 		void UpdateInertiaTensor();
 		std::vector<DirectX::XMVECTOR> GetBoundingBoxVertices(std::vector<DirectX::XMVECTOR> transformedVertices);
 		void UpdateCollisionMesh();
+		bool ShouldRest(float ts);
 
 		DirectX::XMVECTOR m_Velocity;
 		DirectX::XMVECTOR m_AngularVelocity;
