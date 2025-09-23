@@ -30,17 +30,17 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(tinyobjloader)
 
-file(GLOB_RECURSE RENDERER_SOURCES CONFIGURE_DEPENDS
+file(GLOB_RECURSE ENGINE_SOURCES CONFIGURE_DEPENDS
     src/*.cpp
     src/*.h
     src/*.hlsl
 )
 
 # Your executable
-add_executable(DX12Engine ${RENDERER_SOURCES})
+add_library(DX12Engine STATIC ${ENGINE_SOURCES})
 
 # Link dependencies
-target_link_libraries(DX12Engine
+target_link_libraries(DX12Engine PUBLIC
     DirectXTex
     tinyobjloader
     D3D12.lib
@@ -49,6 +49,7 @@ target_link_libraries(DX12Engine
     dxguid.lib
     D3DCompiler.lib
     dxcompiler.lib
+	Microsoft::DirectX-Headers
 )
 
 # Include headers
@@ -56,7 +57,7 @@ target_include_directories(DX12Engine PRIVATE
     ${directx-headers_SOURCE_DIR}/include/directx
 )
 
-foreach(SHADER ${RENDERER_SOURCES})
+foreach(SHADER ${ENGINE_SOURCES})
     get_filename_component(FILENAME ${SHADER} NAME)
     set(SHADER_TYPE Pixel)
 
@@ -79,7 +80,7 @@ foreach(SHADER ${RENDERER_SOURCES})
 
 endforeach()
 
-source_group(TREE ${CMAKE_CURRENT_SOURCE_DIR}/src PREFIX "Source Files" FILES ${RENDERER_SOURCES})
+source_group(TREE ${CMAKE_CURRENT_SOURCE_DIR}/src PREFIX "Source Files" FILES ${ENGINE_SOURCES})
 
 file(COPY "${CMAKE_SOURCE_DIR}/res" DESTINATION "${CMAKE_CURRENT_BINARY_DIR}")
 
@@ -100,8 +101,8 @@ foreach(SHADER_FILE ${SHADER_FILES})
     list(APPEND COPIED_SHADER_FILES "${SHADER_OUTPUT_DIR}/${SHADER_NAME}")
 endforeach()
 
-add_custom_target(CopyShaders ALL
+add_custom_target(CopyEngineShaders ALL
     DEPENDS ${COPIED_SHADER_FILES}
 )
-add_dependencies(DX12Engine CopyShaders)
+add_dependencies(DX12Engine CopyEngineShaders)
 
