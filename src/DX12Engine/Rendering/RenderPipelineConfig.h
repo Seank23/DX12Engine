@@ -12,6 +12,7 @@ namespace DX12Engine
 		Geometry,
 		Lighting,
 		ScreenSpaceReflection,
+		UI,
 	};
 
 	enum class InputResourceType

@@ -3,6 +3,7 @@
 #include "../RenderContext.h"
 #include "../Queues/CommandQueueManager.h"
 #include "../RootSignatureBuilder.h"
+#include "RenderPassData.h"
 
 namespace DX12Engine
 {
@@ -21,16 +22,18 @@ namespace DX12Engine
 	class GPUResource;
 	class RenderTexture;
 	class GPUResource;
+	class ConstantBuffer;
+	class Camera;
 
 	class RenderPass
 	{
 	public:
 		RenderPass(RenderContext& context)
-			: m_RenderContext(context), m_QueueManager(context.GetQueueManager()), m_CommandList(*m_QueueManager.GetGraphicsQueue().GetCommandList())
+			: m_RenderContext(context), m_QueueManager(context.GetQueueManager()), m_CommandList(*m_QueueManager.GetGraphicsQueue().GetCommandList()), m_Camera(nullptr)
 			{}
 		~RenderPass() = default;
-		virtual void Init() = 0;
-		virtual void Execute() = 0;
+		virtual void Init();
+		virtual void Execute();
 
 		void AddInputResources(std::vector<GPUResource*> resources) 
 		{ 
@@ -42,6 +45,7 @@ namespace DX12Engine
 		}
 		void SetRenderObjects(std::vector<RenderComponent*> renderObjects) { m_RenderObjects = renderObjects; }
 		virtual RenderTexture* GetRenderTarget(RenderTargetType type) = 0;
+		void SetCamera(Camera* camera) { m_Camera = camera; }
 
 		void AddDescriptorTableConfig(DescriptorTableConfig config) { m_DescriptorTableConfigs.push_back(config); }
 
@@ -50,9 +54,15 @@ namespace DX12Engine
 		CommandQueueManager& m_QueueManager;
 		ID3D12GraphicsCommandList& m_CommandList;
 
+		ScreenData m_ScreenData;
+		std::unique_ptr<ConstantBuffer> m_ScreenDataCB;
+		void UpdateCB();
+
 		std::vector<std::shared_ptr<GPUResource>> m_InputResources;
 		std::vector<DescriptorTableConfig> m_DescriptorTableConfigs;
 		std::vector<std::unique_ptr<RenderTexture>> m_RenderTargets;
 		std::vector<RenderComponent*> m_RenderObjects;
+
+		Camera* m_Camera;
 	};
 }

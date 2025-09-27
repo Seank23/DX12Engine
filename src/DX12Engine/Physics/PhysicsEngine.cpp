@@ -60,7 +60,7 @@ namespace DX12Engine
 
 	void PhysicsEngine::PositionalCorrection(ContactManifold& contact)
 	{
-		const float percent = 0.08f;
+		const float percent = 0.02f;
 		const float slop = 0.01f;
 
 		float penetration = contact.PenetrationDepth - slop;

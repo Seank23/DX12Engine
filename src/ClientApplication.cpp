@@ -44,8 +44,8 @@ void ClientApplication::Init(std::shared_ptr<DX12Engine::RenderContext> renderCo
 	DX12Engine::GPUUploader uploader = m_RenderContext->GetUploader();
 	std::vector<DX12Engine::Texture*> textures;
 
-	std::shared_ptr<DX12Engine::Texture> skyboxCube = textureLoader.LoadCubemapDDS(DX12Engine::ResourceManager::GetMaterialPath("skybox/skybox_cubemap.dds"));
-	std::shared_ptr<DX12Engine::Texture> skyboxIrradiance = textureLoader.LoadCubemapDDS(DX12Engine::ResourceManager::GetMaterialPath("skybox/skybox_irradiance.dds"));
+	std::shared_ptr<DX12Engine::Texture> skyboxCube = textureLoader.LoadCubemapDDS(DX12Engine::ResourceManager::GetMaterialPath("skybox/skybox2_cubemap.dds"));
+	std::shared_ptr<DX12Engine::Texture> skyboxIrradiance = textureLoader.LoadCubemapDDS(DX12Engine::ResourceManager::GetMaterialPath("skybox/skybox2_irradiance.dds"));
 	textures = { skyboxCube.get(), skyboxIrradiance.get() };
 	uploader.UploadTextureBatch(textures);
 
@@ -122,7 +122,7 @@ void ClientApplication::Init(std::shared_ptr<DX12Engine::RenderContext> renderCo
 	m_Renderer->SetLightBuffer(m_LightBuffer.get());
 
 	m_Camera = std::make_unique<DX12Engine::Camera>(windowSize.x / windowSize.y, 1.0f, 100.0f);
-	m_Camera->SetPosition({ 5.0f, 1.0f, -12.0f });
+	m_Camera->SetPosition({ 5.0f, 1.0f, -10.0f });
 	m_Camera->SetRotation(5.0f, 115.0f);
 	m_Renderer->SetCamera(m_Camera.get());
 

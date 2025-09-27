@@ -20,6 +20,8 @@ namespace DX12Engine
 
 	void ShadowMapRenderPass::Init()
 	{
+		RenderPass::Init();
+
 		m_RenderTargets.emplace_back(ResourceManager::GetInstance().CreateDepthMap(
 			DirectX::XMINT3(SHADOW_MAP_SIZE, SHADOW_MAP_SIZE, m_ShadowMapCount),
 			DXGI_FORMAT_D32_FLOAT,
@@ -31,6 +33,8 @@ namespace DX12Engine
 
 	void ShadowMapRenderPass::Execute()
 	{
+		RenderPass::Execute();
+
 		RenderTexture* shadowMap = m_RenderTargets[0].get();
 		for (int i = 0; i < m_Lights.size(); i++)
 		{

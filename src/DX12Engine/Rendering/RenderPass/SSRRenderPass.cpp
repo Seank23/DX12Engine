@@ -20,25 +20,22 @@ namespace DX12Engine
 
 	void SSRRenderPass::Init()
 	{
+		RenderPass::Init();
+
 		DirectX::XMINT2 windowSize = m_RenderContext.GetWindowSize();
 		m_RenderTargets.emplace_back(ResourceManager::GetInstance().CreateRenderTargetTexture(DirectX::XMINT2(windowSize.x, windowSize.y), DXGI_FORMAT_R8G8B8A8_UNORM));
-
-		ResourceManager::GetInstance().UpdateSRVDescriptors(EngineUtils::VectorSharedPtrToPtrs(m_InputResources));
 		ResourceManager::GetInstance().UpdateSRVDescriptors(reinterpret_cast<std::vector<GPUResource*> const&>(m_RenderTargets));
-		AddDescriptorTableConfig({ (UINT)m_InputResources.size(), D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 0 });
 
 		m_Viewport = { 0.0f, 0.0f, (float)windowSize.x, (float)windowSize.y, -1.0f, 1.0f };
 		m_ScissorRect = { 0, 0, (LONG)windowSize.x, (LONG)windowSize.y };
-
-		m_SSRPassCB = ResourceManager::GetInstance().CreateConstantBuffer(sizeof(SSRPassData));
-		m_SSRPassData.ScreenSize = DirectX::XMFLOAT2(windowSize.x, windowSize.y);
 
 		CreateSSRPassPSO();
 	}
 
 	void SSRRenderPass::Execute()
 	{
-		UpdateSSRPassCB();
+		RenderPass::Execute();
+
 		RenderTexture* renderTarget = m_RenderTargets[0].get();
 
 		if (!m_RenderContext.GetUploader().UploadAllPending()) // Upload any pending resources
@@ -67,7 +64,7 @@ namespace DX12Engine
 		auto srvHeap = m_RenderContext.GetHeapManager().GetRenderPassHeap().GetHeap();
 		m_CommandList.SetDescriptorHeaps(1, &srvHeap);
 
-		m_CommandList.SetGraphicsRootConstantBufferView(0, m_SSRPassCB->GetGPUAddress());
+		m_CommandList.SetGraphicsRootConstantBufferView(0, m_ScreenDataCB->GetGPUAddress());
 		int startIndex = 1;
 		for (int i = 0; i < m_DescriptorTableConfigs.size(); i++)
 		{
@@ -120,15 +117,5 @@ namespace DX12Engine
 		m_RootSignature = ResourceManager::GetInstance().CreateRootSignature(rootSignatureBuilder.Build());
 		pipelineStateBuilder = pipelineStateBuilder.SetRootSignature(m_RootSignature.Get());
 		m_PipelineState = ResourceManager::GetInstance().CreatePipelineState(pipelineStateBuilder.Build());
-	}
-
-	void SSRRenderPass::UpdateSSRPassCB()
-	{
-		m_SSRPassData.CameraPosition = DirectX::XMFLOAT4(m_Camera->GetPosition().x, m_Camera->GetPosition().y, m_Camera->GetPosition().z, 1.0f);
-		m_SSRPassData.ViewMatrix = m_Camera->GetViewMatrix();
-		m_SSRPassData.ProjectionMatrix = m_Camera->GetProjectionMatrix();
-		m_SSRPassData.InvViewMatrix = DirectX::XMMatrixInverse(nullptr, m_Camera->GetViewMatrix());
-		m_SSRPassData.InvProjectionMatrix = DirectX::XMMatrixInverse(nullptr, m_Camera->GetProjectionMatrix());
-		m_SSRPassCB->Update(&m_SSRPassData, sizeof(SSRPassData));
 	}
 }

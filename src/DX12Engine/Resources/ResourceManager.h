@@ -46,13 +46,14 @@ namespace DX12Engine
 		std::unique_ptr<Texture> CreateTexture(const DirectX::ScratchImage* imageData);
 		std::unique_ptr<Texture> CreateCubeMap(const DirectX::ScratchImage* imageData);
 		std::unique_ptr<RenderTexture> CreateDepthMap(DirectX::XMINT3 dimensions, DXGI_FORMAT dsvFormat, DXGI_FORMAT srvFormat, bool isCubeMap = false);
-		std::unique_ptr<RenderTexture> CreateRenderTargetTexture(DirectX::XMINT2 dimensions, DXGI_FORMAT format, UINT mipLevels = 1);
+		std::unique_ptr<RenderTexture> CreateRenderTargetTexture(DirectX::XMINT2 dimensions, DXGI_FORMAT format, UINT mipLevels = 1, DirectX::XMFLOAT4 clearColor = { 0.0f, 0.0f, 0.0f, 1.0f });
 
 		void UpdateSRVDescriptors(std::vector<GPUResource*> resources);
 
 		Microsoft::WRL::ComPtr<ID3D12PipelineState> CreatePipelineState(const D3D12_GRAPHICS_PIPELINE_STATE_DESC& desc);
 		Microsoft::WRL::ComPtr<ID3D12RootSignature> CreateRootSignature(const D3D12_ROOT_SIGNATURE_DESC& desc);
 
+		void AddShader(const std::string& name, const std::string& shaderPath, const std::string& shaderType) { m_Shaders.insert({ name, std::make_unique<Shader>(shaderPath, shaderType) }); }
 		Shader* GetShader(const std::string& name) { return m_Shaders[name].get(); }
 
 		static std::wstring GetMaterialPath(std::string path) { return L"res/Materials/" + std::wstring(path.begin(), path.end()); }

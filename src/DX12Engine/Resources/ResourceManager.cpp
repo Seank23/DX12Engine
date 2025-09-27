@@ -394,7 +394,7 @@ namespace DX12Engine
 		return std::make_unique<RenderTexture>(depthMapResource, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, dsvDescriptors, srvDesc, isCubeMap);
 	}
 
-	std::unique_ptr<RenderTexture> ResourceManager::CreateRenderTargetTexture(DirectX::XMINT2 dimensions, DXGI_FORMAT format, UINT mipLevels)
+	std::unique_ptr<RenderTexture> ResourceManager::CreateRenderTargetTexture(DirectX::XMINT2 dimensions, DXGI_FORMAT format, UINT mipLevels, DirectX::XMFLOAT4 clearColor)
 	{
 		D3D12_RESOURCE_DESC textureDesc = {};
 		textureDesc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
@@ -409,10 +409,10 @@ namespace DX12Engine
 
 		D3D12_CLEAR_VALUE clearValue = {};
 		clearValue.Format = format;
-		clearValue.Color[0] = 0.0f;
-		clearValue.Color[1] = 0.0f;
-		clearValue.Color[2] = 0.0f;
-		clearValue.Color[3] = 1.0f;
+		clearValue.Color[0] = clearColor.x;
+		clearValue.Color[1] = clearColor.y;
+		clearValue.Color[2] = clearColor.z;
+		clearValue.Color[3] = clearColor.w;
 
 		ID3D12Resource* renderTargetResource = nullptr;
 		auto heapProps = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);
@@ -439,7 +439,7 @@ namespace DX12Engine
 		srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
 		srvDesc.Texture2D.MipLevels = mipLevels;
 
-		return std::make_unique<RenderTexture>(renderTargetResource, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, rtvDescriptors, srvDesc, false);
+		return std::make_unique<RenderTexture>(renderTargetResource, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, rtvDescriptors, srvDesc, false, clearColor);
 	}
 
 	void ResourceManager::UpdateSRVDescriptors(std::vector<GPUResource*> resources)

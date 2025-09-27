@@ -16,8 +16,10 @@ namespace DX12Engine
 
     void GeometryRenderPass::Init()
     {
+        RenderPass::Init();
+
 		DirectX::XMINT2 windowSize = m_RenderContext.GetWindowSize();
-		m_RenderTargets.emplace_back(ResourceManager::GetInstance().CreateRenderTargetTexture(DirectX::XMINT2(windowSize.x, windowSize.y), DXGI_FORMAT_R8G8B8A8_UNORM)); // Albedo
+		m_RenderTargets.emplace_back(ResourceManager::GetInstance().CreateRenderTargetTexture(DirectX::XMINT2(windowSize.x, windowSize.y), DXGI_FORMAT_R8G8B8A8_UNORM, 1 , { 1.0f, 1.0f, 1.0f, 1.0f })); // Albedo
 		m_RenderTargets.emplace_back(ResourceManager::GetInstance().CreateRenderTargetTexture(DirectX::XMINT2(windowSize.x, windowSize.y), DXGI_FORMAT_R16G16B16A16_FLOAT)); // World Normal
 		m_RenderTargets.emplace_back(ResourceManager::GetInstance().CreateRenderTargetTexture(DirectX::XMINT2(windowSize.x, windowSize.y), DXGI_FORMAT_R16G16B16A16_FLOAT)); // Object Normal
 		m_RenderTargets.emplace_back(ResourceManager::GetInstance().CreateRenderTargetTexture(DirectX::XMINT2(windowSize.x, windowSize.y), DXGI_FORMAT_R16G16B16A16_FLOAT)); // Metallic, Roughness, AO
@@ -32,6 +34,8 @@ namespace DX12Engine
 
     void GeometryRenderPass::Execute()
     {
+		RenderPass::Execute();
+
         if (!m_RenderContext.GetUploader().UploadAllPending()) // Upload any pending resources
             m_QueueManager.GetGraphicsQueue().ResetCommandAllocatorAndList();
 
@@ -64,9 +68,12 @@ namespace DX12Engine
 		auto dsvHandle = m_RenderTargets[5]->GetTextureDescriptor().GetCPUHandle();
 		m_CommandList.OMSetRenderTargets(5, rtvHandles, false, &dsvHandle);
 
-        const float clearColor[] = { 0.0f, 0.0f, 0.0f, 1.0f };
-		for (int i = 0; i < 5; i++)
-			m_CommandList.ClearRenderTargetView(rtvHandles[i], clearColor, 0, nullptr);
+        for (int i = 0; i < 5; i++)
+        {
+			DirectX::XMFLOAT4 rtClearColor = m_RenderTargets[i]->GetClearColor();
+            const float clearColor[] = { rtClearColor.x, rtClearColor.y, rtClearColor.z, rtClearColor.w };
+            m_CommandList.ClearRenderTargetView(rtvHandles[i], clearColor, 0, nullptr);
+        }
 		m_CommandList.ClearDepthStencilView(dsvHandle, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
 
         m_CommandList.IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);

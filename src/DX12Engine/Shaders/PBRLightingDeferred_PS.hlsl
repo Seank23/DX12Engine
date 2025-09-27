@@ -13,19 +13,21 @@ struct Light
     matrix ViewProjMatrix;
 };
 
-cbuffer LightBuffer : register(b0)
+cbuffer ScreenBuffer : register(b0)
+{
+    float4 CameraPosition;
+    float4x4 ViewMatrix;
+    float4x4 ProjectionMatrix;
+    float4x4 InvViewMatrix;
+    float4x4 InvProjectionMatrix;
+    float2 ScreenSize;
+};
+
+cbuffer LightBuffer : register(b1)
 {
     int LightCount;
     float3 Padding;
     Light Lights[MAX_LIGHTS];
-};
-
-cbuffer LightingPassBuffer : register(b1)
-{
-    float4 CameraPosition;
-    float4x4 InvViewMatrix;
-    float4x4 InvProjectionMatrix;
-    float2 ScreenSize;
 };
 
 struct PSInput

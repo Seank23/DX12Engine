@@ -7,6 +7,7 @@
 #include "RenderPass/GeometryRenderPass.h"
 #include "RenderPass/LightingRenderPass.h"
 #include "RenderPass/SSRRenderPass.h"
+#include "RenderPass/UIRenderPass.h"
 #include "RenderPipelineConfig.h"
 #include "../Entity/GameObject.h"
 #include "../Entity/RenderComponent.h"
@@ -93,6 +94,8 @@ namespace DX12Engine
 			return std::make_unique<LightingRenderPass>(*m_RenderContext);
 		case RenderPassType::ScreenSpaceReflection:
 			return std::make_unique<SSRRenderPass>(*m_RenderContext);
+		case RenderPassType::UI:
+			return std::make_unique<UIRenderPass>(*m_RenderContext);
 		default:
 			return nullptr;
 		}
@@ -167,6 +170,9 @@ namespace DX12Engine
 							for (auto& texture : *static_cast<std::vector<std::shared_ptr<Texture>>*>(inputResource.second))
 								renderPass->AddInputResources({ texture });
 							break;
+						case InputResourceType::Camera:
+							renderPass->SetCamera(static_cast<Camera*>(inputResource.second));
+							break;
 						}
 					}
 					// Pass-specific input resources
@@ -194,20 +200,6 @@ namespace DX12Engine
 							{
 							case InputResourceType::LightBuffer:
 								static_cast<LightingRenderPass*>(renderPass)->SetLightBuffer(static_cast<LightBuffer*>(inputResource.second));
-								break;
-							case InputResourceType::Camera:
-								static_cast<LightingRenderPass*>(renderPass)->SetCamera(static_cast<Camera*>(inputResource.second));
-								break;
-							}
-						}
-						break;
-					case RenderPassType::ScreenSpaceReflection:
-						for (auto& inputResource : passConfig.InputResources)
-						{
-							switch (inputResource.first)
-							{
-							case InputResourceType::Camera:
-								static_cast<SSRRenderPass*>(renderPass)->SetCamera(static_cast<Camera*>(inputResource.second));
 								break;
 							}
 						}

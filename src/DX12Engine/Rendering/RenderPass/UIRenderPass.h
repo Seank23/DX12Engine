@@ -3,30 +3,26 @@
 
 namespace DX12Engine
 {
-	class LightBuffer;
+	class ConstantBuffer;
 
-	class LightingRenderPass : public RenderPass
+	class UIRenderPass : public RenderPass
 	{
 	public:
-		LightingRenderPass(RenderContext& context);
-		~LightingRenderPass();
+		UIRenderPass(RenderContext& context);
+		~UIRenderPass();
 
 		void Init() override;
 		void Execute() override;
 		RenderTexture* GetRenderTarget(RenderTargetType type) override;
 
-		void SetLightBuffer(LightBuffer* lightBuffer) { m_LightBuffer = lightBuffer; }
-
 	private:
-		void CreateLightingPassPSO();
+		void CreateUIPassPSO();
 
 		Microsoft::WRL::ComPtr<ID3D12RootSignature> m_RootSignature;
 		Microsoft::WRL::ComPtr<ID3D12PipelineState> m_PipelineState;
 
 		D3D12_VIEWPORT m_Viewport;
 		D3D12_RECT m_ScissorRect;
-
-		LightBuffer* m_LightBuffer;
 	};
 }
 

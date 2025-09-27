@@ -1,4 +1,4 @@
-cbuffer LightingPassBuffer : register(b0)
+cbuffer ScreenBuffer : register(b0)
 {
     float4 CameraPosition;
     float4x4 ViewMatrix;

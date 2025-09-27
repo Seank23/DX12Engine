@@ -1,22 +1,22 @@
-#include "LightingRenderPass.h"
+#include "UIRenderPass.h"
 #include "../../Resources/ResourceManager.h"
 #include "../RenderContext.h"
 #include "../PipelineStateBuilder.h"
 #include "../RootSignatureBuilder.h"
-#include "../Buffers/LightBuffer.h"
+
 
 namespace DX12Engine
 {
-	LightingRenderPass::LightingRenderPass(RenderContext& context)
+	DX12Engine::UIRenderPass::UIRenderPass(RenderContext& context)
 		: RenderPass(context)
 	{
 	}
 
-	LightingRenderPass::~LightingRenderPass()
+	UIRenderPass::~UIRenderPass()
 	{
 	}
 
-	void LightingRenderPass::Init()
+	void UIRenderPass::Init()
 	{
 		RenderPass::Init();
 
@@ -27,10 +27,10 @@ namespace DX12Engine
 		m_Viewport = { 0.0f, 0.0f, (float)windowSize.x, (float)windowSize.y, -1.0f, 1.0f };
 		m_ScissorRect = { 0, 0, (LONG)windowSize.x, (LONG)windowSize.y };
 
-		CreateLightingPassPSO();
+		CreateUIPassPSO();
 	}
 
-	void LightingRenderPass::Execute()
+	void UIRenderPass::Execute()
 	{
 		RenderPass::Execute();
 		RenderTexture* renderTarget = m_RenderTargets[0].get();
@@ -62,8 +62,7 @@ namespace DX12Engine
 		m_CommandList.SetDescriptorHeaps(1, &srvHeap);
 
 		m_CommandList.SetGraphicsRootConstantBufferView(0, m_ScreenDataCB->GetGPUAddress());
-		m_CommandList.SetGraphicsRootConstantBufferView(1, m_LightBuffer->GetCBVAddress());
-		int startIndex = 2;
+		int startIndex = 1;
 		for (int i = 0; i < m_DescriptorTableConfigs.size(); i++)
 		{
 			int resourceIndex = m_DescriptorTableConfigs[i].BaseShaderRegister;
@@ -85,7 +84,7 @@ namespace DX12Engine
 		m_QueueManager.WaitForFenceCPUBlocking(fenceVal);
 	}
 
-	RenderTexture* LightingRenderPass::GetRenderTarget(RenderTargetType type)
+	RenderTexture* UIRenderPass::GetRenderTarget(RenderTargetType type)
 	{
 		switch (type)
 		{
@@ -96,22 +95,26 @@ namespace DX12Engine
 		}
 	}
 
-	void LightingRenderPass::CreateLightingPassPSO()
+	void UIRenderPass::CreateUIPassPSO()
 	{
 		PipelineStateBuilder pipelineStateBuilder;
 		RootSignatureBuilder rootSignatureBuilder;
 
+		CD3DX12_DEPTH_STENCIL_DESC depthStencilDesc(D3D12_DEFAULT);
+		depthStencilDesc.DepthEnable = FALSE;
+		depthStencilDesc.StencilEnable = FALSE;
+
 		pipelineStateBuilder = pipelineStateBuilder.SetBlendState(CD3DX12_BLEND_DESC(D3D12_DEFAULT))
 			.SetRasterizerState(CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT))
 			.SetPrimitiveTopologyType(D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE)
+			.SetDepthStencilState(depthStencilDesc)
 			.SetRenderTargets({ DXGI_FORMAT_R8G8B8A8_UNORM })
 			.SetSampleDesc(UINT_MAX, 1, 0).SetVertexShader(ResourceManager::GetInstance().GetShader("RenderTriangle_VS"))
-			.SetPixelShader(ResourceManager::GetInstance().GetShader("PBRLightingDeferred_PS"));
+			.SetPixelShader(ResourceManager::GetInstance().GetShader("UIGrid_PS"));
 
-		rootSignatureBuilder = rootSignatureBuilder.AddConstantBuffer(0).AddConstantBuffer(1)
+		rootSignatureBuilder = rootSignatureBuilder.AddConstantBuffer(0)
 			.AddDescriptorTables(m_DescriptorTableConfigs)
-			.AddSampler(0, D3D12_FILTER_ANISOTROPIC)
-			.AddShadowMapSampler(1);
+			.AddSampler(0, D3D12_FILTER_ANISOTROPIC);
 
 		m_RootSignature = ResourceManager::GetInstance().CreateRootSignature(rootSignatureBuilder.Build());
 		pipelineStateBuilder = pipelineStateBuilder.SetRootSignature(m_RootSignature.Get());
