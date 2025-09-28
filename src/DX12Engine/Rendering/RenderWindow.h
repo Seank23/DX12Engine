@@ -19,7 +19,7 @@ namespace DX12Engine
 		RenderWindow();
 		~RenderWindow();
 
-		HWND Init(Application* app, DirectX::XMINT2 windowSize);
+		HWND Init(Application* app, DirectX::XMINT2 windowSize, std::string windowName);
 		void CreateSwapChain(ID3D12CommandQueue* commandQueue);
 		void CreateRTVHeap(ID3D12Device* device);
 		void CreateDepthStencilBuffer();
@@ -45,6 +45,7 @@ namespace DX12Engine
 		HWND m_WindowHandle;
 		HINSTANCE m_WindowInstance;
 		DirectX::XMINT2 m_WindowSize;
+		std::string m_WindowName;
 
 		Microsoft::WRL::ComPtr<IDXGISwapChain3> m_SwapChain;
 		Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> m_RTVHeap;

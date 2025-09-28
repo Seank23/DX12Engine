@@ -34,6 +34,7 @@ namespace DX12Engine
 		~RenderPass() = default;
 		virtual void Init();
 		virtual void Execute();
+		virtual RenderTexture* GetRenderTarget(RenderTargetType type) = 0;
 
 		void AddInputResources(std::vector<GPUResource*> resources) 
 		{ 
@@ -43,8 +44,10 @@ namespace DX12Engine
 		{
 			m_InputResources.insert(m_InputResources.end(), resources.begin(), resources.end());
 		}
+		void SetVertexShader(const std::string& name) { m_VertexShaderName = name; }
+		void SetPixelShader(const std::string& name) { m_PixelShaderName = name; }
 		void SetRenderObjects(std::vector<RenderComponent*> renderObjects) { m_RenderObjects = renderObjects; }
-		virtual RenderTexture* GetRenderTarget(RenderTargetType type) = 0;
+
 		void SetCamera(Camera* camera) { m_Camera = camera; }
 
 		void AddDescriptorTableConfig(DescriptorTableConfig config) { m_DescriptorTableConfigs.push_back(config); }
@@ -62,6 +65,8 @@ namespace DX12Engine
 		std::vector<DescriptorTableConfig> m_DescriptorTableConfigs;
 		std::vector<std::unique_ptr<RenderTexture>> m_RenderTargets;
 		std::vector<RenderComponent*> m_RenderObjects;
+		std::string m_VertexShaderName;
+		std::string m_PixelShaderName;
 
 		Camera* m_Camera;
 	};

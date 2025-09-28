@@ -18,6 +18,9 @@ namespace DX12Engine
     {
         RenderPass::Init();
 
+		m_VertexShaderName = m_VertexShaderName.empty() ? "Geometry_VS" : m_VertexShaderName;
+		m_PixelShaderName = m_PixelShaderName.empty() ? "Geometry_PS" : m_PixelShaderName;
+
 		DirectX::XMINT2 windowSize = m_RenderContext.GetWindowSize();
 		m_RenderTargets.emplace_back(ResourceManager::GetInstance().CreateRenderTargetTexture(DirectX::XMINT2(windowSize.x, windowSize.y), DXGI_FORMAT_R8G8B8A8_UNORM, 1 , { 1.0f, 1.0f, 1.0f, 1.0f })); // Albedo
 		m_RenderTargets.emplace_back(ResourceManager::GetInstance().CreateRenderTargetTexture(DirectX::XMINT2(windowSize.x, windowSize.y), DXGI_FORMAT_R16G16B16A16_FLOAT)); // World Normal
@@ -134,7 +137,7 @@ namespace DX12Engine
         PipelineStateBuilder pipelineStateBuilder;
         RootSignatureBuilder rootSignatureBuilder;
 
-        pipelineStateBuilder = pipelineStateBuilder.ConfigureFromDefault(ResourceManager::GetInstance().GetShader("Geometry_VS"), ResourceManager::GetInstance().GetShader("Geometry_PS"))
+        pipelineStateBuilder = pipelineStateBuilder.ConfigureFromDefault(ResourceManager::GetInstance().GetShader(m_VertexShaderName), ResourceManager::GetInstance().GetShader(m_PixelShaderName))
             .SetRenderTargets({ DXGI_FORMAT_R8G8B8A8_UNORM, DXGI_FORMAT_R16G16B16A16_FLOAT, DXGI_FORMAT_R16G16B16A16_FLOAT, DXGI_FORMAT_R16G16B16A16_FLOAT, DXGI_FORMAT_R16G16B16A16_FLOAT })
             .SetDepthStencilFormat(DXGI_FORMAT_D32_FLOAT);
 

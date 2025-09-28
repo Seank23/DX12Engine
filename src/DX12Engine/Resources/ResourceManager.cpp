@@ -10,19 +10,19 @@ namespace DX12Engine
 
 	ResourceManager::ResourceManager()
 	{
-		m_Shaders.insert({ "BasicLighting_VS", std::make_unique<Shader>(GetShaderPath("BasicLighting_VS.hlsl"), "vertex") });
-		m_Shaders.insert({ "BasicLighting_PS", std::make_unique<Shader>(GetShaderPath("BasicLighting_PS.hlsl"), "pixel") });
-		m_Shaders.insert({ "PBRLighting_VS", std::make_unique<Shader>(GetShaderPath("PBRLighting_VS.hlsl"), "vertex") });
-		m_Shaders.insert({ "PBRLighting_PS", std::make_unique<Shader>(GetShaderPath("PBRLighting_PS.hlsl"), "pixel") });
-		m_Shaders.insert({ "ShadowMap_VS", std::make_unique<Shader>(GetShaderPath("ShadowMap_VS.hlsl"), "vertex") });
-		m_Shaders.insert({ "ShadowCubeMap_VS", std::make_unique<Shader>(GetShaderPath("ShadowCubeMap_VS.hlsl"), "vertex") });
-		m_Shaders.insert({ "ShadowCubeMap_PS", std::make_unique<Shader>(GetShaderPath("ShadowCubeMap_PS.hlsl"), "pixel") });
-		m_Shaders.insert({ "Geometry_VS", std::make_unique<Shader>(GetShaderPath("Geometry_VS.hlsl"), "vertex") });
-		m_Shaders.insert({ "Geometry_PS", std::make_unique<Shader>(GetShaderPath("Geometry_PS.hlsl"), "pixel") });
-		m_Shaders.insert({ "RenderTriangle_VS", std::make_unique<Shader>(GetShaderPath("RenderTriangle_VS.hlsl"), "vertex") });
-		m_Shaders.insert({ "PBRLightingDeferred_PS", std::make_unique<Shader>(GetShaderPath("PBRLightingDeferred_PS.hlsl"), "pixel") });
-		m_Shaders.insert({ "FinalRender_PS", std::make_unique<Shader>(GetShaderPath("FinalRender_PS.hlsl"), "pixel") });
-		m_Shaders.insert({ "SSRPass_PS", std::make_unique<Shader>(GetShaderPath("SSRPass_PS.hlsl"), "pixel") });
+		m_Shaders.insert({ "BasicLighting_VS", std::make_unique<Shader>(GetShaderPath("BasicLighting_VS.hlsl"), ShaderType::Vertex) });
+		m_Shaders.insert({ "BasicLighting_PS", std::make_unique<Shader>(GetShaderPath("BasicLighting_PS.hlsl"), ShaderType::Pixel) });
+		m_Shaders.insert({ "PBRLighting_VS", std::make_unique<Shader>(GetShaderPath("PBRLighting_VS.hlsl"), ShaderType::Vertex) });
+		m_Shaders.insert({ "PBRLighting_PS", std::make_unique<Shader>(GetShaderPath("PBRLighting_PS.hlsl"), ShaderType::Pixel) });
+		m_Shaders.insert({ "ShadowMap_VS", std::make_unique<Shader>(GetShaderPath("ShadowMap_VS.hlsl"), ShaderType::Vertex) });
+		m_Shaders.insert({ "ShadowCubeMap_VS", std::make_unique<Shader>(GetShaderPath("ShadowCubeMap_VS.hlsl"), ShaderType::Vertex) });
+		m_Shaders.insert({ "ShadowCubeMap_PS", std::make_unique<Shader>(GetShaderPath("ShadowCubeMap_PS.hlsl"), ShaderType::Pixel) });
+		m_Shaders.insert({ "Geometry_VS", std::make_unique<Shader>(GetShaderPath("Geometry_VS.hlsl"), ShaderType::Vertex) });
+		m_Shaders.insert({ "Geometry_PS", std::make_unique<Shader>(GetShaderPath("Geometry_PS.hlsl"), ShaderType::Pixel) });
+		m_Shaders.insert({ "RenderTriangle_VS", std::make_unique<Shader>(GetShaderPath("RenderTriangle_VS.hlsl"), ShaderType::Vertex) });
+		m_Shaders.insert({ "PBRLightingDeferred_PS", std::make_unique<Shader>(GetShaderPath("PBRLightingDeferred_PS.hlsl"), ShaderType::Pixel) });
+		m_Shaders.insert({ "FinalRender_PS", std::make_unique<Shader>(GetShaderPath("FinalRender_PS.hlsl"), ShaderType::Pixel) });
+		m_Shaders.insert({ "SSRPass_PS", std::make_unique<Shader>(GetShaderPath("SSRPass_PS.hlsl"), ShaderType::Pixel) });
 	}
 
 	ResourceManager::~ResourceManager()

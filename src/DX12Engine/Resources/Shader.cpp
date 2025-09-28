@@ -3,7 +3,7 @@
 
 namespace DX12Engine
 {
-	Shader::Shader(std::string shaderPath, std::string shaderType)
+	Shader::Shader(std::string shaderPath, ShaderType shaderType)
 	{
 		std::wstring widestr = std::wstring(shaderPath.begin(), shaderPath.end());
 
@@ -15,9 +15,9 @@ namespace DX12Engine
 		dxcLibrary->CreateBlobFromFile(widestr.c_str(), nullptr, &sourceBlob);
 		IDxcOperationResult* compileResult = nullptr;
 
-		if (shaderType == "vertex")
+		if (shaderType == ShaderType::Vertex)
 			dxcCompiler->Compile(sourceBlob, widestr.c_str(), L"main", L"vs_6_0", nullptr, 0, nullptr, 0, nullptr, &compileResult);
-		else if (shaderType == "pixel")
+		else if (shaderType == ShaderType::Pixel)
 			dxcCompiler->Compile(sourceBlob, widestr.c_str(), L"main", L"ps_6_0", nullptr, 0, nullptr, 0, nullptr, &compileResult);
 
 		compileResult->GetResult(&m_Shader);

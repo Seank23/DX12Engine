@@ -9,9 +9,9 @@ namespace DX12Engine
 	class Launcher
 	{
 	public:
-		static void Launch(Application* app, int windowSize[])
+		static void Launch(Application* app, int windowSize[], std::string name = "DirectX 12 Renderer")
 		{
-			auto renderContext = std::make_shared<RenderContext>(app, windowSize[0], windowSize[1]);
+			auto renderContext = std::make_shared<RenderContext>(app, windowSize[0], windowSize[1], name);
 			app->Init(renderContext, { (float)windowSize[0], (float)windowSize[1] });
 
 			auto startTime = std::chrono::high_resolution_clock::now();

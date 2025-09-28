@@ -14,7 +14,7 @@ namespace DX12Engine
 	class RenderContext
 	{
 	public:
-		RenderContext(Application* app, int width, int height);
+		RenderContext(Application* app, int width, int height, std::string name);
 		~RenderContext();
 
 		DirectX::XMINT2							GetWindowSize() const { return m_WindowSize; }

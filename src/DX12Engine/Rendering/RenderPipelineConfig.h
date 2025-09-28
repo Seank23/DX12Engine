@@ -26,6 +26,8 @@ namespace DX12Engine
 		RenderTargets_Geometry,
 		RenderTargets_Lighting,
 		ExternalTextures,
+		VertexShader,
+		PixelShader,
 	};
 
 	class GPUResource;

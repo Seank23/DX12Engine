@@ -44,12 +44,13 @@ namespace DX12Engine
 		m_RTVDescriptorSize = 0;
 	}
 
-	HWND RenderWindow::Init(Application* app, DirectX::XMINT2 windowSize)
+	HWND RenderWindow::Init(Application* app, DirectX::XMINT2 windowSize, std::string windowName)
 	{
 		m_WindowSize = windowSize;
+		m_WindowName = windowName;
 		WNDCLASSEX wc = { sizeof(WNDCLASSEX), CS_CLASSDC, WindowProc, 0, 0, m_WindowInstance, nullptr, nullptr, nullptr, nullptr, "DX12Window", nullptr };
 		RegisterClassEx(&wc);
-		m_WindowHandle = CreateWindow(wc.lpszClassName, "DirectX 12 Renderer", WS_OVERLAPPEDWINDOW, 100, 100, windowSize.x, windowSize.y, nullptr, nullptr, wc.hInstance, app);
+		m_WindowHandle = CreateWindow(wc.lpszClassName, windowName.c_str(), WS_OVERLAPPEDWINDOW, 100, 100, windowSize.x, windowSize.y, nullptr, nullptr, wc.hInstance, app);
 		ShowWindow(m_WindowHandle, SW_SHOWDEFAULT);
 		return m_WindowHandle;
 	}

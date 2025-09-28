@@ -53,7 +53,7 @@ namespace DX12Engine
 		Microsoft::WRL::ComPtr<ID3D12PipelineState> CreatePipelineState(const D3D12_GRAPHICS_PIPELINE_STATE_DESC& desc);
 		Microsoft::WRL::ComPtr<ID3D12RootSignature> CreateRootSignature(const D3D12_ROOT_SIGNATURE_DESC& desc);
 
-		void AddShader(const std::string& name, const std::string& shaderPath, const std::string& shaderType) { m_Shaders.insert({ name, std::make_unique<Shader>(shaderPath, shaderType) }); }
+		void AddShader(const std::string& name, const std::string& shaderPath, ShaderType shaderType) { m_Shaders.insert({ name, std::make_unique<Shader>(shaderPath, shaderType) }); }
 		Shader* GetShader(const std::string& name) { return m_Shaders[name].get(); }
 
 		static std::wstring GetMaterialPath(std::string path) { return L"res/Materials/" + std::wstring(path.begin(), path.end()); }

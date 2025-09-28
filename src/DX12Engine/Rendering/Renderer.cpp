@@ -173,6 +173,12 @@ namespace DX12Engine
 						case InputResourceType::Camera:
 							renderPass->SetCamera(static_cast<Camera*>(inputResource.second));
 							break;
+						case InputResourceType::VertexShader:
+							renderPass->SetVertexShader(*static_cast<std::string*>(inputResource.second));
+							break;
+						case InputResourceType::PixelShader:
+							renderPass->SetPixelShader(*static_cast<std::string*>(inputResource.second));
+							break;
 						}
 					}
 					// Pass-specific input resources

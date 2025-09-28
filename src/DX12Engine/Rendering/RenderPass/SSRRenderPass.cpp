@@ -22,6 +22,9 @@ namespace DX12Engine
 	{
 		RenderPass::Init();
 
+		m_VertexShaderName = m_VertexShaderName.empty() ? "RenderTriangle_VS" : m_VertexShaderName;
+		m_PixelShaderName = m_PixelShaderName.empty() ? "SSRPass_PS" : m_PixelShaderName;
+
 		DirectX::XMINT2 windowSize = m_RenderContext.GetWindowSize();
 		m_RenderTargets.emplace_back(ResourceManager::GetInstance().CreateRenderTargetTexture(DirectX::XMINT2(windowSize.x, windowSize.y), DXGI_FORMAT_R8G8B8A8_UNORM));
 		ResourceManager::GetInstance().UpdateSRVDescriptors(reinterpret_cast<std::vector<GPUResource*> const&>(m_RenderTargets));
@@ -107,8 +110,8 @@ namespace DX12Engine
 			.SetRasterizerState(CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT))
 			.SetPrimitiveTopologyType(D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE)
 			.SetRenderTargets({ DXGI_FORMAT_R8G8B8A8_UNORM })
-			.SetSampleDesc(UINT_MAX, 1, 0).SetVertexShader(ResourceManager::GetInstance().GetShader("RenderTriangle_VS"))
-			.SetPixelShader(ResourceManager::GetInstance().GetShader("SSRPass_PS"));
+			.SetSampleDesc(UINT_MAX, 1, 0).SetVertexShader(ResourceManager::GetInstance().GetShader(m_VertexShaderName))
+			.SetPixelShader(ResourceManager::GetInstance().GetShader(m_PixelShaderName));
 
 		rootSignatureBuilder = rootSignatureBuilder.AddConstantBuffer(0)
 			.AddDescriptorTables(m_DescriptorTableConfigs)

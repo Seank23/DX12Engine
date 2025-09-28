@@ -5,10 +5,17 @@
 
 namespace DX12Engine
 {
+	enum class ShaderType
+	{
+		Vertex,
+		Pixel,
+		Compute
+	};
+
 	class Shader
 	{
 	public:
-		Shader(std::string shaderPath, std::string shaderType);
+		Shader(std::string shaderPath, ShaderType shaderType);
 		~Shader();
 
 		const Microsoft::WRL::ComPtr<IDxcBlob> GetShader() { return m_Shader; }
