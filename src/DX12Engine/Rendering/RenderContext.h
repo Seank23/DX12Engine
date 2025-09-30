@@ -17,7 +17,7 @@ namespace DX12Engine
 		RenderContext(Application* app, int width, int height, std::string name);
 		~RenderContext();
 
-		DirectX::XMINT2							GetWindowSize() const { return m_WindowSize; }
+		DirectX::XMINT2								GetWindowSize() const { return m_WindowSize; }
 		HWND										GetWindowHandle() const { return m_RenderWindow->GetWindowHandle(); }
 		Microsoft::WRL::ComPtr<ID3D12Device>		GetDevice() const { return m_Device; }
 		CD3DX12_CPU_DESCRIPTOR_HANDLE				GetRTVHandle() const { return m_RenderWindow->GetRTVHandle(); }
@@ -26,6 +26,7 @@ namespace DX12Engine
 		DescriptorHeapManager&						GetHeapManager() const { return *m_HeapManager; }
 		GPUUploader&								GetUploader() const { return *m_Uploader; }
 
+		void						SetWindowSize(DirectX::XMINT2 windowSize) { m_WindowSize = windowSize; }
 		CD3DX12_RESOURCE_BARRIER	TransitionRenderTarget(bool forward) const { return m_RenderWindow->TransitionRenderTarget(forward); }
 		bool						ProcessWindowMessages() const { return m_RenderWindow->ProcessWindowMessages(); }
 		void						PresentFrame() const { m_RenderWindow->PresentFrame(); }

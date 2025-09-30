@@ -5,14 +5,10 @@
 namespace DX12Engine
 {
 	Camera::Camera(float aspectRatio, float zNear, float zFar)
-		: m_Position({ 0.0f, 0.0f, 0.0f }), m_Pitch(0.0f), m_Yaw(0.0f)
+		: InputController(), m_AspectRatio(aspectRatio), m_ZNear(zNear), m_ZFar(zFar), m_FOV(60.0f),
+		m_Position({ 0.0f, 0.0f, 0.0f }), m_Pitch(0.0f), m_Yaw(0.0f), m_hasChanged(false)
 	{
-		m_ProjectionMatrix = DirectX::XMMatrixPerspectiveFovLH(
-			DirectX::XMConvertToRadians(60.0f),
-			aspectRatio,
-			zNear,
-			zFar
-		);
+		UpdateProjectionMatrix();
 		UpdateViewMatrix();
 	}
 
@@ -22,65 +18,83 @@ namespace DX12Engine
 
 	void Camera::Update(float deltaTime)
 	{
+		if (m_hasChanged)
+		{
+			UpdateViewMatrix();
+			m_hasChanged = false;
+		}
 	}
 
-	void Camera::ProcessKeyboardInput(float deltaTime)
+	void Camera::ProcessKeyInput(InputCommand command, float deltaTime)
 	{
+		m_hasChanged = true;
 		float speed = 5.0f * deltaTime;
 
 		DirectX::XMVECTOR forwardVector = GetForwardVector();
 		DirectX::XMVECTOR rightVector = DirectX::XMVector3Cross(forwardVector, DirectX::XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f));
+		DirectX::XMVECTOR positionVector = DirectX::XMLoadFloat3(&m_Position);
 
-		if (GetAsyncKeyState('W') & 0x8000)
+		switch (command)
 		{
-			DirectX::XMVECTOR positionVector = DirectX::XMLoadFloat3(&m_Position);
+		case InputCommand::MoveForward:
 			positionVector = DirectX::XMVectorAdd(positionVector, DirectX::XMVectorScale(forwardVector, speed));
 			DirectX::XMStoreFloat3(&m_Position, positionVector);
-		}
-		if (GetAsyncKeyState('S') & 0x8000)
-		{
-			DirectX::XMVECTOR positionVector = DirectX::XMLoadFloat3(&m_Position);
+			break;
+		case InputCommand::MoveBackward:
 			positionVector = DirectX::XMVectorSubtract(positionVector, DirectX::XMVectorScale(forwardVector, speed));
 			DirectX::XMStoreFloat3(&m_Position, positionVector);
-		}
-		if (GetAsyncKeyState('A') & 0x8000)
-		{
-			DirectX::XMVECTOR positionVector = DirectX::XMLoadFloat3(&m_Position);
+			break;
+		case InputCommand::MoveLeft:
 			positionVector = DirectX::XMVectorAdd(positionVector, DirectX::XMVectorScale(rightVector, speed));
 			DirectX::XMStoreFloat3(&m_Position, positionVector);
-		}
-		if (GetAsyncKeyState('D') & 0x8000)
-		{
-			DirectX::XMVECTOR positionVector = DirectX::XMLoadFloat3(&m_Position);
+			break;
+		case InputCommand::MoveRight:
 			positionVector = DirectX::XMVectorSubtract(positionVector, DirectX::XMVectorScale(rightVector, speed));
 			DirectX::XMStoreFloat3(&m_Position, positionVector);
-		}
-		if (GetAsyncKeyState('Q') & 0x8000)
-		{
-			DirectX::XMVECTOR positionVector = DirectX::XMLoadFloat3(&m_Position);
-			positionVector = DirectX::XMVectorSubtract(positionVector, DirectX::XMVectorSet(0.0f, speed, 0.0f, 0.0f));
-			DirectX::XMStoreFloat3(&m_Position, positionVector);
-		}
-		if (GetAsyncKeyState('E') & 0x8000)
-		{
-			DirectX::XMVECTOR positionVector = DirectX::XMLoadFloat3(&m_Position);
+			break;
+		case InputCommand::MoveUp:
 			positionVector = DirectX::XMVectorAdd(positionVector, DirectX::XMVectorSet(0.0f, speed, 0.0f, 0.0f));
 			DirectX::XMStoreFloat3(&m_Position, positionVector);
+			break;
+		case InputCommand::MoveDown:
+			positionVector = DirectX::XMVectorSubtract(positionVector, DirectX::XMVectorSet(0.0f, speed, 0.0f, 0.0f));
+			DirectX::XMStoreFloat3(&m_Position, positionVector);
+			break;
 		}
-		//std::cout << "x: " << m_Position.x << ", y: " << m_Position.y << ", z: " << m_Position.z << std::endl;
-		UpdateViewMatrix();
 	}
 
-	void Camera::ProcessMouseInput(float dX, float dY)
+	void Camera::ProcessMouseInput(InputCommand command, float dX, float dY)
 	{
-		if (GetAsyncKeyState(VK_RBUTTON))
+		m_hasChanged = true;
+		float sensitivity = 0.005f;
+
+		switch (command)
 		{
-			float sensitivity = 0.005f;
+		case InputCommand::Pan:
 			m_Yaw -= dX * sensitivity;
 			m_Pitch -= dY * sensitivity;
 			m_Pitch = max(-DirectX::XM_PIDIV2, min(DirectX::XM_PIDIV2, m_Pitch));
-			UpdateViewMatrix();
+			break;
 		}
+	}
+
+	void Camera::SetAspectRatio(float aspectRatio)
+	{
+		m_AspectRatio = aspectRatio;
+		UpdateProjectionMatrix();
+	}
+
+	void Camera::SetClippingPlanes(float zNear, float zFar)
+	{
+		m_ZNear = zNear;
+		m_ZFar = zFar;
+		UpdateProjectionMatrix();
+	}
+
+	void Camera::SetFOV(float fov)
+	{
+		m_FOV = fov;
+		UpdateProjectionMatrix();
 	}
 
 	void Camera::SetPosition(DirectX::XMFLOAT3 position)
@@ -94,6 +108,16 @@ namespace DX12Engine
 		m_Pitch = DirectX::XMConvertToRadians(pitch);
 		m_Yaw = DirectX::XMConvertToRadians(yaw);
 		UpdateViewMatrix();
+	}
+
+	void Camera::UpdateProjectionMatrix()
+	{
+		m_ProjectionMatrix = DirectX::XMMatrixPerspectiveFovLH(
+			DirectX::XMConvertToRadians(m_FOV),
+			m_AspectRatio,
+			m_ZNear,
+			m_ZFar
+		);
 	}
 
 	void Camera::UpdateViewMatrix()

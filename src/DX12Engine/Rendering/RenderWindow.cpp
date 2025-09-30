@@ -11,15 +11,14 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 		SetWindowLongPtr(hwnd, GWLP_USERDATA, (LONG_PTR)pCreate->lpCreateParams);
 		return 0;
 	}
-	if (uMsg == WM_DESTROY)
+	else if (uMsg == WM_DESTROY)
 	{
 		PostQuitMessage(0);
 		return 0;
 	}
-	if (uMsg == WM_MOUSEMOVE)
+	else
 	{
-		if (app != nullptr) app->HandleMouseMovement(hwnd, lParam);
-		return 0;
+		if (app != nullptr) app->HandleWindowEvent(hwnd, uMsg, lParam);
 	}
 	return DefWindowProc(hwnd, uMsg, wParam, lParam);
 }

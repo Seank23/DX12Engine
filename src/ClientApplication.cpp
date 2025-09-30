@@ -1,3 +1,4 @@
+#if ENABLE_TEST_PROJECT
 #include "ClientApplication.h"
 #include <windowsx.h>
 
@@ -126,6 +127,9 @@ void ClientApplication::Init(std::shared_ptr<DX12Engine::RenderContext> renderCo
 	m_Camera->SetRotation(5.0f, 115.0f);
 	m_Renderer->SetCamera(m_Camera.get());
 
+	m_InputHandler = std::make_unique<InputHandler>();
+	m_InputHandler->SetCamera(m_Camera.get());
+
 	auto shadowCastingLights = m_LightBuffer->GetLightsByType({ DX12Engine::LightType::Directional, DX12Engine::LightType::Spot });
 	auto cubeShadowCastingLights = m_LightBuffer->GetLightsByType({ DX12Engine::LightType::Point });
 
@@ -193,7 +197,7 @@ void ClientApplication::Init(std::shared_ptr<DX12Engine::RenderContext> renderCo
 
 void ClientApplication::Update(float ts, float elapsed)
 {
-	m_Camera->ProcessKeyboardInput(ts);
+	m_InputHandler->ProcessInput(ts);
 
 	m_PhysicsEngine.Update(ts, elapsed);
 	m_SceneObjects.Update(ts, elapsed);
@@ -203,23 +207,13 @@ void ClientApplication::Update(float ts, float elapsed)
 	m_Renderer->ExecutePipeline(m_RenderPipeline);
 }
 
-void ClientApplication::HandleMouseMovement(HWND hwnd, LPARAM lParam)
+void ClientApplication::HandleWindowEvent(HWND hwnd, UINT uMsg, LPARAM lParam)
 {
-	int mouseX = GET_X_LPARAM(lParam);
-	int mouseY = GET_Y_LPARAM(lParam);
-
-	if (m_FirstMouse) 
+	switch (uMsg)
 	{
-		m_LastMouseX = (float)mouseX;
-		m_LastMouseY = (float)mouseY;
-		m_FirstMouse = false;
+	case WM_MOUSEMOVE:
+		m_InputHandler->HandleMouseMovement(hwnd, lParam);
+		break;
 	}
-
-	float deltaX = (float)(mouseX - m_LastMouseX);
-	float deltaY = (float)(mouseY - m_LastMouseY);
-
-	m_LastMouseX = (float)mouseX;
-	m_LastMouseY = (float)mouseY;
-
-	m_Camera->ProcessMouseInput(deltaX, deltaY);
 }
+#endif

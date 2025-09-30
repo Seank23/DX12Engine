@@ -26,6 +26,13 @@ namespace DX12Engine
 		UpdateCB();
 	}
 
+	void RenderPass::OnResize(DirectX::XMINT2 newSize)
+	{
+		m_ScreenData.ScreenSize = DirectX::XMFLOAT2((float)newSize.x, (float)newSize.y);
+		if (m_ScreenDataCB)
+			m_ScreenDataCB->Update(&m_ScreenData, sizeof(ScreenData));
+	}
+
 	void RenderPass::UpdateCB()
 	{
 		if (m_Camera != nullptr)

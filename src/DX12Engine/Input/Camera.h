@@ -1,17 +1,24 @@
 #pragma once
 #include "DirectXMath.h"
+#include <unordered_map>
+#include <string>
+#include "InputController.h"
 
 namespace DX12Engine
 {
-	class Camera
+	class Camera : public InputController
 	{
 	public:
 		Camera(float aspectRatio, float zNear, float zFar);
 		~Camera();
 
-		void Update(float deltaTime);
-		void ProcessKeyboardInput(float deltaTime);
-		void ProcessMouseInput(float dX, float dY);
+		void SetAspectRatio(float aspectRatio);
+		void SetClippingPlanes(float zNear, float zFar);
+		void SetFOV(float fov);
+
+		virtual void Update(float deltaTime) override;
+		virtual void ProcessKeyInput(InputCommand command, float deltaTime) override;
+		virtual void ProcessMouseInput(InputCommand command, float dX, float dY) override;
 
 		DirectX::XMMATRIX GetViewMatrix() const { return m_ViewMatrix; }
 		DirectX::XMMATRIX GetProjectionMatrix() const { return m_ProjectionMatrix; }
@@ -21,12 +28,20 @@ namespace DX12Engine
 		void SetRotation(float pitch, float yaw);
 
 	private:
+		void UpdateProjectionMatrix();
 		void UpdateViewMatrix();
 		DirectX::XMVECTOR GetForwardVector();
+
+		float m_AspectRatio;
+		float m_ZNear;
+		float m_ZFar;
+		float m_FOV;
 
 		DirectX::XMFLOAT3 m_Position;
 		float m_Pitch;
 		float m_Yaw;
+
+		bool m_hasChanged;
 
 		DirectX::XMMATRIX m_ViewMatrix;
 		DirectX::XMMATRIX m_ProjectionMatrix;

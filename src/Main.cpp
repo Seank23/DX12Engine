@@ -1,3 +1,4 @@
+#if ENABLE_TEST_PROJECT
 #include "./ClientApplication.h"
 #include "DX12Engine/Launcher.h"
 
@@ -7,3 +8,4 @@ int main()
 	ClientApplication app;
 	DX12Engine::Launcher::Launch(&app, windowSize);
 }
+#endif

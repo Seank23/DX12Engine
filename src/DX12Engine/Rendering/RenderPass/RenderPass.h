@@ -34,6 +34,7 @@ namespace DX12Engine
 		~RenderPass() = default;
 		virtual void Init();
 		virtual void Execute();
+		virtual void OnResize(DirectX::XMINT2 newSize);
 		virtual RenderTexture* GetRenderTarget(RenderTargetType type) = 0;
 
 		void AddInputResources(std::vector<GPUResource*> resources) 
