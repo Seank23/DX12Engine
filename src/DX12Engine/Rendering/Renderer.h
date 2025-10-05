@@ -2,9 +2,9 @@
 #include "RenderContext.h"
 #include "../Resources/Texture.h"
 #include "Heaps/RenderPassDescriptorHeap.h"
-#include "Buffers/LightBuffer.h"
-#include "../Input/Camera.h"
 #include "../Resources/RenderTexture.h"
+#include "../Entity/Scene.h"
+#include "RenderPipelineConfig.h"
 
 namespace DX12Engine
 {
@@ -26,19 +26,18 @@ namespace DX12Engine
 		~Renderer();
 
 		bool PollWindow();
-		void UpdateObjectList(std::vector<std::shared_ptr<GameObject>> objects);
 		void ExecutePipeline(RenderPipeline pipeline);
 
 		std::unique_ptr<std::vector<RenderTargetType>> GetTargets(std::vector<RenderTargetType> targets);
 		RenderPipeline CreateRenderPipeline(RenderPipelineConfig config);
 
-		void SetLightBuffer(LightBuffer* lightBuffer) { m_LightBuffer = lightBuffer; }
-		void SetCamera(Camera* camera) { m_Camera = camera; }
+		void SetCurrentScene(Scene* scene) { m_CurrentScene = scene; }
 
 		D3D12_VIEWPORT GetDefaultViewport();
 		D3D12_RECT GetDefaultScissorRect();
 
 	private:
+		void SetSceneData(RenderPipeline pipeline);
 		void PresentFrame(RenderTexture* finalRenderTarget);
 		std::unique_ptr<RenderPass> GetRenderPass(RenderPassType type, int count);
 
@@ -47,8 +46,7 @@ namespace DX12Engine
 		ID3D12GraphicsCommandList* m_CommandList;
 		RenderPassDescriptorHeap& m_RenderHeap;
 
-		LightBuffer* m_LightBuffer;
-		Camera* m_Camera;
+		Scene* m_CurrentScene;
 
 		Microsoft::WRL::ComPtr<ID3D12RootSignature> m_RootSignature;
 		Microsoft::WRL::ComPtr<ID3D12PipelineState> m_PipelineState;

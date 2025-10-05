@@ -70,10 +70,7 @@ namespace DX12Engine
 		POINT mousePos;
 		GetCursorPos(&mousePos);
 		ScreenToClient(hwnd, &mousePos);
-		float mouseX = static_cast<float>(mousePos.x);
-		float mouseY = static_cast<float>(mousePos.y);
-
-
-		std::printf("Mouse Clicked at: X: %.1f, Y: %.1f\n", mouseX, mouseY);
+		m_LastMouseX = static_cast<float>(mousePos.x);
+		m_LastMouseY = static_cast<float>(mousePos.y);
 	}
 }

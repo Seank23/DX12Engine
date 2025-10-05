@@ -12,6 +12,7 @@ namespace DX12Engine
 	ShadowMapRenderPass::ShadowMapRenderPass(RenderContext& context, int shadowMapCount, bool isCubeMap)
 		: RenderPass(context), m_ShadowMapCount(shadowMapCount), m_IsCubeMap(isCubeMap)
 	{
+		m_Type = isCubeMap ? RenderPassType::CubeShadowMap : RenderPassType::ShadowMap;
 	}
 
 	ShadowMapRenderPass::~ShadowMapRenderPass()

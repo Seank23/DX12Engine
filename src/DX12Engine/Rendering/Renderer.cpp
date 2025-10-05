@@ -41,45 +41,6 @@ namespace DX12Engine
 	{
 	}
 
-	void Renderer::PresentFrame(RenderTexture* finalRenderTarget)
-	{
-		if (!m_RenderContext->GetUploader().UploadAllPending()) // Upload any pending resources
-			m_QueueManager.GetGraphicsQueue().ResetCommandAllocatorAndList();
-
-		m_CommandList->SetPipelineState(m_PipelineState.Get());
-		m_CommandList->SetGraphicsRootSignature(m_RootSignature.Get());
-
-		auto viewport = GetDefaultViewport();
-		auto scissorRect = GetDefaultScissorRect();
-		m_CommandList->RSSetViewports(1, &viewport);
-		m_CommandList->RSSetScissorRects(1, &scissorRect);
-
-		auto barrier = m_RenderContext->TransitionRenderTarget(true);
-		m_CommandList->ResourceBarrier(1, &barrier);
-
-		auto rtvHandle = m_RenderContext->GetRTVHandle();
-		m_CommandList->OMSetRenderTargets(1, &rtvHandle, FALSE, nullptr);
-
-		const float clearColor[] = { 0.0f, 0.2f, 0.4f, 1.0f };
-		m_CommandList->ClearRenderTargetView(rtvHandle, clearColor, 0, nullptr);
-
-		auto srvHeap = m_RenderHeap.GetHeap();
-		m_CommandList->SetDescriptorHeaps(1, &srvHeap);
-
-		m_CommandList->SetGraphicsRootDescriptorTable(0, finalRenderTarget->GetDescriptor()->GetGPUHandle());
-
-		m_CommandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-		m_CommandList->DrawInstanced(3, 1, 0, 0);
-
-		barrier = m_RenderContext->TransitionRenderTarget(false);
-		m_CommandList->ResourceBarrier(1, &barrier);
-
-		UINT fenceVal = m_QueueManager.GetGraphicsQueue().ExecuteCommandList();
-
-		m_RenderContext->PresentFrame();
-		m_QueueManager.WaitForFenceCPUBlocking(fenceVal);
-	}
-
 	std::unique_ptr<RenderPass> Renderer::GetRenderPass(RenderPassType type, int count)
 	{
 		switch (type)
@@ -106,16 +67,9 @@ namespace DX12Engine
 		return m_RenderContext->ProcessWindowMessages();
 	}
 
-	void Renderer::UpdateObjectList(std::vector<std::shared_ptr<GameObject>> objects)
-	{
-		for (std::shared_ptr<GameObject> obj : objects)
-		{
-			obj->GetComponent<RenderComponent>()->UpdateConstantBufferData(m_Camera->GetViewMatrix(), m_Camera->GetProjectionMatrix(), m_Camera->GetPosition());
-		}
-	}
-
 	void Renderer::ExecutePipeline(RenderPipeline pipeline)
 	{
+		SetSceneData(pipeline);
 		for (RenderPass* pass : pipeline.RenderPasses)
 		{
 			pass->Execute();
@@ -147,31 +101,30 @@ namespace DX12Engine
 					{
 						switch (inputResource.first)
 						{
-						case InputResourceType::SceneObjects:
-							renderPass->SetRenderObjects(*static_cast<std::vector<RenderComponent*>*>(inputResource.second));
-							break;
 						case InputResourceType::RenderTargets_ShadowMap:
 							for (auto& target : *static_cast<std::vector<RenderTargetType>*>(inputResource.second))
 								renderPass->AddInputResources({ pipeline.RenderPasses[renderPassOrder[RenderPassType::ShadowMap]]->GetRenderTarget(target) });
+							renderPass->AddResourceBlock(static_cast<std::vector<RenderTargetType>*>(inputResource.second)->size());
 							break;
 						case InputResourceType::RenderTargets_CubeShadowMap:
 							for (auto& target : *static_cast<std::vector<RenderTargetType>*>(inputResource.second))
 								renderPass->AddInputResources({ pipeline.RenderPasses[renderPassOrder[RenderPassType::CubeShadowMap]]->GetRenderTarget(target) });
+							renderPass->AddResourceBlock(static_cast<std::vector<RenderTargetType>*>(inputResource.second)->size());
 							break;
 						case InputResourceType::RenderTargets_Geometry:
 							for (auto& target : *static_cast<std::vector<RenderTargetType>*>(inputResource.second))
 								renderPass->AddInputResources({ pipeline.RenderPasses[renderPassOrder[RenderPassType::Geometry]]->GetRenderTarget(target) });
+							renderPass->AddResourceBlock(static_cast<std::vector<RenderTargetType>*>(inputResource.second)->size());
 							break;
 						case InputResourceType::RenderTargets_Lighting:
 							for (auto& target : *static_cast<std::vector<RenderTargetType>*>(inputResource.second))
 								renderPass->AddInputResources({ pipeline.RenderPasses[renderPassOrder[RenderPassType::Lighting]]->GetRenderTarget(target) });
+							renderPass->AddResourceBlock(static_cast<std::vector<RenderTargetType>*>(inputResource.second)->size());
 							break;
 						case InputResourceType::ExternalTextures:
-							for (auto& texture : *static_cast<std::vector<std::shared_ptr<Texture>>*>(inputResource.second))
+							for (auto& texture : *static_cast<std::vector<Texture*>*>(inputResource.second))
 								renderPass->AddInputResources({ texture });
-							break;
-						case InputResourceType::Camera:
-							renderPass->SetCamera(static_cast<Camera*>(inputResource.second));
+							renderPass->AddResourceBlock(static_cast<std::vector<Texture*>*>(inputResource.second)->size());
 							break;
 						case InputResourceType::VertexShader:
 							renderPass->SetVertexShader(*static_cast<std::string*>(inputResource.second));
@@ -200,15 +153,6 @@ namespace DX12Engine
 					case RenderPassType::Geometry:
 						break;
 					case RenderPassType::Lighting:
-						for (auto& inputResource : passConfig.InputResources)
-						{
-							switch (inputResource.first)
-							{
-							case InputResourceType::LightBuffer:
-								static_cast<LightingRenderPass*>(renderPass)->SetLightBuffer(static_cast<LightBuffer*>(inputResource.second));
-								break;
-							}
-						}
 						break;
 					}
 					renderPass->Init();
@@ -251,5 +195,80 @@ namespace DX12Engine
 		scissorRect.right = static_cast<LONG>(windowSize.x);
 		scissorRect.bottom = static_cast<LONG>(windowSize.y);
 		return scissorRect;
+	}
+
+	void Renderer::SetSceneData(RenderPipeline pipeline)
+	{
+		// Upload all textures in the scene
+		std::vector<Texture*> texturesToUpload;
+		if (!m_CurrentScene->GetSkyboxCubemap()->GetIsReady())
+			m_RenderContext->GetUploader().UploadTextureBatch({ m_CurrentScene->GetSkyboxCubemap(), m_CurrentScene->GetSkyboxIrradiance() });
+		std::vector<RenderComponent*> renderComponents = m_CurrentScene->GetSceneObjects().GetAllComponents<RenderComponent>();
+		Camera* sceneCamera = m_CurrentScene->GetCamera();
+		LightBuffer* lightBuffer = m_CurrentScene->GetLightBuffer();
+		for (auto& comp : renderComponents)
+		{
+			comp->UpdateConstantBufferData(sceneCamera->GetViewMatrix(), sceneCamera->GetProjectionMatrix(), sceneCamera->GetPosition());
+			for (int i = 0; i < 5; i++)
+			{
+				Texture* texture = comp->GetMaterial()->GetTexture(static_cast<TextureType>(i));
+				if (texture && !texture->GetIsReady())
+					texturesToUpload.push_back(texture);
+			}
+		}
+		if (!texturesToUpload.empty())
+			m_RenderContext->GetUploader().UploadTextureBatch(texturesToUpload);
+
+		// Set scene objects, camera and light buffer
+		for (auto& renderPass : pipeline.RenderPasses)
+		{
+			renderPass->SetRenderObjects(renderComponents);
+			renderPass->SetCamera(sceneCamera);
+			switch (renderPass->GetType())
+			{
+			case RenderPassType::Lighting:
+				static_cast<LightingRenderPass*>(renderPass)->SetLightBuffer(lightBuffer);
+				break;
+			}
+		}
+	}
+
+	void Renderer::PresentFrame(RenderTexture* finalRenderTarget)
+	{
+		if (!m_RenderContext->GetUploader().UploadAllPending()) // Upload any pending resources
+			m_QueueManager.GetGraphicsQueue().ResetCommandAllocatorAndList();
+
+		m_CommandList->SetPipelineState(m_PipelineState.Get());
+		m_CommandList->SetGraphicsRootSignature(m_RootSignature.Get());
+
+		auto viewport = GetDefaultViewport();
+		auto scissorRect = GetDefaultScissorRect();
+		m_CommandList->RSSetViewports(1, &viewport);
+		m_CommandList->RSSetScissorRects(1, &scissorRect);
+
+		auto barrier = m_RenderContext->TransitionRenderTarget(true);
+		m_CommandList->ResourceBarrier(1, &barrier);
+
+		auto rtvHandle = m_RenderContext->GetRTVHandle();
+		m_CommandList->OMSetRenderTargets(1, &rtvHandle, FALSE, nullptr);
+
+		const float clearColor[] = { 0.0f, 0.2f, 0.4f, 1.0f };
+		m_CommandList->ClearRenderTargetView(rtvHandle, clearColor, 0, nullptr);
+
+		auto srvHeap = m_RenderHeap.GetHeap();
+		m_CommandList->SetDescriptorHeaps(1, &srvHeap);
+
+		m_CommandList->SetGraphicsRootDescriptorTable(0, finalRenderTarget->GetDescriptor()->GetGPUHandle());
+
+		m_CommandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+		m_CommandList->DrawInstanced(3, 1, 0, 0);
+
+		barrier = m_RenderContext->TransitionRenderTarget(false);
+		m_CommandList->ResourceBarrier(1, &barrier);
+
+		UINT fenceVal = m_QueueManager.GetGraphicsQueue().ExecuteCommandList();
+
+		m_RenderContext->PresentFrame();
+		m_QueueManager.WaitForFenceCPUBlocking(fenceVal);
 	}
 }

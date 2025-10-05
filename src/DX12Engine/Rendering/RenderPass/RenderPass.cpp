@@ -13,7 +13,12 @@ namespace DX12Engine
 		if (m_InputResources.size() > 0)
 		{
 			ResourceManager::GetInstance().UpdateSRVDescriptors(EngineUtils::VectorSharedPtrToPtrs(m_InputResources));
-			AddDescriptorTableConfig({ (UINT)m_InputResources.size(), D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 0 });
+			UINT baseRegister = 0;
+			for (UINT size : m_ResourceBlockSizes)
+			{
+				AddDescriptorTableConfig({ size, D3D12_DESCRIPTOR_RANGE_TYPE_SRV, baseRegister });
+				baseRegister += size;
+			}
 		}
 
 		DirectX::XMINT2 windowSize = m_RenderContext.GetWindowSize();

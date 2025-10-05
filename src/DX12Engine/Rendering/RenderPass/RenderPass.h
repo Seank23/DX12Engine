@@ -4,6 +4,7 @@
 #include "../Queues/CommandQueueManager.h"
 #include "../RootSignatureBuilder.h"
 #include "RenderPassData.h"
+#include "../RenderPipelineConfig.h"
 
 namespace DX12Engine
 {
@@ -36,6 +37,7 @@ namespace DX12Engine
 		virtual void Execute();
 		virtual void OnResize(DirectX::XMINT2 newSize);
 		virtual RenderTexture* GetRenderTarget(RenderTargetType type) = 0;
+		RenderPassType GetType() const { return m_Type; }
 
 		void AddInputResources(std::vector<GPUResource*> resources) 
 		{ 
@@ -45,6 +47,7 @@ namespace DX12Engine
 		{
 			m_InputResources.insert(m_InputResources.end(), resources.begin(), resources.end());
 		}
+		void AddResourceBlock(UINT size) { m_ResourceBlockSizes.push_back(size); }
 		void SetVertexShader(const std::string& name) { m_VertexShaderName = name; }
 		void SetPixelShader(const std::string& name) { m_PixelShaderName = name; }
 		void SetRenderObjects(std::vector<RenderComponent*> renderObjects) { m_RenderObjects = renderObjects; }
@@ -62,12 +65,14 @@ namespace DX12Engine
 		std::unique_ptr<ConstantBuffer> m_ScreenDataCB;
 		void UpdateCB();
 
+		RenderPassType m_Type;
 		std::vector<std::shared_ptr<GPUResource>> m_InputResources;
 		std::vector<DescriptorTableConfig> m_DescriptorTableConfigs;
 		std::vector<std::unique_ptr<RenderTexture>> m_RenderTargets;
 		std::vector<RenderComponent*> m_RenderObjects;
 		std::string m_VertexShaderName;
 		std::string m_PixelShaderName;
+		std::vector<UINT> m_ResourceBlockSizes;
 
 		Camera* m_Camera;
 	};

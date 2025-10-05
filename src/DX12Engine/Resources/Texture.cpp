@@ -9,6 +9,7 @@ namespace DX12Engine
 		m_UploadResource = uploadResource;
 		m_Data = data;
 		m_IsCubemap = isCubemap;
+		m_IsUploaded = false;
 	}
 
 	Texture::~Texture()

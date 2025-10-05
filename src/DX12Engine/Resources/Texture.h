@@ -30,6 +30,7 @@ namespace DX12Engine
 		ID3D12Resource* m_UploadResource;
 		std::vector<D3D12_SUBRESOURCE_DATA> m_Data;
 		bool m_IsCubemap = false;
+		bool m_IsUploaded = false;
 	};
 }
 

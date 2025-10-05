@@ -10,6 +10,7 @@ namespace DX12Engine
 	LightingRenderPass::LightingRenderPass(RenderContext& context)
 		: RenderPass(context)
 	{
+		m_Type = RenderPassType::Lighting;
 	}
 
 	LightingRenderPass::~LightingRenderPass()

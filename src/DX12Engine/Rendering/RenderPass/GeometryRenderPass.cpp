@@ -8,6 +8,7 @@ namespace DX12Engine
     GeometryRenderPass::GeometryRenderPass(RenderContext& context)
 		: RenderPass(context)
     {
+		m_Type = RenderPassType::Geometry;
     }
 
     GeometryRenderPass::~GeometryRenderPass()

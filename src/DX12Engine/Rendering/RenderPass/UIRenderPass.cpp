@@ -10,6 +10,7 @@ namespace DX12Engine
 	DX12Engine::UIRenderPass::UIRenderPass(RenderContext& context)
 		: RenderPass(context)
 	{
+		m_Type = RenderPassType::UI;
 	}
 
 	UIRenderPass::~UIRenderPass()

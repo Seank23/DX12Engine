@@ -12,6 +12,7 @@ namespace DX12Engine
 	SSRRenderPass::SSRRenderPass(RenderContext& context)
 		: RenderPass(context)
 	{
+		m_Type = RenderPassType::ScreenSpaceReflection;
 	}
 
 	SSRRenderPass::~SSRRenderPass()
