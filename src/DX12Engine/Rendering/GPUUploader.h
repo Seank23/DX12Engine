@@ -21,7 +21,6 @@ namespace DX12Engine
 		bool UploadAllPending();
 
 	private:
-
 		CommandQueueManager& m_QueueManager;
 		RenderContext& m_RenderContext;
 

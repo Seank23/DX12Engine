@@ -40,7 +40,7 @@ namespace DX12Engine
 		virtual void Init();
 		virtual void Update(float ts, float elapsed);
 
-		void SetMesh(Mesh mesh);
+		void SetMesh(std::shared_ptr<Mesh> mesh);
 
 		void Move(DirectX::XMVECTOR movement);
 		void Scale(DirectX::XMVECTOR scale);
@@ -52,7 +52,7 @@ namespace DX12Engine
 		DirectX::XMVECTOR GetScale() const { return m_Scale; }
 		DirectX::XMVECTOR GetRotation() const { return m_Rotation; }
 		DirectX::XMMATRIX GetModelMatrix() const { return m_ModelMatrix; }
-		Mesh* GetMesh() { return &m_Mesh; }
+		Mesh* GetMesh() { return m_Mesh.get(); }
 
 	private:
 		void UpdateModelMatrix();
@@ -63,7 +63,7 @@ namespace DX12Engine
 		DirectX::XMVECTOR m_Scale;
 		DirectX::XMVECTOR m_Rotation;
 
-		Mesh m_Mesh;
+		std::shared_ptr<Mesh> m_Mesh;
 		DirectX::XMMATRIX m_ModelMatrix;
 	};
 

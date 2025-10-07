@@ -61,8 +61,7 @@ namespace DX12Engine
 	{
 		EngineUtils::Assert(lightIndex < shadowMap->GetTextureDescriptorCount());
 
-		if (!m_RenderContext.GetUploader().UploadAllPending()) // Upload any pending resources
-			m_QueueManager.GetGraphicsQueue().ResetCommandAllocatorAndList();
+		m_QueueManager.GetGraphicsQueue().ResetCommandAllocatorAndList();
 
 		m_CommandList.SetPipelineState(m_PipelineState.Get());
 		m_CommandList.SetGraphicsRootSignature(m_RootSignature.Get());
@@ -107,7 +106,7 @@ namespace DX12Engine
 		shadowMap->SetUsageState(D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
 
 		UINT fenceVal = m_QueueManager.GetGraphicsQueue().ExecuteCommandList();
-		m_QueueManager.WaitForFenceCPUBlocking(fenceVal);
+		m_QueueManager.GetGraphicsQueue().WaitForFenceCPUBlocking(fenceVal);
 	}
 
 	void ShadowMapRenderPass::RenderShadowCubeMap(RenderTexture* shadowMap, int lightIndex)
@@ -129,8 +128,7 @@ namespace DX12Engine
 		{
 			DirectX::XMMATRIX lightViewProj = DirectX::XMMatrixMultiply(shadowTransforms[j], lightProj);
 
-			if (!m_RenderContext.GetUploader().UploadAllPending()) // Upload any pending resources
-				m_QueueManager.GetGraphicsQueue().ResetCommandAllocatorAndList();
+			m_QueueManager.GetGraphicsQueue().ResetCommandAllocatorAndList();
 
 			m_CommandList.SetPipelineState(m_PipelineState.Get());
 			m_CommandList.SetGraphicsRootSignature(m_RootSignature.Get());
@@ -177,7 +175,7 @@ namespace DX12Engine
 			shadowMap->SetUsageState(D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
 
 			UINT fenceVal = m_QueueManager.GetGraphicsQueue().ExecuteCommandList();
-			m_QueueManager.WaitForFenceCPUBlocking(fenceVal);
+			m_QueueManager.GetGraphicsQueue().WaitForFenceCPUBlocking(fenceVal);
 		}
 	}
 

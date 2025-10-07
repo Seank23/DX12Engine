@@ -40,9 +40,6 @@ namespace DX12Engine
     {
 		RenderPass::Execute();
 
-        if (!m_RenderContext.GetUploader().UploadAllPending()) // Upload any pending resources
-            m_QueueManager.GetGraphicsQueue().ResetCommandAllocatorAndList();
-
 		m_CommandList.SetPipelineState(m_PipelineState.Get());
 		m_CommandList.SetGraphicsRootSignature(m_RootSignature.Get());
 
@@ -109,7 +106,7 @@ namespace DX12Engine
         m_CommandList.ResourceBarrier(6, rtBarriers);
 
         UINT fenceVal = m_QueueManager.GetGraphicsQueue().ExecuteCommandList();
-        m_QueueManager.WaitForFenceCPUBlocking(fenceVal);
+        m_QueueManager.GetGraphicsQueue().WaitForFenceCPUBlocking(fenceVal);
     }
 
     RenderTexture* GeometryRenderPass::GetRenderTarget(RenderTargetType type)

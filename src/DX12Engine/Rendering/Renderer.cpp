@@ -70,6 +70,7 @@ namespace DX12Engine
 	void Renderer::ExecutePipeline(RenderPipeline pipeline)
 	{
 		SetSceneData(pipeline);
+		m_RenderContext->GetUploader().UploadAllPending();
 		for (RenderPass* pass : pipeline.RenderPasses)
 		{
 			pass->Execute();
@@ -269,6 +270,6 @@ namespace DX12Engine
 		UINT fenceVal = m_QueueManager.GetGraphicsQueue().ExecuteCommandList();
 
 		m_RenderContext->PresentFrame();
-		m_QueueManager.WaitForFenceCPUBlocking(fenceVal);
+		m_QueueManager.GetGraphicsQueue().WaitForFenceCPUBlocking(fenceVal);
 	}
 }

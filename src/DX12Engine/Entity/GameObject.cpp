@@ -25,11 +25,11 @@ namespace DX12Engine
 		}
 	}
 
-	void GameObject::SetMesh(Mesh mesh)
+	void GameObject::SetMesh(std::shared_ptr<Mesh> mesh)
 	{
 		m_Mesh = mesh;
 		for (const auto& component : m_Components)
-			component->OnMeshChanged(&m_Mesh);
+			component->OnMeshChanged(m_Mesh.get());
 	}
 
 	void GameObject::Move(DirectX::XMVECTOR movement)

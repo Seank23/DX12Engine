@@ -39,9 +39,6 @@ namespace DX12Engine
 		RenderPass::Execute();
 		RenderTexture* renderTarget = m_RenderTargets[0].get();
 
-		if (!m_RenderContext.GetUploader().UploadAllPending()) // Upload any pending resources
-			m_QueueManager.GetGraphicsQueue().ResetCommandAllocatorAndList();
-
 		m_CommandList.SetPipelineState(m_PipelineState.Get());
 		m_CommandList.SetGraphicsRootSignature(m_RootSignature.Get());
 
@@ -86,7 +83,7 @@ namespace DX12Engine
 		renderTarget->SetUsageState(D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
 
 		UINT fenceVal = m_QueueManager.GetGraphicsQueue().ExecuteCommandList();
-		m_QueueManager.WaitForFenceCPUBlocking(fenceVal);
+		m_QueueManager.GetGraphicsQueue().WaitForFenceCPUBlocking(fenceVal);
 	}
 
 	RenderTexture* LightingRenderPass::GetRenderTarget(RenderTargetType type)

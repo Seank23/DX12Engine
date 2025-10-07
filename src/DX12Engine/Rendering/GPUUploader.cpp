@@ -61,9 +61,6 @@ namespace DX12Engine
 		UINT copyFenceVal = m_QueueManager.GetCopyQueue().ExecuteCommandList();
 		m_QueueManager.GetCopyQueue().WaitForFenceCPUBlocking(copyFenceVal);
 		m_QueueManager.GetCopyQueue().ResetCommandList();
-		UINT graphicsFenceVal = m_QueueManager.GetGraphicsQueue().ExecuteCommandList();
-		m_QueueManager.GetGraphicsQueue().WaitForFenceCPUBlocking(graphicsFenceVal);
-		m_QueueManager.GetGraphicsQueue().ResetCommandList();
 	}
 
 	bool GPUUploader::UploadAllPending()

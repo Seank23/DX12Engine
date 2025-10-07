@@ -29,6 +29,7 @@ namespace DX12Engine
 	void RenderPass::Execute()
 	{
 		UpdateCB();
+		m_QueueManager.GetGraphicsQueue().ResetCommandAllocatorAndList();
 	}
 
 	void RenderPass::OnResize(DirectX::XMINT2 newSize)
