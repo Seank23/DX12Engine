@@ -5,10 +5,10 @@
 #include "../Resources/RenderTexture.h"
 #include "../Entity/Scene.h"
 #include "RenderPipelineConfig.h"
+#include "RenderPass/RenderPass.h"
 
 namespace DX12Engine
 {
-	class RenderPass;
 	class GameObject;
 	struct RenderPipelineConfig;
 	enum class RenderPassType;
@@ -17,6 +17,15 @@ namespace DX12Engine
 	struct RenderPipeline
 	{
 		std::vector<RenderPass*> RenderPasses;
+		RenderPass* GetRenderPass(RenderPassType type)
+		{
+			for (RenderPass* pass : RenderPasses)
+			{
+				if (pass->GetType() == type)
+					return pass;
+			}
+			return nullptr;
+		}
 	};
 
 	class Renderer
@@ -39,7 +48,7 @@ namespace DX12Engine
 	private:
 		void SetSceneData(RenderPipeline pipeline);
 		void PresentFrame(RenderTexture* finalRenderTarget);
-		std::unique_ptr<RenderPass> GetRenderPass(RenderPassType type, int count);
+		std::unique_ptr<RenderPass> CreateRenderPass(RenderPassType type, int count);
 
 		std::shared_ptr<RenderContext> m_RenderContext;
 		CommandQueueManager& m_QueueManager;

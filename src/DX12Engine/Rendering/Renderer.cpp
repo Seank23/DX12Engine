@@ -41,7 +41,7 @@ namespace DX12Engine
 	{
 	}
 
-	std::unique_ptr<RenderPass> Renderer::GetRenderPass(RenderPassType type, int count)
+	std::unique_ptr<RenderPass> Renderer::CreateRenderPass(RenderPassType type, int count)
 	{
 		switch (type)
 		{
@@ -93,7 +93,7 @@ namespace DX12Engine
 		{
 			for (const RenderPassConfig& passConfig : config.Passes)
 			{
-				RenderPass* renderPass = GetRenderPass(passConfig.Type, passConfig.Count).release();
+				RenderPass* renderPass = CreateRenderPass(passConfig.Type, passConfig.Count).release();
 				renderPassOrder[passConfig.Type] = i;
 				if (renderPass)
 				{

@@ -55,6 +55,7 @@ namespace DX12Engine
 		void SetCamera(Camera* camera) { m_Camera = camera; }
 
 		void AddDescriptorTableConfig(DescriptorTableConfig config) { m_DescriptorTableConfigs.push_back(config); }
+		void AddConstantBuffer(ConstantBuffer* cb) { m_ExternalCBs.push_back(cb); }
 
 	protected:
 		RenderContext& m_RenderContext;
@@ -75,5 +76,6 @@ namespace DX12Engine
 		std::vector<UINT> m_ResourceBlockSizes;
 
 		Camera* m_Camera;
+		std::vector<ConstantBuffer*> m_ExternalCBs;
 	};
 }

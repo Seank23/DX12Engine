@@ -63,6 +63,8 @@ namespace DX12Engine
 
 		m_CommandList.SetGraphicsRootConstantBufferView(0, m_ScreenDataCB->GetGPUAddress());
 		int startIndex = 1;
+		for (ConstantBuffer* cb : m_ExternalCBs)
+			m_CommandList.SetGraphicsRootConstantBufferView(startIndex++, cb->GetGPUAddress());
 		for (int i = 0; i < m_DescriptorTableConfigs.size(); i++)
 		{
 			int resourceIndex = m_DescriptorTableConfigs[i].BaseShaderRegister;
@@ -113,7 +115,7 @@ namespace DX12Engine
 			.SetVertexShader(ResourceManager::GetInstance().GetShader(m_VertexShaderName))
 			.SetPixelShader(ResourceManager::GetInstance().GetShader(m_PixelShaderName));
 
-		rootSignatureBuilder = rootSignatureBuilder.AddConstantBuffer(0)
+		rootSignatureBuilder = rootSignatureBuilder.AddConstantBuffer(0).AddConstantBuffer(1)
 			.AddDescriptorTables(m_DescriptorTableConfigs)
 			.AddSampler(0, D3D12_FILTER_ANISOTROPIC);
 
