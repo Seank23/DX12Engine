@@ -16,7 +16,7 @@ namespace DX12Engine
 		virtual void Init(std::shared_ptr<RenderContext> renderContext, DirectX::XMFLOAT2 windowSize) = 0;
 		virtual void Update(float ts, float elapsed) = 0;
 
-		virtual void HandleWindowEvent(HWND hwnd, UINT uMsg, LPARAM lParam) = 0;
+		virtual void HandleWindowEvent(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) = 0;
 
 	protected:
 		std::shared_ptr<RenderContext> m_RenderContext;

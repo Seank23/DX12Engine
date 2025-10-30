@@ -18,7 +18,7 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 	}
 	else
 	{
-		if (app != nullptr) app->HandleWindowEvent(hwnd, uMsg, lParam);
+		if (app != nullptr) app->HandleWindowEvent(hwnd, uMsg, wParam, lParam);
 	}
 	return DefWindowProc(hwnd, uMsg, wParam, lParam);
 }

@@ -14,6 +14,7 @@ namespace DX12Engine
 		MoveDown,
 		Pan,
 		Interact,
+		Scroll,
 	};
 
 	class InputController

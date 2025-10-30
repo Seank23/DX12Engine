@@ -18,6 +18,7 @@ namespace DX12Engine
 		virtual void ProcessInput(float deltaTime);
 		virtual void HandleMouseMovement(HWND hwnd, LPARAM lParam);
 		virtual void HandleMouseClick(HWND hwnd, LPARAM lParam);
+		virtual void HandleMouseWheel(HWND hwnd, WPARAM wParam) = 0;
 
 	protected:
 		Camera* m_Camera;
