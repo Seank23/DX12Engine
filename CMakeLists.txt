@@ -39,6 +39,8 @@ file(GLOB_RECURSE ENGINE_SOURCES CONFIGURE_DEPENDS
 # Your executable
 add_library(DX12Engine STATIC ${ENGINE_SOURCES})
 
+add_subdirectory(DemoScene)
+
 # Link dependencies
 target_link_libraries(DX12Engine PUBLIC
     DirectXTex
@@ -81,28 +83,4 @@ foreach(SHADER ${ENGINE_SOURCES})
 endforeach()
 
 source_group(TREE ${CMAKE_CURRENT_SOURCE_DIR}/src PREFIX "Source Files" FILES ${ENGINE_SOURCES})
-
-file(COPY "${CMAKE_SOURCE_DIR}/res" DESTINATION "${CMAKE_CURRENT_BINARY_DIR}")
-
-set(SHADER_OUTPUT_DIR "${CMAKE_BINARY_DIR}/res/Shaders")
-file(GLOB_RECURSE SHADER_FILES CONFIGURE_DEPENDS src/*.hlsl)
-
-foreach(SHADER_FILE ${SHADER_FILES})
-    get_filename_component(SHADER_NAME ${SHADER_FILE} NAME)
-
-    add_custom_command(
-        OUTPUT "${SHADER_OUTPUT_DIR}/${SHADER_NAME}"
-        COMMAND ${CMAKE_COMMAND} -E copy_if_different "${SHADER_FILE}" "${SHADER_OUTPUT_DIR}/${SHADER_NAME}"
-        DEPENDS "${SHADER_FILE}"
-        COMMENT "Copying ${SHADER_NAME} to ${SHADER_OUTPUT_DIR}"
-        VERBATIM
-    )
-
-    list(APPEND COPIED_SHADER_FILES "${SHADER_OUTPUT_DIR}/${SHADER_NAME}")
-endforeach()
-
-add_custom_target(CopyEngineShaders ALL
-    DEPENDS ${COPIED_SHADER_FILES}
-)
-add_dependencies(DX12Engine CopyEngineShaders)
 
