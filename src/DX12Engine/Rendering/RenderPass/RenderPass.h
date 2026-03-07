@@ -39,8 +39,8 @@ namespace DX12Engine
 		virtual RenderTexture* GetRenderTarget(RenderTargetType type) = 0;
 		RenderPassType GetType() const { return m_Type; }
 
-		void AddInputResources(std::vector<GPUResource*> resources) 
-		{ 
+		void AddInputResources(std::vector<GPUResource*> resources)
+		{
 			m_InputResources.insert(m_InputResources.end(), resources.begin(), resources.end());
 		}
 		void AddInputResources(std::vector<std::shared_ptr<GPUResource>> resources)
@@ -69,6 +69,7 @@ namespace DX12Engine
 		RenderPassType m_Type;
 		std::vector<std::shared_ptr<GPUResource>> m_InputResources;
 		std::vector<DescriptorTableConfig> m_DescriptorTableConfigs;
+		std::vector<DescriptorHeapHandle> m_InputResourceBlockHandles;
 		std::vector<std::unique_ptr<RenderTexture>> m_RenderTargets;
 		std::vector<RenderComponent*> m_RenderObjects;
 		std::string m_VertexShaderName;

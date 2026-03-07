@@ -15,6 +15,7 @@ namespace DX12Engine
 		void SetAspectRatio(float aspectRatio);
 		void SetClippingPlanes(float zNear, float zFar);
 		void SetFOV(float fov);
+		void SetSpeed(float speed) { m_Speed = speed; }
 
 		virtual void Update(float deltaTime) override;
 		virtual void ProcessKeyInput(InputCommand command, float deltaTime) override;
@@ -36,6 +37,7 @@ namespace DX12Engine
 		float m_ZNear;
 		float m_ZFar;
 		float m_FOV;
+		float m_Speed;
 
 		DirectX::XMFLOAT3 m_Position;
 		float m_Pitch;

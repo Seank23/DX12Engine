@@ -10,6 +10,7 @@ namespace DX12Engine
 {
 	void RenderPass::Init()
 	{
+		m_InputResourceBlockHandles.clear();
 		if (m_InputResources.size() > 0)
 		{
 			ResourceManager::GetInstance().UpdateSRVDescriptors(EngineUtils::VectorSharedPtrToPtrs(m_InputResources));
@@ -17,6 +18,12 @@ namespace DX12Engine
 			for (UINT size : m_ResourceBlockSizes)
 			{
 				AddDescriptorTableConfig({ size, D3D12_DESCRIPTOR_RANGE_TYPE_SRV, baseRegister });
+				if (size > 0 && baseRegister < m_InputResources.size())
+				{
+					DescriptorHeapHandle* descriptor = m_InputResources[baseRegister]->GetDescriptor();
+					if (descriptor)
+						m_InputResourceBlockHandles.push_back(*descriptor);
+				}
 				baseRegister += size;
 			}
 		}
