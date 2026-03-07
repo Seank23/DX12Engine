@@ -1,11 +1,11 @@
 # DX12Engine
 
-A modular, learning-oriented DirectX 12 rendering engine written in modern C++20. The repository includes a reusable engine static library, a sample client application path, shaders, and asset data for physically-based rendering (PBR), deferred lighting, shadows, and screen-space reflections (SSR).
+A modular, learning-oriented DirectX 12 rendering engine written in modern C++20. The repository includes a reusable engine static library, an embedded demo application (`DemoScene`), shaders, and asset data for physically-based rendering (PBR), deferred lighting, shadows, and screen-space reflections (SSR).
 
 ## Highlights
 
-- **Modern C++20 + CMake** build setup (`DX12Engine` is produced as a static library).  
-- **DirectX 12 rendering framework** with command queues, descriptor heap management, render context/window abstraction, and pipeline state/root signature caches.  
+- **Modern C++20 + CMake** build setup (`DX12Engine` is produced as a static library).
+- **DirectX 12 rendering framework** with command queues, descriptor heap management, render context/window abstraction, and pipeline state/root signature caches.
 - **Configurable multi-pass pipeline** with render passes for:
   - Shadow map
   - Cube shadow map
@@ -16,29 +16,32 @@ A modular, learning-oriented DirectX 12 rendering engine written in modern C++20
 - **Material system** with basic and PBR materials.
 - **Resource loading** for OBJ models (TinyObjLoader) and DDS/WIC textures (DirectXTex).
 - **Simple rigid-body style physics** integration and collision handling primitives.
-- **Sample scene wiring** in `ClientApplication` (models, textures, lights, camera, and render pipeline config).
+- **Embedded demo application** in `DemoScene/` showing how to build an executable against the engine library.
 
 ## Repository Layout
 
 ```text
 .
-├── CMakeLists.txt
-├── res/
-│   ├── Materials/
-│   └── Models/
-└── src/
-    ├── DX12Engine/
-    │   ├── Entity/
-    │   ├── IO/
-    │   ├── Input/
-    │   ├── Physics/
-    │   ├── Rendering/
-    │   ├── Resources/
-    │   ├── Shaders/
-    │   └── Utils/
-    ├── ClientApplication.cpp
-    ├── ClientApplication.h
-    └── Main.cpp
+|-- CMakeLists.txt
+|-- DemoScene/
+|   |-- CMakeLists.txt
+|   `-- src/
+|-- res/
+|   |-- Materials/
+|   `-- Models/
+`-- src/
+    |-- DX12Engine/
+    |   |-- Entity/
+    |   |-- IO/
+    |   |-- Input/
+    |   |-- Physics/
+    |   |-- Rendering/
+    |   |-- Resources/
+    |   |-- Shaders/
+    |   `-- Utils/
+    |-- ClientApplication.cpp
+    |-- ClientApplication.h
+    `-- Main.cpp
 ```
 
 ## Requirements
@@ -64,7 +67,7 @@ A modular, learning-oriented DirectX 12 rendering engine written in modern C++20
 From the repository root:
 
 ```bash
-cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+cmake -S . -B build
 ```
 
 ### 2) Build
@@ -73,28 +76,49 @@ cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
 cmake --build build --config Release
 ```
 
-This produces the static library target:
+This produces:
 
-- `DX12Engine`
+- `DX12Engine` static library
+- `DemoScene` executable target
 
-### 3) Runtime resources
+If you are generating with Visual Studio, the solution will be written to the build directory, for example:
 
-The CMake build copies `res/` into the build directory and copies `.hlsl` shaders to `build/res/Shaders` via the `CopyEngineShaders` custom target.
+- `build/DX12Engine.sln`
 
-## Running an Application
+## DemoScene
 
-The current CMake file builds the engine as a static library. A sample app entry point exists in `src/Main.cpp`, but it is guarded by `#if ENABLE_TEST_PROJECT`.
+`DemoScene` is an example executable that lives inside this repository and is added to the root build through `add_subdirectory(DemoScene)`.
 
-You have two common options:
+### Build just the demo
 
-1. **Integrate DX12Engine into your own executable** and call `DX12Engine::Launcher::Launch(...)` with your `Application` subclass.
-2. **Enable the test harness** by adding an executable target and compile definition in CMake, e.g.:
-
-```cmake
-add_executable(DX12EngineTest src/Main.cpp src/ClientApplication.cpp src/ClientApplication.h)
-target_compile_definitions(DX12EngineTest PRIVATE ENABLE_TEST_PROJECT=1)
-target_link_libraries(DX12EngineTest PRIVATE DX12Engine)
+```bash
+cmake --build build --target DemoScene --config Debug
 ```
+
+### Run the demo
+
+After building, the executable is typically at:
+
+- `build/DemoScene/Debug/DemoScene.exe`
+
+When `DemoScene` is built, CMake also copies runtime content automatically:
+
+- `res/` is copied to the build root: `build/res`
+- `res/` is copied beside the executable: `build/DemoScene/<Config>/res`
+- engine and demo `.hlsl` shaders are copied into both `build/res/Shaders` and `build/DemoScene/<Config>/res/Shaders`
+- `dxcompiler.dll` and `dxil.dll` are copied beside `DemoScene.exe`
+
+This means you can usually launch the built executable directly from Visual Studio or from the build output folder without manually copying assets.
+
+## Runtime resources
+
+The root build copies `res/` into the build directory and copies engine shaders to `build/res/Shaders`. `DemoScene` also performs its own post-build copy so assets and shaders are available next to the executable.
+
+## Running your own application
+
+The engine itself is built as a static library. To create your own executable, add a new target that links against `DX12Engine` and call `DX12Engine::Launcher::Launch(...)` with your `Application` subclass.
+
+A legacy sample app entry point still exists in `src/Main.cpp`, but it is guarded by `#if ENABLE_TEST_PROJECT` and is not part of the normal repo build.
 
 ## Engine Architecture Overview
 
@@ -106,7 +130,7 @@ target_link_libraries(DX12EngineTest PRIVATE DX12Engine)
 
 The renderer supports composition of render passes through `RenderPipelineConfig`, where each pass can consume typed input resources and prior pass outputs.
 
-In the sample scene (`ClientApplication`), the configured pass order is:
+A typical deferred pipeline in this repository is:
 
 1. ShadowMap
 2. CubeShadowMap
@@ -125,7 +149,7 @@ In the sample scene (`ClientApplication`), the configured pass order is:
 
 ### Scene + ECS-style composition
 
-Game objects can attach render and physics components. The sample scene creates multiple objects (`Cube`, `Ball`, `Floor`), assigns meshes/materials, and pushes them through physics + rendering updates each frame.
+Game objects can attach render and physics components. Sample scenes create objects such as `Cube`, `Ball`, and `Floor`, assign meshes/materials, and push them through rendering and optional physics updates each frame.
 
 ### Physics
 
@@ -162,7 +186,7 @@ Assets provided in `res/` include:
 ## Notes and Limitations
 
 - The project is Windows/DirectX12-specific and will not compile as-is on non-Windows platforms.
-- The current root CMake config creates only a static library target; executable wiring is left to the consuming project or local test harness setup.
+- The repository build currently includes the engine library and the `DemoScene` executable.
 - Some systems (such as full UI rendering integration) are scaffolded in architecture but may be incomplete for production use.
 
 ## Development Tips
@@ -170,6 +194,7 @@ Assets provided in `res/` include:
 - When adding new passes, update `RenderPassType`, implement the pass class, and extend the renderer pass factory/creation logic.
 - Keep shader names consistent with what `ResourceManager` registers.
 - Treat `res/` as runtime content; ensure build/output copies stay in sync if you add assets.
+- If you add another executable under the repo, prefer following the `DemoScene/` pattern for resource and shader copying.
 
 ## Contributing
 

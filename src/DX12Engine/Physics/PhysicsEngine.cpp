@@ -1,20 +1,26 @@
 #include "PhysicsEngine.h"
-#include <iostream>
+#include <cmath>
 #include "../Entity/GameObject.h"
 #include <algorithm>
 
 namespace DX12Engine
 {
+	namespace
+	{
+		constexpr float kCollisionForceDuration = 0.01f;
+	}
+
 	void PhysicsEngine::Update(float ts, float elapsed)
 	{
 		ts *= SIMULATION_RATE;
-		//ts = 0.002f;
 		for (const auto& component : m_Components)
 		{
 			if (!component->m_IsStatic && APPLY_GRAVITY)
 			{
-				DirectX::XMVECTOR gravityForce = DirectX::XMVectorSet(0.0f, -GRAVITY * component->m_Mass, 0.0f, 0.0f);
-				component->ApplyForce(Force{ gravityForce, 0.0f, component->GetPosition() });
+				component->m_Acceleration = DirectX::XMVectorAdd(
+					component->m_Acceleration,
+					DirectX::XMVectorSet(0.0f, -GRAVITY, 0.0f, 0.0f)
+				);
 			}
 		}
 
@@ -93,15 +99,21 @@ namespace DX12Engine
 			float restitution = 50.0f;
 			float impulseMagnitude = -(1.0f + restitution) * velocityAlongNormal;
 			impulseMagnitude /= a->m_InvMass + b->m_InvMass;
-			DirectX::XMVECTOR impulse = DirectX::XMVectorScale(contact.Normal, impulseMagnitude);
-			DirectX::XMVECTOR pointOnObject = DirectX::XMVectorSubtract(contactPoint, b->GetPosition());
-			std::cout << "Point on object: " << DirectX::XMVectorGetX(pointOnObject) << ", " << DirectX::XMVectorGetY(pointOnObject) << ", " << DirectX::XMVectorGetZ(pointOnObject) << std::endl;
-			if (a->m_InvMass > 0.0f)
-				a->ApplyForce(Force{ DirectX::XMVectorNegate(impulse), 0.01f, contactPoint });
-			if (b->m_InvMass > 0.0f)
-				b->ApplyForce(Force{ impulse, 0.01f, contactPoint });
+			DirectX::XMVECTOR impulse = DirectX::XMVectorScale(contact.Normal, impulseMagnitude * kCollisionForceDuration);
 
-			// Friction
+			if (a->m_InvMass > 0.0f)
+			{
+				a->m_Velocity = DirectX::XMVectorSubtract(a->m_Velocity, DirectX::XMVectorScale(impulse, a->m_InvMass));
+				DirectX::XMVECTOR angularImpulseA = DirectX::XMVector3Cross(ra, DirectX::XMVectorNegate(impulse));
+				a->m_AngularVelocity = DirectX::XMVectorAdd(a->m_AngularVelocity, DirectX::XMVector3Transform(angularImpulseA, a->m_InverseInertiaTensor));
+			}
+			if (b->m_InvMass > 0.0f)
+			{
+				b->m_Velocity = DirectX::XMVectorAdd(b->m_Velocity, DirectX::XMVectorScale(impulse, b->m_InvMass));
+				DirectX::XMVECTOR angularImpulseB = DirectX::XMVector3Cross(rb, impulse);
+				b->m_AngularVelocity = DirectX::XMVectorAdd(b->m_AngularVelocity, DirectX::XMVector3Transform(angularImpulseB, b->m_InverseInertiaTensor));
+			}
+
 			DirectX::XMVECTOR tangent = DirectX::XMVectorSubtract(relativeVelocity, DirectX::XMVectorScale(contact.Normal, velocityAlongNormal));
 			float tangentLength = DirectX::XMVectorGetX(DirectX::XMVector3Length(tangent));
 			if (tangentLength > 1e-4f)
@@ -117,52 +129,18 @@ namespace DX12Engine
 			jt = std::clamp(jt, -maxFriction, maxFriction);
 			if (jt != 0.0f)
 			{
-				DirectX::XMVECTOR frictionImpulse = DirectX::XMVectorScale(tangent, jt);
+				DirectX::XMVECTOR frictionImpulse = DirectX::XMVectorScale(tangent, jt * kCollisionForceDuration);
 				if (a->m_InvMass > 0.0f)
-					a->ApplyForce(Force{ DirectX::XMVectorNegate(frictionImpulse), 0.01f, contactPoint });
-				if (b->m_InvMass > 0.0f)
-					b->ApplyForce(Force{ frictionImpulse, 0.01f, contactPoint });
-			}
-
-			// Angular friction
-			if (a->m_InvMass > 0.0f)
-			{
-				DirectX::XMVECTOR relPositionA = DirectX::XMVectorSubtract(contactPoint, a->GetPosition());
-				DirectX::XMVECTOR relVelocityA = DirectX::XMVectorAdd(a->m_Velocity, DirectX::XMVector3Cross(a->m_AngularVelocity, relPositionA));
-				DirectX::XMVECTOR velocityNormalA = DirectX::XMVectorMultiply(DirectX::XMVector3Dot(relVelocityA, contact.Normal), contact.Normal);
-				DirectX::XMVECTOR velocityWithoutNormalA = DirectX::XMVectorSubtract(relVelocityA, velocityNormalA);
-				if (DirectX::XMVectorGetX(DirectX::XMVector3Length(velocityWithoutNormalA)) > 1e-5f)
 				{
-					DirectX::XMVECTOR posCrossTangent = DirectX::XMVector3Cross(relPositionA, DirectX::XMVector3Normalize(velocityWithoutNormalA));
-					DirectX::XMVECTOR angularComp = DirectX::XMVector3Transform(posCrossTangent, a->m_InverseInertiaTensor);
-					float angularDenom = DirectX::XMVectorGetX(DirectX::XMVector3Dot(DirectX::XMVector3Cross(angularComp, relPositionA), DirectX::XMVector3Normalize(velocityWithoutNormalA)));
-					if (fabs(angularDenom) > 1e-5f)
-					{
-						DirectX::XMVECTOR frictionDir = DirectX::XMVector3Normalize(velocityWithoutNormalA);
-						float frictionTorqueMag = frictionCoefficient * (DirectX::XMVectorGetX(DirectX::XMVector3Length(velocityWithoutNormalA)) / angularDenom) * DirectX::XMVectorGetX(DirectX::XMVector3Length(relPositionA));
-						DirectX::XMVECTOR frictionTorque = DirectX::XMVectorScale(DirectX::XMVector3Cross(relPositionA, frictionDir), frictionTorqueMag);
-						a->ApplyTorque(DirectX::XMVectorNegate(frictionTorque));
-					}
+					a->m_Velocity = DirectX::XMVectorSubtract(a->m_Velocity, DirectX::XMVectorScale(frictionImpulse, a->m_InvMass));
+					DirectX::XMVECTOR angularFrictionA = DirectX::XMVector3Cross(ra, DirectX::XMVectorNegate(frictionImpulse));
+					a->m_AngularVelocity = DirectX::XMVectorAdd(a->m_AngularVelocity, DirectX::XMVector3Transform(angularFrictionA, a->m_InverseInertiaTensor));
 				}
-			}
-			if (b->m_InvMass > 0.0f)
-			{
-				DirectX::XMVECTOR relPositionB = DirectX::XMVectorSubtract(contactPoint, b->GetPosition());
-				DirectX::XMVECTOR relVelocityB = DirectX::XMVectorAdd(b->m_Velocity, DirectX::XMVector3Cross(b->m_AngularVelocity, relPositionB));
-				DirectX::XMVECTOR velocityNormalB = DirectX::XMVectorMultiply(DirectX::XMVector3Dot(relVelocityB, contact.Normal), contact.Normal);
-				DirectX::XMVECTOR velocityWithoutNormalB = DirectX::XMVectorSubtract(relVelocityB, velocityNormalB);
-				if (DirectX::XMVectorGetX(DirectX::XMVector3Length(velocityWithoutNormalB)) > 1e-5f)
+				if (b->m_InvMass > 0.0f)
 				{
-					DirectX::XMVECTOR posCrossTangent = DirectX::XMVector3Cross(relPositionB, DirectX::XMVector3Normalize(velocityWithoutNormalB));
-					DirectX::XMVECTOR angularComp = DirectX::XMVector3Transform(posCrossTangent, b->m_InverseInertiaTensor);
-					float angularDenom = DirectX::XMVectorGetX(DirectX::XMVector3Dot(DirectX::XMVector3Cross(angularComp, relPositionB), DirectX::XMVector3Normalize(velocityWithoutNormalB)));
-					if (fabs(angularDenom) > 1e-5f)
-					{
-						DirectX::XMVECTOR frictionDir = DirectX::XMVector3Normalize(velocityWithoutNormalB);
-						float frictionTorqueMag = frictionCoefficient * (DirectX::XMVectorGetX(DirectX::XMVector3Length(velocityWithoutNormalB)) / angularDenom) * DirectX::XMVectorGetX(DirectX::XMVector3Length(relPositionB));
-						DirectX::XMVECTOR frictionTorque = DirectX::XMVectorScale(DirectX::XMVector3Cross(relPositionB, frictionDir), frictionTorqueMag);
-						b->ApplyTorque(DirectX::XMVectorNegate(frictionTorque));
-					}
+					b->m_Velocity = DirectX::XMVectorAdd(b->m_Velocity, DirectX::XMVectorScale(frictionImpulse, b->m_InvMass));
+					DirectX::XMVECTOR angularFrictionB = DirectX::XMVector3Cross(rb, frictionImpulse);
+					b->m_AngularVelocity = DirectX::XMVectorAdd(b->m_AngularVelocity, DirectX::XMVector3Transform(angularFrictionB, b->m_InverseInertiaTensor));
 				}
 			}
 		}
@@ -173,9 +151,8 @@ namespace DX12Engine
 		DirectX::XMVECTOR up = DirectX::XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f);
 		DirectX::XMVECTOR right = DirectX::XMVectorSet(1.0f, 0.0f, 0.0f, 0.0f);
 
-		// Use up if normal is not too close to Y axis
 		DirectX::XMVECTOR tangent = DirectX::XMVector3Cross(normal, up);
-		if (DirectX::XMVector3LengthSq(tangent).m128_f32[0] < 1e-4f) 
+		if (DirectX::XMVector3LengthSq(tangent).m128_f32[0] < 1e-4f)
 		{
 			tangent = DirectX::XMVector3Cross(normal, right);
 		}

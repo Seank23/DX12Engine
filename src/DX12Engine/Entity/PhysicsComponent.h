@@ -58,6 +58,7 @@ namespace DX12Engine
 		float m_InvMass;
 		bool m_IsStatic;
 		float m_AngularDamping = 0.1f;
+		float m_TimeBelowSleepThreshold = 0.0f;
 
 		std::vector<Force> m_Forces;
 
@@ -65,4 +66,3 @@ namespace DX12Engine
 		CollisionMesh m_CollisionMesh;
 	};
 }
-

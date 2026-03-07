@@ -2,7 +2,6 @@
 #include "PhysicsComponent.h"
 #include "GameObject.h"
 #include "../Utils/EngineUtils.h"
-#include <iostream>
 
 namespace DX12Engine
 {
@@ -133,7 +132,6 @@ namespace DX12Engine
 			m_BoundingBox.MinPoint = { DirectX::XMVectorGetX(updatedVertices[0]), DirectX::XMVectorGetY(updatedVertices[0]), DirectX::XMVectorGetZ(updatedVertices[0]) };
 			m_BoundingBox.MaxPoint = { DirectX::XMVectorGetX(updatedVertices[6]), DirectX::XMVectorGetY(updatedVertices[6]), DirectX::XMVectorGetZ(updatedVertices[6]) };
 			m_CollisionMesh.PlaneData.Center = { DirectX::XMVectorGetX(m_Parent->GetPosition()), m_BoundingBox.MaxPoint.y, DirectX::XMVectorGetZ(m_Parent->GetPosition()) };
-			//m_CollisionMesh.PlaneData.Normal = DirectX::XMVector3Normalize(m_Parent->GetRotation());
 			m_CollisionMesh.PlaneData.Normal = { 0.0f, 1.0f, 0.0f, 0.0f };
 			break;
 		}
@@ -207,7 +205,7 @@ namespace DX12Engine
 				}
 			}
 		}
-		m_Forces.erase(std::remove_if(m_Forces.begin(), m_Forces.end(), [](Force f) { return f.Duration <= 0.0f; }), m_Forces.end());
+		m_Forces.erase(std::remove_if(m_Forces.begin(), m_Forces.end(), [](const Force& f) { return f.Duration <= 0.0f; }), m_Forces.end());
 	}
 
 	void PhysicsComponent::UpdateInertiaTensor()
@@ -246,19 +244,20 @@ namespace DX12Engine
 	bool PhysicsComponent::ShouldRest(float ts)
 	{
 		if (m_Forces.size() > 0 || !DirectX::XMVector3Equal(m_Torque, DirectX::XMVectorZero()))
+		{
+			m_TimeBelowSleepThreshold = 0.0f;
 			return false;
+		}
 
 		const float sleepLinearThreshold = 0.01f;
 		const float sleepAngularThreshold = 0.01f;
 		const float sleepTimeThreshold = 1.0f;
 
-		float timeBelowThreshold = 0.0f;
-
 		if (DirectX::XMVectorGetX(DirectX::XMVector3Length(m_Velocity)) < sleepLinearThreshold &&
 			DirectX::XMVectorGetX(DirectX::XMVector3Length(m_AngularVelocity)) < sleepAngularThreshold)
 		{
-			timeBelowThreshold += ts;
-			if (timeBelowThreshold >= sleepTimeThreshold)
+			m_TimeBelowSleepThreshold += ts;
+			if (m_TimeBelowSleepThreshold >= sleepTimeThreshold)
 			{
 				m_Velocity = DirectX::XMVectorZero();
 				m_AngularVelocity = DirectX::XMVectorZero();
@@ -267,8 +266,8 @@ namespace DX12Engine
 		}
 		else
 		{
-			timeBelowThreshold = 0.0f;
-			return false;
+			m_TimeBelowSleepThreshold = 0.0f;
 		}
+		return false;
 	}
 }
