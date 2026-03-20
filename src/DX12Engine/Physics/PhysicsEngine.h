@@ -5,8 +5,6 @@
 #include "../Entity/PhysicsComponent.h"
 
 constexpr auto SIMULATION_RATE = 1.0f;
-constexpr auto APPLY_GRAVITY = 1;
-constexpr auto GRAVITY = 9.81f;
 
 namespace DX12Engine
 {
@@ -23,7 +21,7 @@ namespace DX12Engine
 	private:
 		bool CheckCollision(PhysicsComponent* a, PhysicsComponent* b, ContactManifold* outContact);
 		void PositionalCorrection(ContactManifold& contact);
-		void ResolveCollision(ContactManifold& contact);
+		void ResolveCollision(ContactManifold& contact, float ts);
 		DirectX::XMVECTOR CalculateContactTangent(DirectX::XMVECTOR normal);
 
 		std::vector<PhysicsComponent*> m_Components;

@@ -89,8 +89,8 @@ namespace DX12EngineDemo
 		m_SceneObjects.Add("Floor", floor);
 
 		m_PhysicsEngine->SetComponents(m_SceneObjects.GetAllComponents<DX12Engine::PhysicsComponent>());
-		m_SceneObjects.Get("Cube")->GetComponent<DX12Engine::PhysicsComponent>()->ApplyForce(DX12Engine::Force{ { 300.0f, 1000.0f, 0.0f }, 0.05f });
-		m_SceneObjects.Get("Ball")->GetComponent<DX12Engine::PhysicsComponent>()->ApplyForce(DX12Engine::Force{ { -300.0, 500.0f, 0.0f }, 0.05f });
+		m_SceneObjects.Get("Cube")->GetComponent<DX12Engine::PhysicsComponent>()->ApplyForce(DX12Engine::Force{ { 200.0f, 700.0f, 0.0f }, 0.05f });
+		m_SceneObjects.Get("Ball")->GetComponent<DX12Engine::PhysicsComponent>()->ApplyForce(DX12Engine::Force{ { -200.0, 300.0f, 0.0f }, 0.05f });
 	}
 
 	void DemoScene::Update(float ts, float elapsed)

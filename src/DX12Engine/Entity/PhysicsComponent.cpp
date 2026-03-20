@@ -1,4 +1,4 @@
-#define NOMINMAX
+﻿#define NOMINMAX
 #include "PhysicsComponent.h"
 #include "GameObject.h"
 #include "../Utils/EngineUtils.h"
@@ -30,10 +30,29 @@ namespace DX12Engine
 
     void PhysicsComponent::Update(float ts, float elapsed)
     {
-		if (m_IsStatic || ShouldRest(ts)) return;
+		if (m_IsStatic)
+		{
+			m_Acceleration = DirectX::XMVectorZero();
+			return;
+		}
+
+		if (ShouldRest(ts))
+		{
+			m_Acceleration = DirectX::XMVectorZero();
+			return;
+		}
+
+		if (APPLY_GRAVITY)
+		{
+			m_Acceleration = DirectX::XMVectorAdd(
+				m_Acceleration,
+				DirectX::XMVectorSet(0.0f, -GRAVITY, 0.0f, 0.0f)
+			);
+		}
 
 		EvaluateForces(ts);
 		m_Velocity = DirectX::XMVectorAdd(m_Velocity, DirectX::XMVectorScale(m_Acceleration, ts));
+		m_Velocity = DirectX::XMVectorScale(m_Velocity, std::powf(1.0f - m_LinearDamping, ts));
 
 		if (!DirectX::XMVector4Equal(m_Torque, DirectX::XMVectorZero()) || !DirectX::XMVector4Equal(m_AngularVelocity, DirectX::XMVectorZero()))
 		{
@@ -43,7 +62,12 @@ namespace DX12Engine
 			UpdateInertiaTensor();
 
 			DirectX::XMVECTOR rotation = m_Parent->GetRotation();
-			DirectX::XMVECTOR delta = DirectX::XMQuaternionMultiply(rotation, DirectX::XMVectorScale(m_AngularVelocity, 0.5f));
+			DirectX::XMVECTOR omegaQuat = DirectX::XMVectorSet(
+				DirectX::XMVectorGetX(m_AngularVelocity),
+				DirectX::XMVectorGetY(m_AngularVelocity),
+				DirectX::XMVectorGetZ(m_AngularVelocity),
+				0.0f);
+			DirectX::XMVECTOR delta = DirectX::XMVectorScale(DirectX::XMQuaternionMultiply(omegaQuat, rotation), 0.5f);
 			rotation = DirectX::XMVector4Normalize(DirectX::XMVectorAdd(rotation, DirectX::XMVectorScale(delta, ts)));
 			m_Parent->SetRotationQuaternion(rotation);
 		}
@@ -77,6 +101,11 @@ namespace DX12Engine
 				m_BoundingBox.MaxPoint.y - m_BoundingBox.MinPoint.y,
 				m_BoundingBox.MaxPoint.z - m_BoundingBox.MinPoint.z
 			};
+			m_LocalHalfExtents = {
+				m_BoundingBox.Dimensions.x * 0.5f,
+				m_BoundingBox.Dimensions.y * 0.5f,
+				m_BoundingBox.Dimensions.z * 0.5f
+			};
 			m_CollisionMesh.SphereData.Radius = (DirectX::XMVectorGetX(m_BoundingBox.Vertices[6]) - DirectX::XMVectorGetX(m_BoundingBox.Vertices[0])) / 2.0f;
 			UpdateCollisionMesh();
 		}
@@ -96,15 +125,15 @@ namespace DX12Engine
 			m_BoundingBox.MinPoint = { DirectX::XMVectorGetX(updatedVertices[0]), DirectX::XMVectorGetY(updatedVertices[0]), DirectX::XMVectorGetZ(updatedVertices[0]) };
 			m_BoundingBox.MaxPoint = { DirectX::XMVectorGetX(updatedVertices[6]), DirectX::XMVectorGetY(updatedVertices[6]), DirectX::XMVectorGetZ(updatedVertices[6]) };
 
-			DirectX::XMVECTOR right = DirectX::XMVector3Normalize(modelMatrix.r[0]);
-			DirectX::XMVECTOR up = DirectX::XMVector3Normalize(modelMatrix.r[1]);
-			DirectX::XMVECTOR forward = DirectX::XMVector3Normalize(modelMatrix.r[2]);
-			DirectX::XMVECTOR localExtents = DirectX::XMVectorScale(DirectX::XMVectorSubtract(DirectX::XMLoadFloat3(&m_BoundingBox.MinPoint), DirectX::XMLoadFloat3(&m_BoundingBox.MaxPoint)), 0.5f);
-			DirectX::XMVECTOR worldExtents;
-			worldExtents = DirectX::XMVectorSet(
-				DirectX::XMVectorGetX(DirectX::XMVector3Length(DirectX::XMVectorScale(modelMatrix.r[0], DirectX::XMVectorGetX(localExtents)))),
-				DirectX::XMVectorGetX(DirectX::XMVector3Length(DirectX::XMVectorScale(modelMatrix.r[1], DirectX::XMVectorGetY(localExtents)))),
-				DirectX::XMVectorGetX(DirectX::XMVector3Length(DirectX::XMVectorScale(modelMatrix.r[2], DirectX::XMVectorGetZ(localExtents)))),
+			DirectX::XMMATRIX rotationMatrix = DirectX::XMMatrixRotationQuaternion(m_Parent->GetRotation());
+			DirectX::XMVECTOR right = DirectX::XMVector3Normalize(rotationMatrix.r[0]);
+			DirectX::XMVECTOR up = DirectX::XMVector3Normalize(rotationMatrix.r[1]);
+			DirectX::XMVECTOR forward = DirectX::XMVector3Normalize(rotationMatrix.r[2]);
+			DirectX::XMVECTOR scale = m_Parent->GetScale();
+			DirectX::XMVECTOR worldExtents = DirectX::XMVectorSet(
+				m_LocalHalfExtents.x * DirectX::XMVectorGetX(scale),
+				m_LocalHalfExtents.y * DirectX::XMVectorGetY(scale),
+				m_LocalHalfExtents.z * DirectX::XMVectorGetZ(scale),
 				0.0f
 			);
 			m_CollisionMesh.OBBData.Center = m_Parent->GetPosition();
@@ -131,8 +160,14 @@ namespace DX12Engine
 			std::vector<DirectX::XMVECTOR> updatedVertices = GetBoundingBoxVertices(transformedVertices);
 			m_BoundingBox.MinPoint = { DirectX::XMVectorGetX(updatedVertices[0]), DirectX::XMVectorGetY(updatedVertices[0]), DirectX::XMVectorGetZ(updatedVertices[0]) };
 			m_BoundingBox.MaxPoint = { DirectX::XMVectorGetX(updatedVertices[6]), DirectX::XMVectorGetY(updatedVertices[6]), DirectX::XMVectorGetZ(updatedVertices[6]) };
-			m_CollisionMesh.PlaneData.Center = { DirectX::XMVectorGetX(m_Parent->GetPosition()), m_BoundingBox.MaxPoint.y, DirectX::XMVectorGetZ(m_Parent->GetPosition()) };
-			m_CollisionMesh.PlaneData.Normal = { 0.0f, 1.0f, 0.0f, 0.0f };
+			float centerX = (m_BoundingBox.MinPoint.x + m_BoundingBox.MaxPoint.x) * 0.5f;
+			float centerZ = (m_BoundingBox.MinPoint.z + m_BoundingBox.MaxPoint.z) * 0.5f;
+			m_CollisionMesh.PlaneData.Center = DirectX::XMVectorSet(centerX, m_BoundingBox.MaxPoint.y, centerZ, 0.0f);
+			m_CollisionMesh.PlaneData.Normal = DirectX::XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f);
+			m_CollisionMesh.PlaneData.Tangent0 = DirectX::XMVectorSet(1.0f, 0.0f, 0.0f, 0.0f);
+			m_CollisionMesh.PlaneData.Tangent1 = DirectX::XMVectorSet(0.0f, 0.0f, 1.0f, 0.0f);
+			m_CollisionMesh.PlaneData.HalfExtent0 = (m_BoundingBox.MaxPoint.x - m_BoundingBox.MinPoint.x) * 0.5f;
+			m_CollisionMesh.PlaneData.HalfExtent1 = (m_BoundingBox.MaxPoint.z - m_BoundingBox.MinPoint.z) * 0.5f;
 			break;
 		}
 		}
@@ -163,6 +198,19 @@ namespace DX12Engine
 		else
 		{
 			SetIsStatic(false);
+
+			// Box inertia tensor from AABB dimensions: I = (mass/12) * diag(h²+d², w²+d², w²+h²)
+			const float w = m_BoundingBox.Dimensions.x;
+			const float h = m_BoundingBox.Dimensions.y;
+			const float d = m_BoundingBox.Dimensions.z;
+			const float k = mass / 12.0f;
+			m_LocalInertiaTensor = DirectX::XMMatrixSet(
+				k * (h * h + d * d), 0.0f, 0.0f, 0.0f,
+				0.0f, k * (w * w + d * d), 0.0f, 0.0f,
+				0.0f, 0.0f, k * (w * w + h * h), 0.0f,
+				0.0f, 0.0f, 0.0f, 1.0f
+			);
+
 			UpdateInertiaTensor();
 		}
 	}
@@ -172,8 +220,16 @@ namespace DX12Engine
 		m_IsStatic = isStatic;
 		if (isStatic)
 		{
-			m_InverseInertiaTensor = DirectX::XMMatrixIdentity();
+			m_InverseInertiaTensor = DirectX::XMMatrixSet(
+				0.0f, 0.0f, 0.0f, 0.0f,
+				0.0f, 0.0f, 0.0f, 0.0f,
+				0.0f, 0.0f, 0.0f, 0.0f,
+				0.0f, 0.0f, 0.0f, 0.0f
+			);
 			m_InvMass = 0.0f;
+			m_Velocity = DirectX::XMVectorZero();
+			m_AngularVelocity = DirectX::XMVectorZero();
+			m_Acceleration = DirectX::XMVectorZero();
 		}
 		UpdateCollisionMesh();
 	}
@@ -249,18 +305,21 @@ namespace DX12Engine
 			return false;
 		}
 
-		const float sleepLinearThreshold = 0.01f;
-		const float sleepAngularThreshold = 0.01f;
-		const float sleepTimeThreshold = 1.0f;
+		const float sleepLinearThreshold = 0.05f;
+		const float sleepAngularThreshold = 0.1f;
+		const float sleepTimeThreshold = 0.1f;
 
-		if (DirectX::XMVectorGetX(DirectX::XMVector3Length(m_Velocity)) < sleepLinearThreshold &&
-			DirectX::XMVectorGetX(DirectX::XMVector3Length(m_AngularVelocity)) < sleepAngularThreshold)
+		float linearSpeed = DirectX::XMVectorGetX(DirectX::XMVector3Length(m_Velocity));
+		float angularSpeed = DirectX::XMVectorGetX(DirectX::XMVector3Length(m_AngularVelocity));
+
+		if (linearSpeed < sleepLinearThreshold && angularSpeed < sleepAngularThreshold)
 		{
 			m_TimeBelowSleepThreshold += ts;
 			if (m_TimeBelowSleepThreshold >= sleepTimeThreshold)
 			{
 				m_Velocity = DirectX::XMVectorZero();
 				m_AngularVelocity = DirectX::XMVectorZero();
+				m_TimeBelowSleepThreshold = 0.0f;
 				return true;
 			}
 		}

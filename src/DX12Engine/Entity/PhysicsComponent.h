@@ -5,6 +5,9 @@
 #include "../Physics/AABoundingBox.h"
 #include "../Physics/CollisionMesh.h"
 
+constexpr auto APPLY_GRAVITY = 1;
+constexpr auto GRAVITY = 9.81f;
+
 namespace DX12Engine
 {
 	struct Force
@@ -33,6 +36,11 @@ namespace DX12Engine
 
 		void SetMass(float mass);
 		void SetIsStatic(bool isStatic);
+		void SetRestitution(float restitution) { m_Restitution = restitution; }
+		void SetStaticFriction(float friction) { m_StaticFriction = friction; }
+		void SetKineticFriction(float friction) { m_KineticFriction = friction; }
+		void SetLinearDamping(float damping) { m_LinearDamping = damping; }
+		void SetAngularDamping(float damping) { m_AngularDamping = damping; }
 
 		void SetCollisionMeshType(CollisionMeshType type);
 
@@ -47,6 +55,8 @@ namespace DX12Engine
 		void UpdateCollisionMesh();
 		bool ShouldRest(float ts);
 
+		DirectX::XMFLOAT3 m_LocalHalfExtents = { 0.0f, 0.0f, 0.0f };
+
 		DirectX::XMVECTOR m_Velocity;
 		DirectX::XMVECTOR m_AngularVelocity;
 		DirectX::XMVECTOR m_Acceleration;
@@ -57,7 +67,11 @@ namespace DX12Engine
 		float m_Mass;
 		float m_InvMass;
 		bool m_IsStatic;
-		float m_AngularDamping = 0.1f;
+		float m_LinearDamping = 0.02f;
+		float m_AngularDamping = 0.05f;
+		float m_Restitution = 0.5f;
+		float m_StaticFriction = 0.5f;
+		float m_KineticFriction = 0.3f;
 		float m_TimeBelowSleepThreshold = 0.0f;
 
 		std::vector<Force> m_Forces;
