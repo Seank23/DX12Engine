@@ -9,8 +9,32 @@ namespace DX12Engine
 
 	void PhysicsEngine::Update(float ts, float elapsed)
 	{
-		ts *= SIMULATION_RATE;
+		m_Accumulator += ts;
+		int steps = 0;
+		while (m_Accumulator >= FIXED_DT && steps < MAX_SUBSTEPS)
+		{
+			Step(FIXED_DT * SIMULATION_RATE, elapsed);
+			m_Accumulator -= FIXED_DT;
+			++steps;
+		}
+		if (m_Accumulator > FIXED_DT * MAX_SUBSTEPS)
+			m_Accumulator = 0.0f;
+	}
 
+	void PhysicsEngine::SetComponents(std::vector<PhysicsComponent*> components)
+	{
+		m_Components = components;
+		for (auto* c : m_Components)
+			c->m_ManagedByEngine = true;
+	}
+
+	void PhysicsEngine::Step(float dt, float elapsed)
+	{
+		// Semi-implicit Euler: integrate forces into velocity first
+		for (const auto& component : m_Components)
+			component->IntegrateVelocity(dt);
+
+		// Detect collisions using current positions
 		std::vector<ContactManifold> contacts;
 		for (int i = 0; i < m_Components.size(); i++)
 		{
@@ -28,13 +52,16 @@ namespace DX12Engine
 		{
 			if (contact.Contacts.size() > 0)
 			{
-				ResolveCollision(contact, ts);
+				ResolveCollision(contact, dt);
 				PositionalCorrection(contact);
 			}
 		}
 
 		for (const auto& component : m_Components)
-			component->Update(ts, elapsed);
+			component->IntegratePosition(dt);
+
+		for (const auto& component : m_Components)
+			component->Update(dt, elapsed);
 	}
 
 	bool PhysicsEngine::CheckCollision(PhysicsComponent* a, PhysicsComponent* b, ContactManifold* outContact)
@@ -199,19 +226,5 @@ namespace DX12Engine
 					DirectX::XMVector3Cross(rb, frictionImpulse),
 					b->m_InverseInertiaTensor));
 		}
-	}
-
-	DirectX::XMVECTOR PhysicsEngine::CalculateContactTangent(DirectX::XMVECTOR normal)
-	{
-		DirectX::XMVECTOR up = DirectX::XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f);
-		DirectX::XMVECTOR right = DirectX::XMVectorSet(1.0f, 0.0f, 0.0f, 0.0f);
-
-		DirectX::XMVECTOR tangent = DirectX::XMVector3Cross(normal, up);
-		if (DirectX::XMVector3LengthSq(tangent).m128_f32[0] < 1e-4f)
-		{
-			tangent = DirectX::XMVector3Cross(normal, right);
-		}
-
-		return DirectX::XMVector3Normalize(tangent);
 	}
 }

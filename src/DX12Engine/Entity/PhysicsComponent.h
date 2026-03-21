@@ -14,7 +14,9 @@ namespace DX12Engine
 	{
 		DirectX::XMVECTOR Magnitude;
 		float Duration = 0.05f;
-		DirectX::XMVECTOR Point;
+		DirectX::XMVECTOR Point = DirectX::XMVectorZero();
+		bool IsLocalSpace = false;
+		bool HasPoint = false;
 	};
 
 	class PhysicsComponent : public Component
@@ -27,6 +29,8 @@ namespace DX12Engine
 
 		virtual void Init() override;
 		virtual void Update(float ts, float elapsed) override;
+		void IntegrateVelocity(float ts);
+		void IntegratePosition(float ts);
 
 		virtual void OnMeshChanged(Mesh* newMesh) override;
 		virtual void OnTransformChanged(TransformType type) override;
@@ -73,6 +77,7 @@ namespace DX12Engine
 		float m_StaticFriction = 0.5f;
 		float m_KineticFriction = 0.3f;
 		float m_TimeBelowSleepThreshold = 0.0f;
+		bool m_ManagedByEngine = false;
 
 		std::vector<Force> m_Forces;
 

@@ -69,6 +69,6 @@ namespace DX12Engine
 
 	void GameObject::UpdateModelMatrix()
 	{
-		m_ModelMatrix = DirectX::XMMatrixRotationQuaternion(m_Rotation) * DirectX::XMMatrixTranslationFromVector(m_Position) * DirectX::XMMatrixScalingFromVector(m_Scale);
+		m_ModelMatrix = DirectX::XMMatrixScalingFromVector(m_Scale) * DirectX::XMMatrixRotationQuaternion(m_Rotation) * DirectX::XMMatrixTranslationFromVector(m_Position);
 	}
 }

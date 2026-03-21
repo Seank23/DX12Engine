@@ -30,6 +30,13 @@ namespace DX12Engine
 
     void PhysicsComponent::Update(float ts, float elapsed)
     {
+		if (m_ManagedByEngine) return;
+		IntegrateVelocity(ts);
+		IntegratePosition(ts);
+    }
+
+    void PhysicsComponent::IntegrateVelocity(float ts)
+    {
 		if (m_IsStatic)
 		{
 			m_Acceleration = DirectX::XMVectorZero();
@@ -56,11 +63,23 @@ namespace DX12Engine
 
 		if (!DirectX::XMVector4Equal(m_Torque, DirectX::XMVectorZero()) || !DirectX::XMVector4Equal(m_AngularVelocity, DirectX::XMVectorZero()))
 		{
-			DirectX::XMVECTOR angularAccceleration = DirectX::XMVector3Transform(m_Torque, m_InverseInertiaTensor);
-			m_AngularVelocity = DirectX::XMVectorAdd(m_AngularVelocity, DirectX::XMVectorScale(angularAccceleration, ts));
+			DirectX::XMVECTOR angularAcceleration = DirectX::XMVector3Transform(m_Torque, m_InverseInertiaTensor);
+			m_AngularVelocity = DirectX::XMVectorAdd(m_AngularVelocity, DirectX::XMVectorScale(angularAcceleration, ts));
+
 			m_AngularVelocity = DirectX::XMVectorScale(m_AngularVelocity, std::powf(1.0f - m_AngularDamping, ts));
 			UpdateInertiaTensor();
+		}
 
+		m_Acceleration = DirectX::XMVectorZero();
+		m_Torque = DirectX::XMVectorZero();
+    }
+
+    void PhysicsComponent::IntegratePosition(float ts)
+    {
+		if (m_IsStatic) return;
+
+		if (!DirectX::XMVector4Equal(m_AngularVelocity, DirectX::XMVectorZero()))
+		{
 			DirectX::XMVECTOR rotation = m_Parent->GetRotation();
 			DirectX::XMVECTOR omegaQuat = DirectX::XMVectorSet(
 				DirectX::XMVectorGetX(m_AngularVelocity),
@@ -71,11 +90,7 @@ namespace DX12Engine
 			rotation = DirectX::XMVector4Normalize(DirectX::XMVectorAdd(rotation, DirectX::XMVectorScale(delta, ts)));
 			m_Parent->SetRotationQuaternion(rotation);
 		}
-
 		m_Parent->Move(DirectX::XMVectorScale(m_Velocity, ts));
-
-		m_Acceleration = DirectX::XMVectorZero();
-		m_Torque = DirectX::XMVectorZero();
     }
 
 	void PhysicsComponent::OnMeshChanged(Mesh* newMesh)
