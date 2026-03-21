@@ -63,6 +63,7 @@ namespace DX12Engine
 
 		DirectX::XMVECTOR m_Velocity;
 		DirectX::XMVECTOR m_AngularVelocity;
+		DirectX::XMVECTOR m_PseudoVelocity;
 		DirectX::XMVECTOR m_Acceleration;
 		DirectX::XMVECTOR m_Torque;
 		DirectX::XMMATRIX m_InverseInertiaTensor;

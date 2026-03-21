@@ -9,6 +9,7 @@ namespace DX12Engine
 		: Component(parent, ComponentType::Physics, true),
 		m_Velocity(DirectX::XMVectorZero()),
 		m_AngularVelocity(DirectX::XMVectorZero()),
+		m_PseudoVelocity(DirectX::XMVectorZero()),
 		m_Acceleration(DirectX::XMVectorZero()),
 		m_Torque(DirectX::XMVectorZero()),
 		m_InverseInertiaTensor(DirectX::XMMatrixIdentity()),
@@ -214,10 +215,11 @@ namespace DX12Engine
 		{
 			SetIsStatic(false);
 
-			// Box inertia tensor from AABB dimensions: I = (mass/12) * diag(h²+d², w²+d², w²+h²)
-			const float w = m_BoundingBox.Dimensions.x;
-			const float h = m_BoundingBox.Dimensions.y;
-			const float d = m_BoundingBox.Dimensions.z;
+			// Box inertia tensor from scaled dimensions: I = (mass/12) * diag(h²+d², w²+d², w²+h²)
+			DirectX::XMVECTOR scale = m_Parent->GetScale();
+			const float w = m_BoundingBox.Dimensions.x * DirectX::XMVectorGetX(scale);
+			const float h = m_BoundingBox.Dimensions.y * DirectX::XMVectorGetY(scale);
+			const float d = m_BoundingBox.Dimensions.z * DirectX::XMVectorGetZ(scale);
 			const float k = mass / 12.0f;
 			m_LocalInertiaTensor = DirectX::XMMatrixSet(
 				k * (h * h + d * d), 0.0f, 0.0f, 0.0f,
@@ -268,10 +270,14 @@ namespace DX12Engine
 			{
 				m_Acceleration = DirectX::XMVectorAdd(m_Acceleration, DirectX::XMVectorScale(force.Magnitude, 1.0f / m_Mass));
 				force.Duration -= ts;
-				if (!DirectX::XMVector3Equal(force.Point, DirectX::XMVectorZero()))
+				if (force.HasPoint)
 				{
-					DirectX::XMVECTOR position = m_Parent->GetPosition();
-					DirectX::XMVECTOR torque = DirectX::XMVector3Cross(DirectX::XMVectorSubtract(force.Point, position), force.Magnitude);
+					DirectX::XMVECTOR worldPoint = force.Point;
+					if (force.IsLocalSpace)
+						worldPoint = DirectX::XMVectorAdd(m_Parent->GetPosition(),
+							DirectX::XMVector3Rotate(force.Point, m_Parent->GetRotation()));
+					DirectX::XMVECTOR leverArm = DirectX::XMVectorSubtract(worldPoint, m_Parent->GetPosition());
+					DirectX::XMVECTOR torque = DirectX::XMVector3Cross(leverArm, force.Magnitude);
 					m_Torque = DirectX::XMVectorAdd(m_Torque, torque);
 				}
 			}
@@ -282,7 +288,7 @@ namespace DX12Engine
 	void PhysicsComponent::UpdateInertiaTensor()
 	{
 		DirectX::XMMATRIX rotationMatrix = DirectX::XMMatrixRotationQuaternion(m_Parent->GetRotation());
-		DirectX::XMMATRIX worldInertiaTensor = DirectX::XMMatrixMultiply(DirectX::XMMatrixTranspose(rotationMatrix), DirectX::XMMatrixMultiply(m_LocalInertiaTensor, rotationMatrix));
+		DirectX::XMMATRIX worldInertiaTensor = DirectX::XMMatrixMultiply(rotationMatrix, DirectX::XMMatrixMultiply(m_LocalInertiaTensor, DirectX::XMMatrixTranspose(rotationMatrix)));
 		m_InverseInertiaTensor = DirectX::XMMatrixInverse(nullptr, worldInertiaTensor);
 	}
 
@@ -320,9 +326,35 @@ namespace DX12Engine
 			return false;
 		}
 
+		// Only allow sleep when a box is lying flat on one of its six faces.
+		// A body balanced on an edge/corner with near-zero velocity is not
+		// in a stable pose and gravity must be allowed to topple it.
+		if (m_CollisionMesh.Type == CollisionMeshType::Box)
+		{
+			const DirectX::XMVECTOR worldUp = DirectX::XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f);
+			const DirectX::XMVECTOR q = m_Parent->GetRotation();
+			const DirectX::XMVECTOR localAxes[3] = {
+				DirectX::XMVector3Rotate(DirectX::XMVectorSet(1.0f, 0.0f, 0.0f, 0.0f), q),
+				DirectX::XMVector3Rotate(DirectX::XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f), q),
+				DirectX::XMVector3Rotate(DirectX::XMVectorSet(0.0f, 0.0f, 1.0f, 0.0f), q)
+			};
+			constexpr float kFaceAlignThreshold = 0.966f; // cos(15°)
+			bool stable = false;
+			for (int i = 0; i < 3; ++i)
+			{
+				float d = std::abs(DirectX::XMVectorGetX(DirectX::XMVector3Dot(localAxes[i], worldUp)));
+				if (d >= kFaceAlignThreshold) { stable = true; break; }
+			}
+			if (!stable)
+			{
+				m_TimeBelowSleepThreshold = 0.0f;
+				return false;
+			}
+		}
+
 		const float sleepLinearThreshold = 0.05f;
 		const float sleepAngularThreshold = 0.1f;
-		const float sleepTimeThreshold = 0.1f;
+		const float sleepTimeThreshold = 0.5f;
 
 		float linearSpeed = DirectX::XMVectorGetX(DirectX::XMVector3Length(m_Velocity));
 		float angularSpeed = DirectX::XMVectorGetX(DirectX::XMVector3Length(m_AngularVelocity));

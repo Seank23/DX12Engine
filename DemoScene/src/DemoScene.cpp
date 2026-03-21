@@ -60,7 +60,7 @@ namespace DX12EngineDemo
 
 		m_Cube = std::make_shared<DX12Engine::GameObject>();
 		m_Cube->SetMesh(cubeMesh);
-		m_Cube->Move({ -1.5f, 1.0f, 0.0f });
+		m_Cube->Move({ -1.5f, 1.0f, -0.0f });
 		DX12Engine::RenderComponent* cubeRenderComp = m_Cube->CreateComponent<DX12Engine::RenderComponent>();
 		cubeRenderComp->SetMaterial(pbrBrick);
 		DX12Engine::PhysicsComponent* cubePhysicsComp = m_Cube->CreateComponent<DX12Engine::PhysicsComponent>();
@@ -84,7 +84,7 @@ namespace DX12EngineDemo
 		ballPhysicsComp->SetCollisionMeshType(DX12Engine::CollisionMeshType::Sphere);
 		m_SceneObjects.Add("Ball", m_Ball);
 
-		/*std::shared_ptr<DX12Engine::GameObject> floor = std::make_shared<DX12Engine::GameObject>();
+		std::shared_ptr<DX12Engine::GameObject> floor = std::make_shared<DX12Engine::GameObject>();
 		floor->SetMesh(floorMesh);
 		floor->Move({ 0.0f, -1.0f, 0.0f });
 		floor->Scale({ 2.0f, 1.0f, 2.0f });
@@ -96,10 +96,10 @@ namespace DX12EngineDemo
 		floorPhysicsComp->SetStaticFriction(0.3f);
 		floorPhysicsComp->SetKineticFriction(0.2f);
 		floorPhysicsComp->SetCollisionMeshType(DX12Engine::CollisionMeshType::Plane);
-		m_SceneObjects.Add("Floor", floor);*/
+		m_SceneObjects.Add("Floor", floor);
 
 		// Asphalt floor — high friction, low bounce
-		std::shared_ptr<DX12Engine::GameObject> asphaltFloor = std::make_shared<DX12Engine::GameObject>();
+		/*std::shared_ptr<DX12Engine::GameObject> asphaltFloor = std::make_shared<DX12Engine::GameObject>();
 		asphaltFloor->SetMesh(floorMesh);
 		asphaltFloor->Move({ 0.0f, -1.0f, 0.0f });
 		asphaltFloor->Scale({ 2.0f, 1.0f, 2.0f });
@@ -111,13 +111,13 @@ namespace DX12EngineDemo
 		asphaltPhysicsComp->SetStaticFriction(0.85f);
 		asphaltPhysicsComp->SetKineticFriction(0.7f);
 		asphaltPhysicsComp->SetCollisionMeshType(DX12Engine::CollisionMeshType::Plane);
-		m_SceneObjects.Add("AsphaltFloor", asphaltFloor);
+		m_SceneObjects.Add("AsphaltFloor", asphaltFloor);*/
 
 		m_PhysicsEngine->SetComponents(m_SceneObjects.GetAllComponents<DX12Engine::PhysicsComponent>());
-		m_SceneObjects.Get("Cube")->GetComponent<DX12Engine::PhysicsComponent>()->ApplyForce(DX12Engine::Force{ { 300.0f, 700.0f, 0.0f }, 0.05f, { -0.5f, 0.9f, 0.1f }, true, true });
-		m_SceneObjects.Get("Ball")->GetComponent<DX12Engine::PhysicsComponent>()->ApplyForce(DX12Engine::Force{ { -200.0, 300.0f, 0.0f }, 0.05f, { 0.5f, 0.7f, -0.2f }, true, true });
-		//m_SceneObjects.Get("Cube")->GetComponent<DX12Engine::PhysicsComponent>()->ApplyForce(DX12Engine::Force{ { 300.0f, 700.0f, 0.0f }, 0.05f });
-		//m_SceneObjects.Get("Ball")->GetComponent<DX12Engine::PhysicsComponent>()->ApplyForce(DX12Engine::Force{ { -200.0, 300.0f, 0.0f }, 0.05f });
+		//m_SceneObjects.Get("Cube")->GetComponent<DX12Engine::PhysicsComponent>()->ApplyForce(DX12Engine::Force{ { 300.0f, 700.0f, 0.0f }, 0.05f, { -0.2f, 0.2f, 0.1f }, true, true });
+		//m_SceneObjects.Get("Ball")->GetComponent<DX12Engine::PhysicsComponent>()->ApplyForce(DX12Engine::Force{ { -200.0, 300.0f, 0.0f }, 0.05f, { 0.5f, 0.7f, -0.2f }, true, true });
+		m_SceneObjects.Get("Cube")->GetComponent<DX12Engine::PhysicsComponent>()->ApplyForce(DX12Engine::Force{ { 500.0f, 700.0f, 0.0f }, 0.05f });
+		m_SceneObjects.Get("Ball")->GetComponent<DX12Engine::PhysicsComponent>()->ApplyForce(DX12Engine::Force{ { -200.0, 300.0f, 0.0f }, 0.05f });
 	}
 
 	void DemoScene::Update(float ts, float elapsed)

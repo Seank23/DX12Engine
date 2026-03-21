@@ -3,6 +3,8 @@
 #include <DirectXMath.h>
 #include <vector>
 #include <wrl.h>
+#include <cstdint>
+#include <functional>
 
 namespace DX12Engine
 {
@@ -46,6 +48,44 @@ namespace DX12Engine
 		DirectX::XMVECTOR Point;
 		DirectX::XMVECTOR Normal;
 		float PenetrationDepth;
+	};
+
+	struct CachedContact
+	{
+		DirectX::XMVECTOR Point;
+		float AccJn = 0.0f;
+		float AccJt0 = 0.0f;
+		float AccJt1 = 0.0f;
+	};
+
+	struct BodyPairKey
+	{
+		const PhysicsComponent* A;
+		const PhysicsComponent* B;
+
+		bool operator==(const BodyPairKey& other) const
+		{
+			return A == other.A && B == other.B;
+		}
+	};
+
+	struct BodyPairHash
+	{
+		size_t operator()(const BodyPairKey& key) const
+		{
+			auto h1 = std::hash<uintptr_t>{}(reinterpret_cast<uintptr_t>(key.A));
+			auto h2 = std::hash<uintptr_t>{}(reinterpret_cast<uintptr_t>(key.B));
+			return h1 ^ (h2 * 2654435761u);
+		}
+	};
+
+	struct CachedManifold
+	{
+		std::vector<CachedContact> Contacts;
+		DirectX::XMVECTOR Normal = DirectX::XMVectorZero();
+		DirectX::XMVECTOR Tangent0 = DirectX::XMVectorZero();
+		DirectX::XMVECTOR Tangent1 = DirectX::XMVectorZero();
+		int Age = 0;
 	};
 
 	struct ContactManifold
@@ -106,9 +146,6 @@ namespace DX12Engine
             if (!OBBVsPlane(box, plane))
                 return false;
 
-            // Test all 8 vertices of the box against the plane directly.
-            // This is robust for any orientation — edge/corner contacts are caught
-            // without relying on a correct reference face selection.
             float ex = DirectX::XMVectorGetX(box.Extents);
             float ey = DirectX::XMVectorGetY(box.Extents);
             float ez = DirectX::XMVectorGetZ(box.Extents);
@@ -116,6 +153,9 @@ namespace DX12Engine
             const float sx[8] = { -1, 1, 1,-1,-1, 1, 1,-1 };
             const float sy[8] = { -1,-1, 1, 1,-1,-1, 1, 1 };
             const float sz[8] = { -1,-1,-1,-1, 1, 1, 1, 1 };
+
+            std::vector<ContactPoint> pendingContacts;
+            std::vector<DirectX::XMVECTOR> pendingVertices;
 
             for (int i = 0; i < 8; ++i)
             {
@@ -132,50 +172,51 @@ namespace DX12Engine
                 float dist = DirectX::XMVectorGetX(DirectX::XMVector3Dot(plane.Normal, DirectX::XMVectorSubtract(v, plane.Center)));
                 if (dist <= 0.0f)
                 {
-                    DirectX::XMVECTOR offset = DirectX::XMVectorSubtract(v, plane.Center);
+                    DirectX::XMVECTOR projectedPt = DirectX::XMVectorSubtract(v, DirectX::XMVectorScale(plane.Normal, dist));
+
+                    DirectX::XMVECTOR offset = DirectX::XMVectorSubtract(projectedPt, plane.Center);
                     float proj0 = DirectX::XMVectorGetX(DirectX::XMVector3Dot(offset, plane.Tangent0));
                     float proj1 = DirectX::XMVectorGetX(DirectX::XMVector3Dot(offset, plane.Tangent1));
-                    float clamped0 = proj0;
-                    float clamped1 = proj1;
                     bool wasClamped = false;
                     if (plane.HalfExtent0 > 0.0f)
                     {
-                        clamped0 = (std::max)(-plane.HalfExtent0, (std::min)(proj0, plane.HalfExtent0));
+                        float clamped0 = (std::max)(-plane.HalfExtent0, (std::min)(proj0, plane.HalfExtent0));
                         if (clamped0 != proj0) wasClamped = true;
                     }
                     if (plane.HalfExtent1 > 0.0f)
                     {
-                        clamped1 = (std::max)(-plane.HalfExtent1, (std::min)(proj1, plane.HalfExtent1));
+                        float clamped1 = (std::max)(-plane.HalfExtent1, (std::min)(proj1, plane.HalfExtent1));
                         if (clamped1 != proj1) wasClamped = true;
                     }
 
-                    DirectX::XMVECTOR contactPt = v;
-                    float penetration = -dist;
-                    if (wasClamped)
-                    {
-                        DirectX::XMVECTOR edgePt = DirectX::XMVectorAdd(plane.Center,
-                            DirectX::XMVectorAdd(
-                                DirectX::XMVectorScale(plane.Tangent0, clamped0),
-                                DirectX::XMVectorScale(plane.Tangent1, clamped1)
-                            )
-                        );
-                        DirectX::XMVECTOR diff = DirectX::XMVectorSubtract(v, edgePt);
-                        float edgeDist = DirectX::XMVectorGetX(DirectX::XMVector3Length(diff));
-                        if (edgeDist > -dist) continue;
-                        contactPt = edgePt;
-                        penetration = -dist;
-                    }
+                    if (wasClamped) continue;
 
                     ContactPoint cp;
-                    cp.Point = contactPt;
+                    cp.Point = projectedPt;
                     cp.Normal = plane.Normal;
-                    cp.PenetrationDepth = penetration;
-                    outManifold->AddContact(cp);
+                    cp.PenetrationDepth = -dist;
+                    pendingContacts.push_back(cp);
+                    pendingVertices.push_back(v);
                 }
             }
 
-            if (outManifold->Contacts.empty())
+            if (pendingContacts.empty())
                 return false;
+
+            // For corner/edge contacts (1-2 vertices) use the actual
+            // penetrating vertex as the contact point.  This gives the
+            // solver the correct lever arm from the box centre so that
+            // normal + friction impulses produce the right toppling torque.
+            // For face landings (3-4 vertices) use the plane-projected
+            // points — their symmetric layout prevents angular artefacts.
+            const bool usePenetratingVertex = (pendingContacts.size() <= 2);
+            for (size_t i = 0; i < pendingContacts.size(); ++i)
+            {
+                ContactPoint cp = pendingContacts[i];
+                if (usePenetratingVertex)
+                    cp.Point = pendingVertices[i];
+                outManifold->AddContact(cp);
+            }
 
             outManifold->Finalise();
             return true;
