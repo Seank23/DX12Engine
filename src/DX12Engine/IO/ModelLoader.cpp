@@ -1,11 +1,23 @@
+#define NOMINMAX
+#define TINYOBJLOADER_IMPLEMENTATION
+// Disable tinyobjloader's bundled fast_float which uses constexpr std::distance
+// (only valid from C++17). The standard strtof fallback is always available.
+#define TINYOBJLOADER_DISABLE_FAST_FLOAT
+// windows.h (pulled in via wrl.h ? Mesh.h) defines min/max macros even with
+// NOMINMAX if it was already included by a prior translation unit's PCH.
+// Unconditionally undefine them here so tiny_obj_loader.h sees clean names.
+#ifdef min
+#undef min
+#endif
+#ifdef max
+#undef max
+#endif
+#include "tiny_obj_loader.h"
 #include "ModelLoader.h"
 #include <string>
 #include <stdexcept>
 #include <iostream>
 #include <unordered_map>
-
-#define TINYOBJLOADER_IMPLEMENTATION
-#include "tiny_obj_loader.h"
 
 namespace DX12Engine
 {

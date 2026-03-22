@@ -75,9 +75,13 @@ namespace DX12EngineDemo
 			DX12Engine::RenderTargetType::Position,
 			DX12Engine::RenderTargetType::Depth
 		};
+		std::vector<DX12Engine::Texture*> ssrExternalTextures = {
+			m_Scene->GetSkyboxIrradiance()
+		};
 		std::vector<DX12Engine::RenderTargetType> ssrLightingTypes{ DX12Engine::RenderTargetType::Composite };
 		DX12Engine::RenderPassConfig ssrConfig;
 		ssrConfig.Type = DX12Engine::RenderPassType::ScreenSpaceReflection;
+		ssrConfig.InputResources[DX12Engine::InputResourceType::ExternalTextures] = &ssrExternalTextures;
 		ssrConfig.InputResources[DX12Engine::InputResourceType::RenderTargets_Geometry] = &ssrGBufferTypes;
 		ssrConfig.InputResources[DX12Engine::InputResourceType::RenderTargets_Lighting] = &ssrLightingTypes;
 

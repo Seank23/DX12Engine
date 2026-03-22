@@ -11,3 +11,11 @@ struct ScreenData
 	DirectX::XMFLOAT2 ScreenSize;
 };
 
+struct SSRTemporalData
+{
+	DirectX::XMMATRIX PrevViewMatrix;
+	DirectX::XMMATRIX PrevProjectionMatrix;
+	uint32_t FrameIndex;
+	DirectX::XMFLOAT3 Padding;
+};
+

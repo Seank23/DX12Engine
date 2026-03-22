@@ -28,15 +28,30 @@ namespace DX12EngineDemo
 		std::shared_ptr<DX12Engine::Light> sunLight = std::make_shared<DX12Engine::Light>();
 		sunLight->SetType((int)DX12Engine::LightType::Directional);
 		sunLight->SetDirection({ 0.45f, -0.577f, 0.577f });
-		sunLight->SetIntensity(5.0f);
+		sunLight->SetIntensity(10.0f);
 		sunLight->SetColor({ 1.0f, 0.85f, 0.8f });
 		m_LightBuffer->AddLight(sunLight);
+		std::shared_ptr<DX12Engine::Light> pointLight = std::make_shared<DX12Engine::Light>();
+		pointLight->SetType((int)DX12Engine::LightType::Point);
+		pointLight->SetPosition({ 0.0f, 1.5f, -0.8f });
+		pointLight->SetIntensity(20.0f);
+		pointLight->SetRange(200.0f);
+		pointLight->SetColor({ 1.0f, 1.0f, 1.0f });
+		//m_LightBuffer->AddLight(pointLight);
+		std::shared_ptr<DX12Engine::Light> spotLight = std::make_shared<DX12Engine::Light>();
+		spotLight->SetType((int)DX12Engine::LightType::Spot);
+		spotLight->SetPosition({ 1.0f, 6.0f, -1.0f });
+		spotLight->SetDirection({ -0.1f, -0.8f, 0.1f });
+		spotLight->SetColor({ 0.9f, 0.5f, 0.0f });
+		spotLight->SetIntensity(20.0f);
+		spotLight->SetSpotAngle(45.0f);
+		//m_LightBuffer->AddLight(spotLight);
 
 		DX12Engine::TextureLoader textureLoader;
 		DX12Engine::GPUUploader uploader = m_RenderContext->GetUploader();
 
-		m_SkyboxCubemap = textureLoader.LoadCubemapDDS(DX12Engine::ResourceManager::GetMaterialPath("skybox/skybox2_cubemap.dds"));
-		m_SkyboxIrradiance = textureLoader.LoadCubemapDDS(DX12Engine::ResourceManager::GetMaterialPath("skybox/skybox2_irradiance.dds"));
+		m_SkyboxCubemap = textureLoader.LoadCubemapDDS(DX12Engine::ResourceManager::GetMaterialPath("skybox/skybox_cubemap.dds"));
+		m_SkyboxIrradiance = textureLoader.LoadCubemapDDS(DX12Engine::ResourceManager::GetMaterialPath("skybox/skybox_irradiance.dds"));
 		uploader.UploadTextureBatch({ m_SkyboxCubemap.get(), m_SkyboxIrradiance.get() });
 
 		auto brickTextures = textureLoader.LoadMaterial(DX12Engine::ResourceManager::GetMaterialPath("dark-worn-stone-ue"));
