@@ -38,6 +38,6 @@ VSOutput main(VSInput input)
     output.uv = input.texCoord;
     float4 tangent = normalize(mul(ModelMatrix, float4(input.tangent, 1.0)));
     output.tangent = tangent.xyz / tangent.w;
-    output.bitangent = cross(output.tangent, output.normal);
+    output.bitangent = cross(output.normal, output.tangent);
     return output;
 }

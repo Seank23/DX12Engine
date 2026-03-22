@@ -45,6 +45,7 @@ namespace DX12Engine
 		std::unique_ptr<ConstantBuffer> CreateConstantBuffer(const UINT bufferSize);
 		std::unique_ptr<Texture> CreateTexture(const DirectX::ScratchImage* imageData);
 		std::unique_ptr<Texture> CreateCubeMap(const DirectX::ScratchImage* imageData);
+		std::unique_ptr<Texture> CreateDefaultCubeMap();
 		std::unique_ptr<RenderTexture> CreateDepthMap(DirectX::XMINT3 dimensions, DXGI_FORMAT dsvFormat, DXGI_FORMAT srvFormat, bool isCubeMap = false);
 		std::unique_ptr<RenderTexture> CreateRenderTargetTexture(DirectX::XMINT2 dimensions, DXGI_FORMAT format, UINT mipLevels = 1, DirectX::XMFLOAT4 clearColor = { 0.0f, 0.0f, 0.0f, 1.0f });
 

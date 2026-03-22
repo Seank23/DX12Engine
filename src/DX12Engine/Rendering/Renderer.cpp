@@ -144,6 +144,8 @@ namespace DX12Engine
 							for (auto& texture : *static_cast<std::vector<Texture*>*>(inputResource))
 								renderPass->AddInputResources({ texture });
 							renderPass->AddResourceBlock(static_cast<UINT>(static_cast<std::vector<Texture*>*>(inputResource)->size()));
+							if (passConfig.Type == RenderPassType::Lighting)
+								static_cast<LightingRenderPass*>(renderPass)->SetHasSkybox(true);
 							break;
 						case InputResourceType::VertexShader:
 							renderPass->SetVertexShader(*static_cast<std::string*>(inputResource));
@@ -218,8 +220,9 @@ namespace DX12Engine
 	void Renderer::SetSceneData(RenderPipeline pipeline)
 	{
 		std::vector<Texture*> texturesToUpload;
-		if (!m_CurrentScene->GetSkyboxCubemap()->GetIsReady())
-			m_RenderContext->GetUploader().UploadTextureBatch({ m_CurrentScene->GetSkyboxCubemap(), m_CurrentScene->GetSkyboxIrradiance() });
+		Texture* skyboxCubemap = m_CurrentScene->GetSkyboxCubemap();
+		if (skyboxCubemap && !skyboxCubemap->GetIsReady())
+			m_RenderContext->GetUploader().UploadTextureBatch({ skyboxCubemap, m_CurrentScene->GetSkyboxIrradiance() });
 		std::vector<RenderComponent*> renderComponents = m_CurrentScene->GetSceneObjects().GetAllComponents<RenderComponent>();
 		Camera* sceneCamera = m_CurrentScene->GetCamera();
 		LightBuffer* lightBuffer = m_CurrentScene->GetLightBuffer();

@@ -23,6 +23,16 @@ namespace DX12Engine
 	{
 		RenderPass::Init();
 
+		if (m_ShadowMapCount == 0)
+		{
+			m_RenderTargets.emplace_back(ResourceManager::GetInstance().CreateDepthMap(
+				DirectX::XMINT3(SHADOW_MAP_SIZE, SHADOW_MAP_SIZE, 1),
+				DXGI_FORMAT_D32_FLOAT,
+				DXGI_FORMAT_R32_FLOAT,
+				m_IsCubeMap));
+			return;
+		}
+
 		m_RenderTargets.emplace_back(ResourceManager::GetInstance().CreateDepthMap(
 			DirectX::XMINT3(SHADOW_MAP_SIZE, SHADOW_MAP_SIZE, m_ShadowMapCount),
 			DXGI_FORMAT_D32_FLOAT,
@@ -37,6 +47,35 @@ namespace DX12Engine
 		RenderPass::Execute();
 
 		RenderTexture* shadowMap = m_RenderTargets[0].get();
+
+		if (m_Lights.empty())
+		{
+			if (shadowMap->GetUsageState() != D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE)
+			{
+				auto barrierToWrite = CD3DX12_RESOURCE_BARRIER::Transition(
+					shadowMap->GetResource(),
+					shadowMap->GetUsageState(),
+					D3D12_RESOURCE_STATE_DEPTH_WRITE
+				);
+				m_CommandList.ResourceBarrier(1, &barrierToWrite);
+				shadowMap->SetUsageState(D3D12_RESOURCE_STATE_DEPTH_WRITE);
+
+				auto dsvHandle = shadowMap->GetTextureDescriptor(0).GetCPUHandle();
+				m_CommandList.ClearDepthStencilView(dsvHandle, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
+
+				auto barrierToRead = CD3DX12_RESOURCE_BARRIER::Transition(
+					shadowMap->GetResource(),
+					D3D12_RESOURCE_STATE_DEPTH_WRITE,
+					D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE
+				);
+				m_CommandList.ResourceBarrier(1, &barrierToRead);
+				shadowMap->SetUsageState(D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+				UINT fenceVal = m_QueueManager.GetGraphicsQueue().ExecuteCommandList();
+				m_QueueManager.GetGraphicsQueue().WaitForFenceCPUBlocking(fenceVal);
+			}
+			return;
+		}
+
 		for (int i = 0; i < m_Lights.size(); i++)
 		{
 			if (m_IsCubeMap)
@@ -66,7 +105,7 @@ namespace DX12Engine
 		m_CommandList.SetPipelineState(m_PipelineState.Get());
 		m_CommandList.SetGraphicsRootSignature(m_RootSignature.Get());
 
-		D3D12_VIEWPORT shadowViewport = { 0.0f, 0.0f, (float)SHADOW_MAP_SIZE, (float)SHADOW_MAP_SIZE, -1.0f, 1.0f };
+		D3D12_VIEWPORT shadowViewport = { 0.0f, 0.0f, (float)SHADOW_MAP_SIZE, (float)SHADOW_MAP_SIZE, 0.0f, 1.0f };
 		D3D12_RECT shadowScissorRect = { 0, 0, SHADOW_MAP_SIZE, SHADOW_MAP_SIZE };
 		m_CommandList.RSSetViewports(1, &shadowViewport);
 		m_CommandList.RSSetScissorRects(1, &shadowScissorRect);
@@ -133,7 +172,7 @@ namespace DX12Engine
 			m_CommandList.SetPipelineState(m_PipelineState.Get());
 			m_CommandList.SetGraphicsRootSignature(m_RootSignature.Get());
 
-			D3D12_VIEWPORT shadowViewport = { 0.0f, 0.0f, (float)SHADOW_MAP_SIZE, (float)SHADOW_MAP_SIZE, -1.0f, 1.0f };
+			D3D12_VIEWPORT shadowViewport = { 0.0f, 0.0f, (float)SHADOW_MAP_SIZE, (float)SHADOW_MAP_SIZE, 0.0f, 1.0f };
 			D3D12_RECT shadowScissorRect = { 0, 0, SHADOW_MAP_SIZE, SHADOW_MAP_SIZE };
 			m_CommandList.RSSetViewports(1, &shadowViewport);
 			m_CommandList.RSSetScissorRects(1, &shadowScissorRect);
@@ -207,7 +246,7 @@ namespace DX12Engine
 		}
 
 		CD3DX12_ROOT_PARAMETER param;
-		param.InitAsConstants(sizeof(ShadowMapData) / 4, 0, 0, D3D12_SHADER_VISIBILITY_VERTEX);
+		param.InitAsConstants(sizeof(ShadowMapData) / 4, 0, 0, D3D12_SHADER_VISIBILITY_ALL);
 		rootSignatureBuilder.AddCustomParam(param);
 
 		m_RootSignature = ResourceManager::GetInstance().CreateRootSignature(rootSignatureBuilder.Build());

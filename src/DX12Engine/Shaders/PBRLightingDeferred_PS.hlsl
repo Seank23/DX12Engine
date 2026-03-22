@@ -98,7 +98,6 @@ float3 PBRLighting(float3 albedo, float metallic, float roughness, float ao, flo
 
 float ShadowPCF(int lightIndex, float4 lightSpacePos, float softRadius)
 {
-    float shadow = 0.0f;
     float3 texSize;
     shadowMaps.GetDimensions(texSize.x, texSize.y, texSize.z);
     float texelSize = 1.0 / texSize.x;
@@ -106,7 +105,12 @@ float ShadowPCF(int lightIndex, float4 lightSpacePos, float softRadius)
     
     float depth = lightSpacePos.z / lightSpacePos.w;
     float2 shadowUV = (lightSpacePos.xy / lightSpacePos.w) * 0.5 + 0.5;
+    shadowUV.y = 1.0 - shadowUV.y;
     
+    if (shadowUV.x < 0.0 || shadowUV.x > 1.0 || shadowUV.y < 0.0 || shadowUV.y > 1.0 || depth < 0.0 || depth > 1.0)
+        return 1.0;
+    
+    float shadow = 0.0f;
     for (int y = -1; y <= 1; y++)
     {
         for (int x = -1; x <= 1; x++)
@@ -117,33 +121,28 @@ float ShadowPCF(int lightIndex, float4 lightSpacePos, float softRadius)
     }
     shadow /= 9.0;
     
-    float bias = 0.5;
-    return shadow + bias;
+    return shadow;
 }
 
-float PointLightShadowPCF(float3 worldPos, float3 lightPos, float softRadius, float3 normal)
+float PointLightShadowPCF(float3 worldPos, float3 lightPos, float softRadius, float3 normal, float farPlane)
 {
     float3 texSize;
     shadowCubeMap.GetDimensions(0, texSize.x, texSize.y, texSize.z);
     float texelSize = 1.0 / texSize.x;
     float radius = texelSize * softRadius;
     
-    float3 lightToFrag = (worldPos - lightPos) + normal * 0.05;
-    float lightDepth = length(lightToFrag) * 0.28;
-    float shadowBias = 0.002;
+    float3 lightToFrag = worldPos - lightPos;
+    float currentDepth = length(lightToFrag) / farPlane;
+    float shadowBias = 0.005 / farPlane;
     float shadowFactor = 0.0;
     
     for (int y = -1; y <= 1; y++)
     {
         for (int x = -1; x <= 1; x++)
         {
-            float shadow = 0.0;
-            float3 transformedUV = normalize(lightToFrag) + float3(x, y, 0) * radius;
-            shadow = shadowCubeMap.Sample(samp, transformedUV).x;
-            if (shadow + shadowBias < lightDepth && shadow < 0.92)
-                shadowFactor += shadow / min(lightDepth * 2.0, 3.0);
-            else
-                shadowFactor += 1.0;
+            float3 sampleDir = normalize(lightToFrag) + float3(x, y, 0) * radius;
+            float closestDepth = shadowCubeMap.Sample(samp, sampleDir).x;
+            shadowFactor += (currentDepth - shadowBias > closestDepth) ? 0.0 : 1.0;
         }
     }
     shadowFactor /= 9.0;
@@ -173,8 +172,8 @@ float4 main(PSInput input) : SV_TARGET
     float3 V = normalize(CameraPosition.xyz - worldPos);
     
     float3 finalColor = float3(0, 0, 0);
-    float shadowFactor = 1.0;
     float aoFactor = 0.02;
+    float ambientShadow = 1.0;
     
     if (depth >= 0.999f)
     {
@@ -184,26 +183,29 @@ float4 main(PSInput input) : SV_TARGET
     }
     
     float3 indirectDiffuse = albedo * irradianceMap.Sample(samp, worldNormal).rgb;
-    finalColor += indirectDiffuse;
     
     for (int i = 0; i < LightCount; i++)
     {
         float3 offsetPos = worldPos + (objectNormal * 0.04) + (worldNormal * aoFactor);
         float4 lightSpacePosition = mul(Lights[i].ViewProjMatrix, float4(offsetPos, 1.0));
-        lightSpacePosition.y *= -1;
         float3 lightDir = normalize(Lights[i].Position - worldPos);
+        float shadowFactor = 1.0;
+        float3 lightContribution = float3(0, 0, 0);
         
         if (Lights[i].Type == 0) // Directional Light
         {
-            finalColor += PBRLighting(albedo, metallic, roughness, ao, worldNormal, V, normalize(-Lights[i].Direction), Lights[i]);
-            shadowFactor *= ShadowPCF(i, lightSpacePosition, 2.0);
+            lightContribution = PBRLighting(albedo, metallic, roughness, ao, worldNormal, V, normalize(-Lights[i].Direction), Lights[i]);
+            shadowFactor = ShadowPCF(i, lightSpacePosition, 2.0);
+            ambientShadow = min(ambientShadow, shadowFactor);
         }
         else if (Lights[i].Type == 1) // Point Light
         {
             float dist = length(Lights[i].Position - worldPos);
-            float attenuation = saturate(1.0 - (dist * dist) / (Lights[i].Range * Lights[i].Range));
-            finalColor += PBRLighting(albedo, metallic, roughness, ao, worldNormal, V, lightDir, Lights[i]) * attenuation;
-            shadowFactor *= PointLightShadowPCF(worldPos, Lights[i].Position, 3.0, worldNormal);
+            float distOverRange = dist / Lights[i].Range;
+            float window = saturate(1.0 - distOverRange * distOverRange * distOverRange * distOverRange);
+            float attenuation = (window * window) / (dist * dist + 1.0);
+            lightContribution = PBRLighting(albedo, metallic, roughness, ao, worldNormal, V, lightDir, Lights[i]) * attenuation;
+            shadowFactor = PointLightShadowPCF(worldPos, Lights[i].Position, 3.0, worldNormal, Lights[i].Padding.x);
         }
         else if (Lights[i].Type == 2) // Spot Light
         {
@@ -212,10 +214,12 @@ float4 main(PSInput input) : SV_TARGET
             float intensity = saturate((theta - cos(Lights[i].SpotAngle * 0.9)) / epsilon);
             float dist = length(Lights[i].Position - worldPos);
             float attenuation = saturate(1.0 - (dist * dist) / (Lights[i].Range * Lights[i].Range));
-            finalColor += PBRLighting(albedo, metallic, roughness, ao, worldNormal, V, lightDir, Lights[i]) * intensity * attenuation;
-            shadowFactor *= ShadowPCF(i, lightSpacePosition, 2.0);
+            lightContribution = PBRLighting(albedo, metallic, roughness, ao, worldNormal, V, lightDir, Lights[i]) * intensity * attenuation;
+            shadowFactor = ShadowPCF(i, lightSpacePosition, 2.0);
+            ambientShadow = min(ambientShadow, shadowFactor);
         }
+        finalColor += lightContribution * shadowFactor;
     }
-    finalColor *= shadowFactor;
+    finalColor += indirectDiffuse * ambientShadow;
 	return float4(finalColor, 1.0f);
 }

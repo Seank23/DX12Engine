@@ -1,5 +1,6 @@
 #pragma once
 #include "RenderPass.h"
+#include "../../Resources/Texture.h"
 
 namespace DX12Engine
 {
@@ -16,6 +17,7 @@ namespace DX12Engine
 		RenderTexture* GetRenderTarget(RenderTargetType type) override;
 
 		void SetLightBuffer(LightBuffer* lightBuffer) { m_LightBuffer = lightBuffer; }
+		void SetHasSkybox(bool hasSkybox) { m_HasSkybox = hasSkybox; }
 
 	private:
 		void CreateLightingPassPSO();
@@ -27,6 +29,10 @@ namespace DX12Engine
 		D3D12_RECT m_ScissorRect;
 
 		LightBuffer* m_LightBuffer;
+
+		bool m_HasSkybox = false;
+		std::unique_ptr<Texture> m_FallbackEnvMap;
+		std::unique_ptr<Texture> m_FallbackIrradianceMap;
 	};
 }
 

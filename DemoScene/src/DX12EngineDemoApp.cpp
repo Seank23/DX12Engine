@@ -25,7 +25,7 @@ namespace DX12EngineDemo
 		m_InputHandler = std::make_unique<DemoInputHandler>();
 		m_InputHandler->SetCamera(m_Scene->GetCamera());
 
-		auto shadowCastingLights = m_Scene->GetLightBuffer()->GetLightsByType({ DX12Engine::LightType::Directional });
+		auto shadowCastingLights = m_Scene->GetLightBuffer()->GetLightsByType({ DX12Engine::LightType::Directional, DX12Engine::LightType::Spot });
 		auto cubeShadowCastingLights = m_Scene->GetLightBuffer()->GetLightsByType({ DX12Engine::LightType::Point });
 
 		DX12Engine::RenderPipelineConfig pipelineConfig;

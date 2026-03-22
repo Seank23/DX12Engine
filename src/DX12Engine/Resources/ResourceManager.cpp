@@ -322,6 +322,75 @@ namespace DX12Engine
 		return std::make_unique<Texture>(textureResource, textureUploadResource, D3D12_RESOURCE_STATE_COPY_DEST, cubemapData, srvHandle, srvDesc, true);
 	}
 
+	std::unique_ptr<Texture> ResourceManager::CreateDefaultCubeMap()
+	{
+		constexpr UINT faceSize = 1;
+		constexpr UINT arraySize = 6;
+		constexpr DXGI_FORMAT format = DXGI_FORMAT_R8G8B8A8_UNORM;
+
+		D3D12_RESOURCE_DESC textureDesc = {};
+		textureDesc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
+		textureDesc.Width = faceSize;
+		textureDesc.Height = faceSize;
+		textureDesc.DepthOrArraySize = arraySize;
+		textureDesc.MipLevels = 1;
+		textureDesc.Format = format;
+		textureDesc.SampleDesc.Count = 1;
+		textureDesc.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
+		textureDesc.Flags = D3D12_RESOURCE_FLAG_NONE;
+
+		auto defaultHeapProps = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);
+		ID3D12Resource* textureResource = nullptr;
+		EngineUtils::ThrowIfFailed(m_Device->CreateCommittedResource(
+			&defaultHeapProps,
+			D3D12_HEAP_FLAG_NONE,
+			&textureDesc,
+			D3D12_RESOURCE_STATE_COPY_DEST,
+			nullptr,
+			IID_PPV_ARGS(&textureResource)));
+
+		const UINT64 uploadBufferSize = GetRequiredIntermediateSize(textureResource, 0, arraySize);
+		auto uploadHeapProps = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD);
+		auto uploadResourceDesc = CD3DX12_RESOURCE_DESC::Buffer(uploadBufferSize);
+		ID3D12Resource* uploadResource = nullptr;
+		EngineUtils::ThrowIfFailed(m_Device->CreateCommittedResource(
+			&uploadHeapProps,
+			D3D12_HEAP_FLAG_NONE,
+			&uploadResourceDesc,
+			D3D12_RESOURCE_STATE_GENERIC_READ,
+			nullptr,
+			IID_PPV_ARGS(&uploadResource)));
+
+		static constexpr UINT32 blackPixel = 0x00000000;
+		std::vector<D3D12_SUBRESOURCE_DATA> subresources(arraySize);
+		for (UINT i = 0; i < arraySize; i++)
+		{
+			subresources[i].pData = &blackPixel;
+			subresources[i].RowPitch = sizeof(UINT32);
+			subresources[i].SlicePitch = sizeof(UINT32);
+		}
+
+		D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
+		srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+		srvDesc.Format = format;
+		srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURECUBE;
+		srvDesc.TextureCube.MipLevels = 1;
+
+		DescriptorHeapHandle srvHandle = m_HeapManager->GetNewSRVDescriptorHeapHandle();
+		m_Device->CreateShaderResourceView(textureResource, &srvDesc, srvHandle.GetCPUHandle());
+
+		auto texture = std::make_unique<Texture>(textureResource, uploadResource, D3D12_RESOURCE_STATE_COPY_DEST, subresources, srvHandle, srvDesc, true);
+
+		UploadResourceWrapper uploadWrapper;
+		uploadWrapper.GPUResource = texture.get();
+		uploadWrapper.UploadResource = uploadResource;
+		uploadWrapper.UploadState = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+		uploadWrapper.Data = subresources[0];
+		m_GPUUploader->UploadResource(uploadWrapper);
+
+		return texture;
+	}
+
 	std::unique_ptr<RenderTexture> ResourceManager::CreateDepthMap(DirectX::XMINT3 dimensions, DXGI_FORMAT dsvFormat, DXGI_FORMAT srvFormat, bool isCubeMap)
 	{
 		int arraySize = dimensions.z;

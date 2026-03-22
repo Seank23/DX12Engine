@@ -31,8 +31,8 @@ namespace DX12Engine
 
         void SetType(int type) { m_LightData.Type = type; }
         void SetIntensity(float intensity) { m_LightData.Intensity = intensity; }
-        void SetRange(float range) { m_LightData.Range = range; }
         void SetColor(DirectX::XMFLOAT3 color) { m_LightData.Color = color; }
+        void SetRange(float range);
         void SetPosition(DirectX::XMFLOAT3 position);
         void SetDirection(DirectX::XMFLOAT3 direction);
         void SetSpotAngle(float angle);

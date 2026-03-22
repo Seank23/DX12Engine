@@ -11,6 +11,7 @@ namespace DX12Engine
 	void RenderPass::Init()
 	{
 		m_InputResourceBlockHandles.clear();
+		m_DescriptorTableConfigs.clear();
 		if (m_InputResources.size() > 0)
 		{
 			ResourceManager::GetInstance().UpdateSRVDescriptors(EngineUtils::VectorSharedPtrToPtrs(m_InputResources));

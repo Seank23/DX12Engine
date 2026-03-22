@@ -19,7 +19,21 @@ namespace DX12Engine
 
 	void LightingRenderPass::Init()
 	{
+		// If no external textures (skybox cubemaps) were provided, insert black fallback
+		// cubemaps so t0 (environmentMap) and t1 (irradianceMap) always have valid descriptors.
+		if (!m_HasSkybox)
+		{
+			m_FallbackEnvMap = ResourceManager::GetInstance().CreateDefaultCubeMap();
+			m_FallbackIrradianceMap = ResourceManager::GetInstance().CreateDefaultCubeMap();
+		m_InputResources.insert(m_InputResources.begin(),
+			{ std::shared_ptr<GPUResource>(m_FallbackEnvMap.get(), [](GPUResource*){}),
+			  std::shared_ptr<GPUResource>(m_FallbackIrradianceMap.get(), [](GPUResource*){})
+			});
+			m_ResourceBlockSizes.insert(m_ResourceBlockSizes.begin(), 2);
+		}
+
 		RenderPass::Init();
+
 
 		m_VertexShaderName = m_VertexShaderName.empty() ? "RenderTriangle_VS" : m_VertexShaderName;
 		m_PixelShaderName = m_PixelShaderName.empty() ? "PBRLightingDeferred_PS" : m_PixelShaderName;
