@@ -1,4 +1,4 @@
-#include "DemoScene.h"
+ï»¿#include "DemoScene.h"
 
 #include "DX12Engine/Entity/RenderComponent.h"
 #include "DX12Engine/IO/ModelLoader.h"
@@ -9,6 +9,8 @@
 #include "DX12Engine/Resources/ResourceManager.h"
 #include "DX12Engine/Entity/PhysicsComponent.h"
 #include "DX12Engine/Physics/PhysicsEngine.h"
+#include "DX12Engine/Asset/ModelAsset.h"
+#include "DX12Engine/Entity/ColliderComponent.h"
 
 namespace DX12EngineDemo
 {
@@ -48,7 +50,7 @@ namespace DX12EngineDemo
 		//m_LightBuffer->AddLight(spotLight);
 
 		DX12Engine::TextureLoader textureLoader;
-		DX12Engine::GPUUploader uploader = m_RenderContext->GetUploader();
+		DX12Engine::GPUUploader& uploader = m_RenderContext->GetUploader();
 
 		m_SkyboxCubemap = textureLoader.LoadCubemapDDS(DX12Engine::ResourceManager::GetMaterialPath("skybox/skybox_cubemap.dds"));
 		m_SkyboxIrradiance = textureLoader.LoadCubemapDDS(DX12Engine::ResourceManager::GetMaterialPath("skybox/skybox_irradiance.dds"));
@@ -69,51 +71,72 @@ namespace DX12EngineDemo
 		pbrWornMetal->SetAllTextures(wornMetalTextures);
 
 		DX12Engine::ModelLoader modelLoader;
-		auto cubeMesh = std::make_shared<DX12Engine::Mesh>(modelLoader.LoadObj(DX12Engine::ResourceManager::GetModelPath("cube.obj")));
-		auto sphereMesh = std::make_shared<DX12Engine::Mesh>(modelLoader.LoadObj(DX12Engine::ResourceManager::GetModelPath("sphere.obj")));
-		auto floorMesh = std::make_shared<DX12Engine::Mesh>(modelLoader.LoadObj(DX12Engine::ResourceManager::GetModelPath("floor.obj")));
+		auto cubeMesh = std::make_shared<DX12Engine::MeshAsset>(modelLoader.LoadObj(DX12Engine::ResourceManager::GetModelPath("cube.obj")));
+		auto sphereMesh = std::make_shared<DX12Engine::MeshAsset>(modelLoader.LoadObj(DX12Engine::ResourceManager::GetModelPath("sphere.obj")));
+		auto floorMesh = std::make_shared<DX12Engine::MeshAsset>(modelLoader.LoadObj(DX12Engine::ResourceManager::GetModelPath("floor.obj")));
+
+		auto cubeModel = std::make_shared<DX12Engine::ModelAsset>("Cube");
+		size_t cubeMeshIdx = cubeModel->AddMesh(cubeMesh);
+		size_t cubeMaterialIdx = cubeModel->AddMaterial(std::make_shared<DX12Engine::MaterialAsset>("Material", pbrBrick));
+		DX12Engine::ModelNode cubeRoot; cubeRoot.Name = "Root"; cubeRoot.ParentIndex = -1; cubeRoot.MeshIndex = -1;
+		size_t cubeRootIdx = cubeModel->AddNode(cubeRoot);
+		DX12Engine::ModelNode cubeNode; cubeNode.Name = "Cube"; cubeNode.ParentIndex = (int)cubeRootIdx; cubeNode.MeshIndex = cubeMeshIdx;
+		size_t cubeNodeIdx = cubeModel->AddNode(cubeNode);
+
+		auto sphereModel = std::make_shared<DX12Engine::ModelAsset>("Sphere");
+		size_t sphereMeshIdx = sphereModel->AddMesh(sphereMesh);
+		size_t sphereMaterialIdx = sphereModel->AddMaterial(std::make_shared<DX12Engine::MaterialAsset>("Material", pbrGold));
+		DX12Engine::ModelNode sphereRoot; sphereRoot.Name = "Root"; sphereRoot.ParentIndex = -1; sphereRoot.MeshIndex = -1;
+		size_t sphereRootIdx = sphereModel->AddNode(sphereRoot);
+		DX12Engine::ModelNode sphereNode; sphereNode.Name = "Sphere"; sphereNode.ParentIndex = (int)sphereRootIdx; sphereNode.MeshIndex = sphereMeshIdx;
+		size_t sphereNodeIdx = sphereModel->AddNode(sphereNode);
+
+		auto floorModel = std::make_shared<DX12Engine::ModelAsset>("Floor");
+		size_t floorMeshIdx = floorModel->AddMesh(floorMesh);
+		size_t floorMaterialIdx = floorModel->AddMaterial(std::make_shared<DX12Engine::MaterialAsset>("Material", pbrWornMetal));
+		DX12Engine::ModelNode floorRoot; floorRoot.Name = "Root"; floorRoot.ParentIndex = -1; floorRoot.MeshIndex = -1;
+		size_t floorRootIdx = floorModel->AddNode(floorRoot);
+		DX12Engine::ModelNode floorNode; floorNode.Name = "Floor"; floorNode.ParentIndex = (int)floorRootIdx; floorNode.MeshIndex = floorMeshIdx;
+		size_t floorNodeIdx = floorModel->AddNode(floorNode);
 
 		m_Cube = std::make_shared<DX12Engine::GameObject>();
-		m_Cube->SetMesh(cubeMesh);
 		m_Cube->Move({ -1.5f, 1.0f, -0.0f });
-		DX12Engine::RenderComponent* cubeRenderComp = m_Cube->CreateComponent<DX12Engine::RenderComponent>();
-		cubeRenderComp->SetMaterial(pbrBrick);
+		m_Cube->CreateComponent<DX12Engine::RenderComponent>(std::make_shared<DX12Engine::ModelInstance>(cubeModel));
+		DX12Engine::ColliderComponent* cubeColliderComp = m_Cube->CreateComponent<DX12Engine::ColliderComponent>(DX12Engine::CollisionMeshType::Box);
+		cubeColliderComp->SetUseRenderModelForCollision(true);
 		DX12Engine::PhysicsComponent* cubePhysicsComp = m_Cube->CreateComponent<DX12Engine::PhysicsComponent>();
 		cubePhysicsComp->SetMass(6.0f);
 		cubePhysicsComp->SetRestitution(0.2f);
 		cubePhysicsComp->SetStaticFriction(0.6f);
 		cubePhysicsComp->SetKineticFriction(0.5f);
-		cubePhysicsComp->SetCollisionMeshType(DX12Engine::CollisionMeshType::Box);
 		m_SceneObjects.Add("Cube", m_Cube);
 
 		m_Ball = std::make_shared<DX12Engine::GameObject>();
-		m_Ball->SetMesh(sphereMesh);
 		m_Ball->Move({ 1.5f, 1.0f, 0.0f });
-		DX12Engine::RenderComponent* ballRenderComp = m_Ball->CreateComponent<DX12Engine::RenderComponent>();
-		ballRenderComp->SetMaterial(pbrGold);
+		m_Ball->CreateComponent<DX12Engine::RenderComponent>(std::make_shared<DX12Engine::ModelInstance>(sphereModel));
+		DX12Engine::ColliderComponent* ballColliderComp = m_Ball->CreateComponent<DX12Engine::ColliderComponent>(DX12Engine::CollisionMeshType::Sphere);
+		ballColliderComp->SetUseRenderModelForCollision(true);
 		DX12Engine::PhysicsComponent* ballPhysicsComp = m_Ball->CreateComponent<DX12Engine::PhysicsComponent>();
 		ballPhysicsComp->SetMass(4.0f);
 		ballPhysicsComp->SetRestitution(0.3f);
 		ballPhysicsComp->SetStaticFriction(0.4f);
 		ballPhysicsComp->SetKineticFriction(0.3f);
-		ballPhysicsComp->SetCollisionMeshType(DX12Engine::CollisionMeshType::Sphere);
 		m_SceneObjects.Add("Ball", m_Ball);
 
 		std::shared_ptr<DX12Engine::GameObject> floor = std::make_shared<DX12Engine::GameObject>();
-		floor->SetMesh(floorMesh);
 		floor->Move({ 0.0f, -1.0f, 0.0f });
 		floor->Scale({ 2.0f, 1.0f, 2.0f });
-		DX12Engine::RenderComponent* floorRenderComp = floor->CreateComponent<DX12Engine::RenderComponent>();
-		floorRenderComp->SetMaterial(pbrWornMetal);
+		DX12Engine::RenderComponent* floorRenderComp = floor->CreateComponent<DX12Engine::RenderComponent>(std::make_shared<DX12Engine::ModelInstance>(floorModel));
+		DX12Engine::ColliderComponent* floorColliderComp = floor->CreateComponent<DX12Engine::ColliderComponent>(DX12Engine::CollisionMeshType::Plane);
+		floorColliderComp->SetUseRenderModelForCollision(true);
 		DX12Engine::PhysicsComponent* floorPhysicsComp = floor->CreateComponent<DX12Engine::PhysicsComponent>();
 		floorPhysicsComp->SetIsStatic(true);
 		floorPhysicsComp->SetRestitution(0.4f);
 		floorPhysicsComp->SetStaticFriction(0.3f);
 		floorPhysicsComp->SetKineticFriction(0.2f);
-		floorPhysicsComp->SetCollisionMeshType(DX12Engine::CollisionMeshType::Plane);
 		m_SceneObjects.Add("Floor", floor);
 
-		// Asphalt floor — high friction, low bounce
+		// Asphalt floor ï¿½ high friction, low bounce
 		/*std::shared_ptr<DX12Engine::GameObject> asphaltFloor = std::make_shared<DX12Engine::GameObject>();
 		asphaltFloor->SetMesh(floorMesh);
 		asphaltFloor->Move({ 0.0f, -1.0f, 0.0f });
@@ -133,6 +156,10 @@ namespace DX12EngineDemo
 		//m_SceneObjects.Get("Ball")->GetComponent<DX12Engine::PhysicsComponent>()->ApplyForce(DX12Engine::Force{ { -200.0, 300.0f, 0.0f }, 0.05f, { 0.5f, 0.7f, -0.2f }, true, true });
 		m_SceneObjects.Get("Cube")->GetComponent<DX12Engine::PhysicsComponent>()->ApplyForce(DX12Engine::Force{ { 500.0f, 700.0f, 0.0f }, 0.05f });
 		m_SceneObjects.Get("Ball")->GetComponent<DX12Engine::PhysicsComponent>()->ApplyForce(DX12Engine::Force{ { -200.0, 300.0f, 0.0f }, 0.05f });
+
+		uploader.UploadAllPending();
+
+		m_SceneObjects.Init();
 	}
 
 	void DemoScene::Update(float ts, float elapsed)

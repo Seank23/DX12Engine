@@ -23,14 +23,14 @@ namespace DX12Engine
         UINT newHandleID = 0;
         UINT blockEnd = m_CurrentDescriptorIndex + count;
 
-        if (blockEnd < m_MaxDescriptors)
+        if (blockEnd <= m_MaxDescriptors)
         {
             newHandleID = m_CurrentDescriptorIndex;
             m_CurrentDescriptorIndex = blockEnd;
         }
         else
         {
-            std::runtime_error("Ran out of render pass descriptor heap handles, need to increase heap size.");
+            throw std::runtime_error("Ran out of render pass descriptor heap handles, need to increase heap size.");
         }
 
         DescriptorHeapHandle newHandle;

@@ -380,13 +380,7 @@ namespace DX12Engine
 		m_Device->CreateShaderResourceView(textureResource, &srvDesc, srvHandle.GetCPUHandle());
 
 		auto texture = std::make_unique<Texture>(textureResource, uploadResource, D3D12_RESOURCE_STATE_COPY_DEST, subresources, srvHandle, srvDesc, true);
-
-		UploadResourceWrapper uploadWrapper;
-		uploadWrapper.GPUResource = texture.get();
-		uploadWrapper.UploadResource = uploadResource;
-		uploadWrapper.UploadState = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
-		uploadWrapper.Data = subresources[0];
-		m_GPUUploader->UploadResource(uploadWrapper);
+		m_GPUUploader->UploadTextureBatch({ texture.get() });
 
 		return texture;
 	}

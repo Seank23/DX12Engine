@@ -12,6 +12,7 @@
 #include "../Entity/GameObject.h"
 #include "../Entity/RenderComponent.h"
 #include <array>
+#include <unordered_set>
 
 namespace DX12Engine
 {
@@ -220,6 +221,7 @@ namespace DX12Engine
 	void Renderer::SetSceneData(RenderPipeline pipeline)
 	{
 		std::vector<Texture*> texturesToUpload;
+		std::unordered_set<Texture*> queuedTextures;
 		Texture* skyboxCubemap = m_CurrentScene->GetSkyboxCubemap();
 		if (skyboxCubemap && !skyboxCubemap->GetIsReady())
 			m_RenderContext->GetUploader().UploadTextureBatch({ skyboxCubemap, m_CurrentScene->GetSkyboxIrradiance() });
@@ -228,12 +230,26 @@ namespace DX12Engine
 		LightBuffer* lightBuffer = m_CurrentScene->GetLightBuffer();
 		for (auto& comp : renderComponents)
 		{
+			if (!comp)
+				continue;
+
 			comp->UpdateConstantBufferData(sceneCamera->GetViewMatrix(), sceneCamera->GetProjectionMatrix(), sceneCamera->GetPosition());
-			for (int i = 0; i < 5; i++)
+			for (const ResolvedPrimitiveBinding& binding : comp->GetResolvedPrimitiveBindings())
 			{
-				Texture* texture = comp->GetMaterial()->GetTexture(static_cast<TextureType>(i));
-				if (texture && !texture->GetIsReady())
-					texturesToUpload.push_back(texture);
+				Material* material = binding.Material;
+				if (!material)
+					continue;
+
+				for (int i = 0; i < 5; i++)
+				{
+					Texture* texture = material->GetTexture(static_cast<TextureType>(i));
+					if (!texture || texture->GetIsReady())
+						continue;
+
+					auto insertResult = queuedTextures.insert(texture);
+					if (insertResult.second)
+						texturesToUpload.push_back(texture);
+				}
 			}
 		}
 		if (!texturesToUpload.empty())
@@ -256,8 +272,8 @@ namespace DX12Engine
 
 	void Renderer::PresentFrame(RenderTexture* finalRenderTarget)
 	{
-		if (!m_RenderContext->GetUploader().UploadAllPending())
-			m_QueueManager.GetGraphicsQueue().ResetCommandAllocatorAndList();
+		m_RenderContext->GetUploader().UploadAllPending();
+		m_QueueManager.GetGraphicsQueue().ResetCommandAllocatorAndList();
 
 		m_CommandList->SetPipelineState(m_PipelineState.Get());
 		m_CommandList->SetGraphicsRootSignature(m_RootSignature.Get());

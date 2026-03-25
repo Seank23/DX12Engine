@@ -19,7 +19,7 @@ namespace DX12Engine
 		bool HasPoint = false;
 	};
 
-	class PhysicsComponent : public Component
+	class PhysicsComponent : public Component, public IColliderListener
 	{
 	public:
 		friend class PhysicsEngine;
@@ -32,7 +32,7 @@ namespace DX12Engine
 		void IntegrateVelocity(float ts);
 		void IntegratePosition(float ts);
 
-		virtual void OnMeshChanged(Mesh* newMesh) override;
+		virtual void OnColliderChanged(ColliderComponent* colliderComponent) override;
 		virtual void OnTransformChanged(TransformType type) override;
 
 		void ApplyForce(Force force);
@@ -46,20 +46,16 @@ namespace DX12Engine
 		void SetLinearDamping(float damping) { m_LinearDamping = damping; }
 		void SetAngularDamping(float damping) { m_AngularDamping = damping; }
 
-		void SetCollisionMeshType(CollisionMeshType type);
-
-		AABoundingBox& GetBoundingBox() { return m_BoundingBox; }
-		CollisionMesh& GetCollisionMesh() { return m_CollisionMesh; }
+		const AABoundingBox& GetBoundingBox() const;
+		const CollisionMesh& GetCollisionMesh() const;
 		DirectX::XMVECTOR GetPosition();
 
 	private:
 		void EvaluateForces(float ts);
+		void RecomputeLocalInertiaTensor();
 		void UpdateInertiaTensor();
-		std::vector<DirectX::XMVECTOR> GetBoundingBoxVertices(std::vector<DirectX::XMVECTOR> transformedVertices);
-		void UpdateCollisionMesh();
+		DirectX::XMFLOAT3 GetCollisionDimensionsForInertia() const;
 		bool ShouldRest(float ts);
-
-		DirectX::XMFLOAT3 m_LocalHalfExtents = { 0.0f, 0.0f, 0.0f };
 
 		DirectX::XMVECTOR m_Velocity;
 		DirectX::XMVECTOR m_AngularVelocity;
@@ -82,7 +78,6 @@ namespace DX12Engine
 
 		std::vector<Force> m_Forces;
 
-		AABoundingBox m_BoundingBox;
-		CollisionMesh m_CollisionMesh;
+		ColliderComponent* m_ColliderComponent = nullptr;
 	};
 }

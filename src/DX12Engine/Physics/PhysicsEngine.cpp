@@ -110,9 +110,14 @@ namespace DX12Engine
 
 	bool PhysicsEngine::CheckCollision(PhysicsComponent* a, PhysicsComponent* b, ContactManifold* outContact)
 	{
+		const CollisionMesh& meshA = a->GetCollisionMesh();
+		const CollisionMesh& meshB = b->GetCollisionMesh();
+		if (meshA.Type == CollisionMeshType::None || meshB.Type == CollisionMeshType::None)
+			return false;
+
 		if (a->GetBoundingBox().Intersects(b->GetBoundingBox()))
 		{
-			if (a->GetCollisionMesh().Intersects(b->GetCollisionMesh(), outContact))
+			if (meshA.Intersects(meshB, outContact))
 			{
 				outContact->A = b->m_InvMass == 0.0f ? b : a;
 				outContact->B = b->m_InvMass == 0.0f ? a : b;

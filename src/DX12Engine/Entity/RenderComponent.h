@@ -1,13 +1,16 @@
 #pragma once
 #include "Component.h"
-#include "../Resources/Mesh.h"
 #include "../Rendering/Buffers/VertexBuffer.h"
 #include "../Rendering/Buffers/IndexBuffer.h"
 #include "../Rendering/Buffers/ConstantBuffer.h"
 #include "../Resources/Materials/Material.h"
+#include "../Asset/ModelInstance.h"
+#include <vector>
 
 namespace DX12Engine
 {
+	class MeshPrimitive;
+
 	struct RenderComponentData
 	{
 		DirectX::XMMATRIX ModelMatrix;
@@ -23,6 +26,12 @@ namespace DX12Engine
 
 	class GameObject;
 
+	struct ResolvedPrimitiveBinding
+	{
+		MeshPrimitive* Primitive = nullptr;
+		Material* Material = nullptr;
+	};
+
 	class RenderComponent : public Component
 	{
 	public:
@@ -30,31 +39,29 @@ namespace DX12Engine
 		friend class ProceduralRenderer;
 
 		RenderComponent(GameObject* parent);
+		RenderComponent(GameObject* parent, std::shared_ptr<ModelInstance> asset);
 		~RenderComponent();
 
 		virtual void Init() override;
 		virtual void Update(float ts, float elapsed) override;
 
-		virtual void OnMeshChanged(Mesh* newMesh) override;
 		virtual void OnTransformChanged(TransformType type) override;
-
-		void SetMaterial(std::shared_ptr<Material> material) { m_Material = material; }
-
-		Material* GetMaterial() { return m_Material.get(); }	
+	
 		D3D12_GPU_VIRTUAL_ADDRESS GetCBVAddress() { return m_ConstantBuffer->GetGPUAddress(); }
 
-		D3D12_VERTEX_BUFFER_VIEW GetVertexBufferView() { return m_VertexBuffer->GetVertexBufferView(); }
-		D3D12_INDEX_BUFFER_VIEW GetIndexBufferView() { return m_IndexBuffer->GetIndexBufferView(); }
+		void SetAsset(std::shared_ptr<ModelInstance> asset);
+		ModelInstance* GetAsset() const { return m_Asset.get(); }
+		const std::vector<ResolvedPrimitiveBinding>& GetResolvedPrimitiveBindings() const { return m_ResolvedPrimitiveBindings; }
 
 		DirectX::XMMATRIX GetModelMatrix();
 
 	private:
 		void UpdateConstantBufferData(DirectX::XMMATRIX viewMatrix, DirectX::XMMATRIX projectionMatrix, DirectX::XMFLOAT3 cameraPosition);
+		void RebuildResolvedPrimitiveBindings();
 
-		std::unique_ptr<VertexBuffer> m_VertexBuffer;
-		std::unique_ptr<IndexBuffer> m_IndexBuffer;
+		std::shared_ptr<ModelInstance> m_Asset;
 		std::unique_ptr<ConstantBuffer> m_ConstantBuffer;
 		RenderComponentData m_RenderObjectData;
-		std::shared_ptr<Material> m_Material;
+		std::vector<ResolvedPrimitiveBinding> m_ResolvedPrimitiveBindings;
 	};
 }

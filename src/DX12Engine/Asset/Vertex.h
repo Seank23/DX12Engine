@@ -1,7 +1,5 @@
 #pragma once
 #include <DirectXMath.h>
-#include <vector>
-#include <wrl.h>
 
 namespace DX12Engine
 {
@@ -11,17 +9,5 @@ namespace DX12Engine
         DirectX::XMFLOAT3 Normal;
         DirectX::XMFLOAT2 TexCoord;
         DirectX::XMFLOAT3 Tangent;
-    };
-
-    struct Mesh 
-    {
-        std::vector<Vertex> Vertices;
-        std::vector<UINT> Indices;
-
-		void Reset()
-		{
-			Vertices.clear();
-			Indices.clear();
-		}
     };
 }

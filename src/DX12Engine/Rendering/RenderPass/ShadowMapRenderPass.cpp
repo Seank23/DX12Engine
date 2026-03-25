@@ -44,14 +44,14 @@ namespace DX12Engine
 
 	void ShadowMapRenderPass::Execute()
 	{
-		RenderPass::Execute();
-
 		RenderTexture* shadowMap = m_RenderTargets[0].get();
 
 		if (m_Lights.empty())
 		{
 			if (shadowMap->GetUsageState() != D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE)
 			{
+				m_QueueManager.GetGraphicsQueue().ResetCommandAllocatorAndList();
+
 				auto barrierToWrite = CD3DX12_RESOURCE_BARRIER::Transition(
 					shadowMap->GetResource(),
 					shadowMap->GetUsageState(),
@@ -126,15 +126,24 @@ namespace DX12Engine
 
 		for (RenderComponent* object : m_RenderObjects)
 		{
+			if (!object)
+				continue;
+
 			DirectX::XMMATRIX mvpMatrix = DirectX::XMMatrixMultiply(object->GetModelMatrix(), m_Lights[lightIndex]->GetViewProjMatrix());
 			m_ShadowMapData.LightMVPMatrix = mvpMatrix;
 
 			m_CommandList.SetGraphicsRoot32BitConstants(0, sizeof(ShadowMapData) / 4, &m_ShadowMapData, 0);
-			auto vertexBufferView = object->GetVertexBufferView();
-			auto indexBufferView = object->GetIndexBufferView();
-			m_CommandList.IASetVertexBuffers(0, 1, &vertexBufferView);
-			m_CommandList.IASetIndexBuffer(&indexBufferView);
-			m_CommandList.DrawIndexedInstanced(indexBufferView.SizeInBytes / 4, 1, 0, 0, 0);
+			for (const ResolvedPrimitiveBinding& binding : object->GetResolvedPrimitiveBindings())
+			{
+				if (!binding.Primitive)
+					continue;
+
+				auto vertexBufferView = binding.Primitive->GetVertexBufferView();
+				auto indexBufferView = binding.Primitive->GetIndexBufferView();
+				m_CommandList.IASetVertexBuffers(0, 1, &vertexBufferView);
+				m_CommandList.IASetIndexBuffer(&indexBufferView);
+				m_CommandList.DrawIndexedInstanced(binding.Primitive->GetIndexCount(), 1, binding.Primitive->GetFirstIndex(), binding.Primitive->GetBaseVertex(), 0);
+			}
 		}
 		barrier = CD3DX12_RESOURCE_BARRIER::Transition(
 			shadowMap->GetResource(),
@@ -193,17 +202,26 @@ namespace DX12Engine
 
 			for (RenderComponent* object : m_RenderObjects)
 			{
+				if (!object)
+					continue;
+
 				DirectX::XMMATRIX mvpMatrix = DirectX::XMMatrixMultiply(object->GetModelMatrix(), lightViewProj);
 				m_ShadowMapData.LightMVPMatrix = mvpMatrix;
 				m_ShadowMapData.ModelMatrix = object->GetModelMatrix();
 				m_ShadowMapData.LightPos = m_Lights[lightIndex]->GetLightData().Position;
 
 				m_CommandList.SetGraphicsRoot32BitConstants(0, sizeof(ShadowMapData) / 4, &m_ShadowMapData, 0);
-				auto vertexBufferView = object->GetVertexBufferView();
-				auto indexBufferView = object->GetIndexBufferView();
-				m_CommandList.IASetVertexBuffers(0, 1, &vertexBufferView);
-				m_CommandList.IASetIndexBuffer(&indexBufferView);
-				m_CommandList.DrawIndexedInstanced(indexBufferView.SizeInBytes / 4, 1, 0, 0, 0);
+				for (const ResolvedPrimitiveBinding& binding : object->GetResolvedPrimitiveBindings())
+				{
+					if (!binding.Primitive)
+						continue;
+
+					auto vertexBufferView = binding.Primitive->GetVertexBufferView();
+					auto indexBufferView = binding.Primitive->GetIndexBufferView();
+					m_CommandList.IASetVertexBuffers(0, 1, &vertexBufferView);
+					m_CommandList.IASetIndexBuffer(&indexBufferView);
+					m_CommandList.DrawIndexedInstanced(binding.Primitive->GetIndexCount(), 1, binding.Primitive->GetFirstIndex(), binding.Primitive->GetBaseVertex(), 0);
+				}
 			}
 			barrier = CD3DX12_RESOURCE_BARRIER::Transition(
 				shadowMap->GetResource(),

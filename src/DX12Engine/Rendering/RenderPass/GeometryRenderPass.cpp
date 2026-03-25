@@ -84,15 +84,25 @@ namespace DX12Engine
 
         for (RenderComponent* object : m_RenderObjects)
         {
-            m_CommandList.SetGraphicsRootConstantBufferView(0, object->GetCBVAddress());
-            int startIndex = 1;
-			object->GetMaterial()->Bind(&m_CommandList, &startIndex);
+            if (!object)
+                continue;
 
-            auto vertexBufferView = object->GetVertexBufferView();
-            auto indexBufferView = object->GetIndexBufferView();
-            m_CommandList.IASetVertexBuffers(0, 1, &vertexBufferView);
-            m_CommandList.IASetIndexBuffer(&indexBufferView);
-            m_CommandList.DrawIndexedInstanced(indexBufferView.SizeInBytes / 4, 1, 0, 0, 0);
+            m_CommandList.SetGraphicsRootConstantBufferView(0, object->GetCBVAddress());
+
+            for (const ResolvedPrimitiveBinding& binding : object->GetResolvedPrimitiveBindings())
+            {
+                if (!binding.Primitive || !binding.Material)
+                    continue;
+
+                int startIndex = 1;
+				binding.Material->Bind(&m_CommandList, &startIndex);
+
+                auto vertexBufferView = binding.Primitive->GetVertexBufferView();
+                auto indexBufferView = binding.Primitive->GetIndexBufferView();
+                m_CommandList.IASetVertexBuffers(0, 1, &vertexBufferView);
+                m_CommandList.IASetIndexBuffer(&indexBufferView);
+                m_CommandList.DrawIndexedInstanced(binding.Primitive->GetIndexCount(), 1, binding.Primitive->GetFirstIndex(), binding.Primitive->GetBaseVertex(), 0);
+            }
         }
         for (int i = 0; i < m_RenderTargets.size(); i++)
         {

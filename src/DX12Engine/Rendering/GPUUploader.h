@@ -2,6 +2,7 @@
 #include "Queues/CommandQueueManager.h"
 #include "../Resources/Texture.h"
 #include "../Resources/UploadResourceWrapper.h"
+#include <vector>
 
 namespace DX12Engine
 {
@@ -13,6 +14,10 @@ namespace DX12Engine
 	public:
 		GPUUploader(RenderContext& context);
 		~GPUUploader();
+		GPUUploader(const GPUUploader&) = delete;
+		GPUUploader& operator=(const GPUUploader&) = delete;
+		GPUUploader(GPUUploader&&) = delete;
+		GPUUploader& operator=(GPUUploader&&) = delete;
 
 		void UploadTextureBatch(std::vector<Texture*> textures);
 		void UploadResource(UploadResourceWrapper resourceWrapper);
@@ -21,6 +26,10 @@ namespace DX12Engine
 		bool UploadAllPending();
 
 	private:
+		void EnsureUploadListsRecording();
+		void ReleasePendingUploadResources();
+		void ReleasePendingReferencedResources();
+
 		CommandQueueManager& m_QueueManager;
 		RenderContext& m_RenderContext;
 
@@ -30,6 +39,9 @@ namespace DX12Engine
 		RenderPassDescriptorHeap& m_RenderHeap;
 
 		int m_UploadCount = 0;
+		bool m_UploadListsRecording = false;
+		std::vector<ID3D12Resource*> m_PendingUploadResources;
+		std::vector<ID3D12Resource*> m_PendingReferencedResources;
 	};
 }
 

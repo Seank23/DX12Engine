@@ -120,7 +120,7 @@ namespace DX12Engine
 		Sphere SphereData;
 		Plane PlaneData;
 
-		bool Intersects(CollisionMesh& other, ContactManifold* outContact)
+		bool Intersects(const CollisionMesh& other, ContactManifold* outContact) const
 		{
 			if (Type == CollisionMeshType::Box && other.Type == CollisionMeshType::Box)
 				return OBBvsOBB(OBBData, other.OBBData, outContact);
@@ -141,7 +141,7 @@ namespace DX12Engine
 			return false;
 		}
 
-        bool BoxVsPlaneContacts(OBB& box, const Plane& plane, ContactManifold* outManifold) 
+        bool BoxVsPlaneContacts(const OBB& box, const Plane& plane, ContactManifold* outManifold) const 
         {
             if (!OBBVsPlane(box, plane))
                 return false;
@@ -208,7 +208,7 @@ namespace DX12Engine
             // solver the correct lever arm from the box centre so that
             // normal + friction impulses produce the right toppling torque.
             // For face landings (3-4 vertices) use the plane-projected
-            // points — their symmetric layout prevents angular artefacts.
+            // points ï¿½ their symmetric layout prevents angular artefacts.
             const bool usePenetratingVertex = (pendingContacts.size() <= 2);
             for (size_t i = 0; i < pendingContacts.size(); ++i)
             {
@@ -222,7 +222,7 @@ namespace DX12Engine
             return true;
         }
 
-		bool OBBvsOBB(const OBB& a, const OBB& b, ContactManifold* contact = nullptr)
+		bool OBBvsOBB(const OBB& a, const OBB& b, ContactManifold* contact = nullptr) const
 		{
             constexpr float EPSILON = 1e-6f;
             float minOverlap = FLT_MAX;
@@ -288,7 +288,7 @@ namespace DX12Engine
             return true;
 		}
 
-        bool SphereVsOBB(const Sphere& sphere, const OBB& obb, ContactManifold* contact = nullptr)
+        bool SphereVsOBB(const Sphere& sphere, const OBB& obb, ContactManifold* contact = nullptr) const
         {
             DirectX::XMVECTOR d = DirectX::XMVectorSubtract(sphere.Center, obb.Center);
             DirectX::XMVECTOR closest = obb.Center;
@@ -321,7 +321,7 @@ namespace DX12Engine
             return true;
         }
 
-        bool SphereVsSphere(const Sphere& a, const Sphere& b, ContactManifold* contact = nullptr)
+        bool SphereVsSphere(const Sphere& a, const Sphere& b, ContactManifold* contact = nullptr) const
         {
             DirectX::XMVECTOR delta = DirectX::XMVectorSubtract(b.Center, a.Center);
             float distSq = DirectX::XMVectorGetX(DirectX::XMVector3LengthSq(delta));
@@ -347,7 +347,7 @@ namespace DX12Engine
             return true;
         }
 
-        bool OBBVsPlane(const OBB& obb, const Plane& plane)
+        bool OBBVsPlane(const OBB& obb, const Plane& plane) const
         {
             float r = 0.0f;
             for (int i = 0; i < 3; ++i)
@@ -384,7 +384,7 @@ namespace DX12Engine
             return true;
         }
 
-		bool SphereVsPlane(const Sphere& sphere, const Plane& plane, ContactManifold* contact = nullptr)
+		bool SphereVsPlane(const Sphere& sphere, const Plane& plane, ContactManifold* contact = nullptr) const
 		{
 			// Find the closest point on the (possibly finite) plane to the sphere center.
 			DirectX::XMVECTOR offset = DirectX::XMVectorSubtract(sphere.Center, plane.Center);
@@ -431,7 +431,7 @@ namespace DX12Engine
 			return true;
 		}
 
-        int GetReferenceFaceIndex(const OBB& box, const DirectX::XMVECTOR& planeNormal) 
+        int GetReferenceFaceIndex(const OBB& box, const DirectX::XMVECTOR& planeNormal) const 
         {
             // Find the box face axis that is most anti-aligned with the plane normal.
             // That face is the one closest to (pointing toward) the plane surface.
@@ -442,8 +442,8 @@ namespace DX12Engine
             for (int i = 0; i < 3; ++i) 
             {
                 float dot = DirectX::XMVectorGetX(DirectX::XMVector3Dot(box.Axis[i], planeNormal));
-                // Positive dot: axis points away from plane — face is on the far side
-                // Negative dot: axis points toward plane — face is closest to plane
+                // Positive dot: axis points away from plane ï¿½ face is on the far side
+                // Negative dot: axis points toward plane ï¿½ face is closest to plane
                 float absDot = fabsf(dot);
                 if (absDot > maxDot) 
                 {
@@ -458,7 +458,7 @@ namespace DX12Engine
             return bestAxis + (bestSign == 1 ? 3 : 0);
         }
 
-        void GetBoxFaceVertices(const OBB& box, int faceIndex, std::vector<DirectX::XMVECTOR>& outVerts) 
+        void GetBoxFaceVertices(const OBB& box, int faceIndex, std::vector<DirectX::XMVECTOR>& outVerts) const 
         {
             // Decode axis index and which side the face is on
             bool positiveDir = faceIndex >= 3;
@@ -491,7 +491,7 @@ namespace DX12Engine
             outVerts.push_back(DirectX::XMVectorSubtract(faceCenter, DirectX::XMVectorSubtract(dA, dB)));
         }
 
-        void ClipFaceAgainstPlane(const std::vector<DirectX::XMVECTOR>& faceVerts, const Plane& plane, ContactManifold& outManifold) 
+        void ClipFaceAgainstPlane(const std::vector<DirectX::XMVECTOR>& faceVerts, const Plane& plane, ContactManifold& outManifold) const 
         {
             for (const auto& v : faceVerts) 
             {

@@ -18,6 +18,8 @@
 #include <stdexcept>
 #include <iostream>
 #include <unordered_map>
+#include "../Asset/MeshAsset.h"
+#include "../Resources/ResourceManager.h"
 
 namespace DX12Engine
 {
@@ -29,7 +31,7 @@ namespace DX12Engine
     {
     }
 
-    Mesh ModelLoader::LoadObj(const std::string& filename)
+    MeshAsset ModelLoader::LoadObj(const std::string& filename)
     {
         tinyobj::ObjReader reader;
 
@@ -47,8 +49,12 @@ namespace DX12Engine
         const auto& shapes = reader.GetShapes();
         const auto& materials = reader.GetMaterials();
 
-        Mesh mesh;
+        MeshAsset mesh;
+        std::vector<Vertex> vertices;
+        std::vector<UINT> indices;
         std::unordered_map<std::string, uint32_t> uniqueVertices;
+		DirectX::XMFLOAT3 minBounds = { FLT_MAX, FLT_MAX, FLT_MAX };
+		DirectX::XMFLOAT3 maxBounds = { -FLT_MAX, -FLT_MAX, -FLT_MAX };
 
         // Iterate over shapes (e.g., cube, sphere, etc.)
         for (const auto& shape : shapes)
@@ -103,33 +109,39 @@ namespace DX12Engine
                     // Add the vertex if it hasn’t been added yet
                     if (uniqueVertices.find(key) == uniqueVertices.end())
                     {
-                        uniqueVertices[key] = static_cast<uint32_t>(mesh.Vertices.size());
-                        mesh.Vertices.push_back({ position, normal, texCoord });
+                        uniqueVertices[key] = static_cast<uint32_t>(vertices.size());
+                        vertices.push_back({ position, normal, texCoord });
+						minBounds.x = std::min(minBounds.x, position.x);
+						minBounds.y = std::min(minBounds.y, position.y);
+						minBounds.z = std::min(minBounds.z, position.z);
+						maxBounds.x = std::max(maxBounds.x, position.x);
+						maxBounds.y = std::max(maxBounds.y, position.y);
+						maxBounds.z = std::max(maxBounds.z, position.z);
                     }
                     // Add the index for this vertex
-                    mesh.Indices.push_back(uniqueVertices[key]);
+                    indices.push_back(uniqueVertices[key]);
                 }
                 indexOffset += fv;
             }
         }
 
         // Compute tangents
-        std::vector<DirectX::XMFLOAT3> tan1(mesh.Vertices.size() * 2);
-        std::vector<DirectX::XMFLOAT3> tan2(tan1.begin() + mesh.Vertices.size(), tan1.end());
+        std::vector<DirectX::XMFLOAT3> tan1(vertices.size() * 2);
+        std::vector<DirectX::XMFLOAT3> tan2(tan1.begin() + vertices.size(), tan1.end());
 
-        for (size_t i = 0; i < mesh.Indices.size(); i += 3)
+        for (size_t i = 0; i < indices.size(); i += 3)
         {
-            UINT i1 = mesh.Indices[i];
-            UINT i2 = mesh.Indices[i + 1];
-            UINT i3 = mesh.Indices[i + 2];
+            UINT i1 = indices[i];
+            UINT i2 = indices[i + 1];
+            UINT i3 = indices[i + 2];
 
-            const DirectX::XMFLOAT3& v1 = mesh.Vertices[i1].Position;
-            const DirectX::XMFLOAT3& v2 = mesh.Vertices[i2].Position;
-            const DirectX::XMFLOAT3& v3 = mesh.Vertices[i3].Position;
+            const DirectX::XMFLOAT3& v1 = vertices[i1].Position;
+            const DirectX::XMFLOAT3& v2 = vertices[i2].Position;
+            const DirectX::XMFLOAT3& v3 = vertices[i3].Position;
 
-            const DirectX::XMFLOAT2& w1 = mesh.Vertices[i1].TexCoord;
-            const DirectX::XMFLOAT2& w2 = mesh.Vertices[i2].TexCoord;
-            const DirectX::XMFLOAT2& w3 = mesh.Vertices[i3].TexCoord;
+            const DirectX::XMFLOAT2& w1 = vertices[i1].TexCoord;
+            const DirectX::XMFLOAT2& w2 = vertices[i2].TexCoord;
+            const DirectX::XMFLOAT2& w3 = vertices[i3].TexCoord;
 
             float x1 = v2.x - v1.x;
             float x2 = v3.x - v1.x;
@@ -166,13 +178,13 @@ namespace DX12Engine
             tan2[i3] = tdir;
         }
 
-        for (size_t i = 0; i < mesh.Vertices.size(); ++i)
+        for (size_t i = 0; i < vertices.size(); ++i)
         {
-            const DirectX::XMFLOAT3& n = mesh.Vertices[i].Normal;
+            const DirectX::XMFLOAT3& n = vertices[i].Normal;
             const DirectX::XMFLOAT3& t = tan1[i];
 
             // Gram-Schmidt orthogonalize
-            mesh.Vertices[i].Tangent =
+            vertices[i].Tangent =
             {
                 t.x - n.x * DirectX::XMVector3Dot(XMLoadFloat3(&n), XMLoadFloat3(&t)).m128_f32[0],
                 t.y - n.y * DirectX::XMVector3Dot(XMLoadFloat3(&n), XMLoadFloat3(&t)).m128_f32[0],
@@ -180,8 +192,15 @@ namespace DX12Engine
             };
 
             // Normalize the tangent
-            DirectX::XMStoreFloat3(&mesh.Vertices[i].Tangent, DirectX::XMVector3Normalize(XMLoadFloat3(&mesh.Vertices[i].Tangent)));
+            DirectX::XMStoreFloat3(&vertices[i].Tangent, DirectX::XMVector3Normalize(XMLoadFloat3(&vertices[i].Tangent)));
         }
+
+        MeshPrimitive prim(
+            ResourceManager::GetInstance().CreateVertexBuffer(vertices),
+            ResourceManager::GetInstance().CreateIndexBuffer(indices),
+            (UINT)indices.size(), 0, 0, 0);
+		prim.SetBounds({ minBounds, maxBounds });
+        mesh.AddPrimitive(std::move(prim));
         return mesh;
     }
 }

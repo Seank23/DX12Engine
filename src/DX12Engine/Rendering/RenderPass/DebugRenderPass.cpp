@@ -34,8 +34,8 @@ namespace DX12Engine
 	{
 		RenderTexture* renderTarget = m_RenderTargets[0].get();
 
-		if (!m_RenderContext.GetUploader().UploadAllPending()) // Upload any pending resources
-			m_QueueManager.GetGraphicsQueue().ResetCommandAllocatorAndList();
+		m_RenderContext.GetUploader().UploadAllPending(); // Upload any pending resources
+		m_QueueManager.GetGraphicsQueue().ResetCommandAllocatorAndList();
 
 		m_CommandList.SetPipelineState(m_PipelineState.Get());
 		m_CommandList.SetGraphicsRootSignature(m_RootSignature.Get());

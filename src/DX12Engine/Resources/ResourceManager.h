@@ -13,7 +13,7 @@
 #include "../Rendering/Buffers/VertexBuffer.h"
 #include "../Rendering/Buffers/IndexBuffer.h"
 #include "../Rendering/Buffers/ConstantBuffer.h"
-#include "../Resources/Mesh.h"
+#include "../Asset/Vertex.h"
 #include "../Resources/Texture.h"
 #include "../Resources/RenderTexture.h"
 #include "../Rendering/Heaps/DescriptorHeapManager.h"

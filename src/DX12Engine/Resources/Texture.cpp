@@ -14,5 +14,10 @@ namespace DX12Engine
 
 	Texture::~Texture()
 	{
+		if (m_UploadResource)
+		{
+			m_UploadResource->Release();
+			m_UploadResource = nullptr;
+		}
 	}
 }
