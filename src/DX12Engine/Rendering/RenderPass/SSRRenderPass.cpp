@@ -30,13 +30,10 @@ namespace DX12Engine
 
 		// Current-frame composite output
 		m_RenderTargets.emplace_back(ResourceManager::GetInstance().CreateRenderTargetTexture(windowSize, DXGI_FORMAT_R16G16B16A16_FLOAT));
-		ResourceManager::GetInstance().UpdateSRVDescriptors(reinterpret_cast<std::vector<GPUResource*> const&>(m_RenderTargets));
 
 		// Ping-pong history buffers (R16G16B16A16 to preserve HDR history)
 		m_HistoryBuffers[0] = ResourceManager::GetInstance().CreateRenderTargetTexture(windowSize, DXGI_FORMAT_R16G16B16A16_FLOAT);
 		m_HistoryBuffers[1] = ResourceManager::GetInstance().CreateRenderTargetTexture(windowSize, DXGI_FORMAT_R16G16B16A16_FLOAT);
-		std::vector<GPUResource*> historyResources = { m_HistoryBuffers[0].get(), m_HistoryBuffers[1].get() };
-		ResourceManager::GetInstance().UpdateSRVDescriptors(historyResources);
 
 		// Temporal constant buffer
 		m_TemporalCB = ResourceManager::GetInstance().CreateConstantBuffer(sizeof(SSRTemporalData));
@@ -130,10 +127,14 @@ namespace DX12Engine
 		{
 			m_CommandList.SetGraphicsRootDescriptorTable(startIndex + i, m_InputResourceBlockHandles[i].GetGPUHandle());
 		}
-		// Bind the history read buffer as the last descriptor table
+		// Bind the history read buffer as the last descriptor table.
+		// Use a fresh UpdateSRVDescriptors call so the handle is always from the
+		// current frame's transient region rather than a stale per-resource descriptor.
+		std::vector<GPUResource*> historyVec = { historyRead };
+		DescriptorHeapHandle historyBlock = ResourceManager::GetInstance().UpdateSRVDescriptors(historyVec);
 		m_CommandList.SetGraphicsRootDescriptorTable(
 			startIndex + (int)m_InputResourceBlockHandles.size(),
-			historyRead->GetDescriptor()->GetGPUHandle());
+			historyBlock.GetGPUHandle());
 
 		m_CommandList.IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 		m_CommandList.DrawInstanced(3, 1, 0, 0);

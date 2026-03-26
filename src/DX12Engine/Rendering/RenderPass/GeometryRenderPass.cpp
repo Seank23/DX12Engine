@@ -2,6 +2,7 @@
 #include "../../Resources/ResourceManager.h"
 #include "../RenderContext.h"
 #include "../../Entity/RenderComponent.h"
+#include <unordered_set>
 
 namespace DX12Engine
 {
@@ -39,6 +40,31 @@ namespace DX12Engine
     void GeometryRenderPass::Execute()
     {
 		RenderPass::Execute();
+
+		// Populate transient shader-visible handles for all ready material textures so
+		// that material->Bind() can call SetGraphicsRootDescriptorTable with a valid GPU
+		// handle for the current frame. Deduplicate via a set so shared textures only
+		// consume one transient slot each.
+		std::vector<GPUResource*> materialTextures;
+		{
+			std::unordered_set<Texture*> seen;
+			for (RenderComponent* object : m_RenderObjects)
+			{
+				if (!object) continue;
+				for (const ResolvedPrimitiveBinding& binding : object->GetResolvedPrimitiveBindings())
+				{
+					if (!binding.Material) continue;
+					for (int i = 0; i < 5; i++)
+					{
+						Texture* tex = binding.Material->GetTexture(static_cast<TextureType>(i));
+						if (tex && tex->GetIsReady() && seen.insert(tex).second)
+							materialTextures.push_back(tex);
+					}
+				}
+			}
+		}
+		if (!materialTextures.empty())
+			ResourceManager::GetInstance().UpdateSRVDescriptors(materialTextures);
 
 		m_CommandList.SetPipelineState(m_PipelineState.Get());
 		m_CommandList.SetGraphicsRootSignature(m_RootSignature.Get());

@@ -7,18 +7,14 @@ namespace DX12Engine
         : DescriptorHeap(device, heapType, numDescriptors, false)
     {
         m_CurrentDescriptorIndex = 0;
-        m_ActiveHandleCount = 0;
+        m_AllocationFailures = 0;
     }
 
     StagingDescriptorHeap::~StagingDescriptorHeap()
     {
-        if (m_ActiveHandleCount != 0)
-            std::runtime_error("There were active handles when the descriptor heap was destroyed. Look for leaks.");
-
-        m_FreeDescriptors.clear();
     }
 
-    DescriptorHeapHandle StagingDescriptorHeap::GetNewHeapHandle()
+    DescriptorHeapHandle StagingDescriptorHeap::AllocatePersistentHandle()
     {
         UINT newHandleID = 0;
 
@@ -27,14 +23,10 @@ namespace DX12Engine
             newHandleID = m_CurrentDescriptorIndex;
             m_CurrentDescriptorIndex++;
         }
-        else if (m_FreeDescriptors.size() > 0)
-        {
-			newHandleID = m_FreeDescriptors.back();
-            m_FreeDescriptors.pop_back();
-        }
         else
         {
-            std::runtime_error("Ran out of dynamic descriptor heap handles, need to increase heap size.");
+            m_AllocationFailures++;
+            throw std::runtime_error("Ran out of dynamic descriptor heap handles, need to increase heap size.");
         }
 
         DescriptorHeapHandle newHandle;
@@ -42,19 +34,15 @@ namespace DX12Engine
         cpuHandle.ptr += newHandleID * m_DescriptorSize;
         newHandle.SetCPUHandle(cpuHandle);
         newHandle.SetHeapIndex(newHandleID);
-        m_ActiveHandleCount++;
 
         return newHandle;
     }
 
-    void StagingDescriptorHeap::FreeHeapHandle(DescriptorHeapHandle handle)
+    DescriptorHeapStats StagingDescriptorHeap::GetStats() const
     {
-        m_FreeDescriptors.push_back(handle.GetHeapIndex());
-
-        if (m_ActiveHandleCount == 0)
-        {
-            std::runtime_error("Freeing heap handles when there should be none left");
-        }
-        m_ActiveHandleCount--;
+        DescriptorHeapStats stats{};
+		stats.persistentCapacity = m_MaxDescriptors;
+		stats.persistentUsed = m_CurrentDescriptorIndex;
+        return stats;
     }
 }

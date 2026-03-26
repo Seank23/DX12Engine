@@ -173,13 +173,7 @@ namespace DX12Engine
 			IID_PPV_ARGS(&constantBufferResource)
 		));
 
-		D3D12_CONSTANT_BUFFER_VIEW_DESC constantBufferViewDesc = {};
-		constantBufferViewDesc.BufferLocation = constantBufferResource->GetGPUVirtualAddress();
-		constantBufferViewDesc.SizeInBytes = alignedSize;
-
-		DescriptorHeapHandle constantBufferHeapHandle = m_HeapManager->GetNewSRVDescriptorHeapHandle();
-		m_Device->CreateConstantBufferView(&constantBufferViewDesc, constantBufferHeapHandle.GetCPUHandle());
-		std::unique_ptr<ConstantBuffer> constantBuffer = std::make_unique<ConstantBuffer>(constantBufferResource, D3D12_RESOURCE_STATE_GENERIC_READ, alignedSize, constantBufferHeapHandle);
+		std::unique_ptr<ConstantBuffer> constantBuffer = std::make_unique<ConstantBuffer>(constantBufferResource, D3D12_RESOURCE_STATE_GENERIC_READ, alignedSize);
 		constantBuffer->SetIsReady(true);
 		return constantBuffer;
 	}
@@ -250,8 +244,7 @@ namespace DX12Engine
 		srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
 		srvDesc.Texture2D.MipLevels = 1;
 
-		DescriptorHeapHandle srvHandle = m_HeapManager->GetNewSRVDescriptorHeapHandle();
-		m_Device->CreateShaderResourceView(textureResource, &srvDesc, srvHandle.GetCPUHandle());
+		DescriptorHeapHandle srvHandle = m_HeapManager->AllocatePersistentSRV();
 
 		return std::make_unique<Texture>(textureResource, textureUploadResource, D3D12_RESOURCE_STATE_COPY_DEST, textureData, srvHandle, srvDesc, false);
 	}
@@ -316,8 +309,7 @@ namespace DX12Engine
 		srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURECUBE;
 		srvDesc.TextureCube.MipLevels = static_cast<UINT>(metadata.mipLevels);
 
-		DescriptorHeapHandle srvHandle = m_HeapManager->GetNewSRVDescriptorHeapHandle();
-		m_Device->CreateShaderResourceView(textureResource, &srvDesc, srvHandle.GetCPUHandle());
+		DescriptorHeapHandle srvHandle = m_HeapManager->AllocatePersistentSRV();
 
 		return std::make_unique<Texture>(textureResource, textureUploadResource, D3D12_RESOURCE_STATE_COPY_DEST, cubemapData, srvHandle, srvDesc, true);
 	}
@@ -376,7 +368,7 @@ namespace DX12Engine
 		srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURECUBE;
 		srvDesc.TextureCube.MipLevels = 1;
 
-		DescriptorHeapHandle srvHandle = m_HeapManager->GetNewSRVDescriptorHeapHandle();
+		DescriptorHeapHandle srvHandle = m_HeapManager->AllocatePersistentSRV();
 		m_Device->CreateShaderResourceView(textureResource, &srvDesc, srvHandle.GetCPUHandle());
 
 		auto texture = std::make_unique<Texture>(textureResource, uploadResource, D3D12_RESOURCE_STATE_COPY_DEST, subresources, srvHandle, srvDesc, true);
@@ -426,7 +418,7 @@ namespace DX12Engine
 			dsvDesc.ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2D;
 			dsvDesc.Flags = D3D12_DSV_FLAG_NONE;
 
-			DescriptorHeapHandle dsvHandle = m_HeapManager->GetNewDSVDescriptorHeapHandle();
+			DescriptorHeapHandle dsvHandle = m_HeapManager->AllocatePersistentDSV();
 			m_Device->CreateDepthStencilView(depthMapResource, &dsvDesc, dsvHandle.GetCPUHandle());
 			dsvDescriptors.push_back(dsvHandle);
 		}
@@ -441,7 +433,7 @@ namespace DX12Engine
 				dsvDesc.Texture2DArray.ArraySize = 1;
 				dsvDesc.Texture2DArray.MipSlice = 0;
 
-				DescriptorHeapHandle dsvHandle = m_HeapManager->GetNewDSVDescriptorHeapHandle();
+				DescriptorHeapHandle dsvHandle = m_HeapManager->AllocatePersistentDSV();
 				m_Device->CreateDepthStencilView(depthMapResource, &dsvDesc, dsvHandle.GetCPUHandle());
 				dsvDescriptors.push_back(dsvHandle);
 			}
@@ -454,7 +446,13 @@ namespace DX12Engine
 		srvDesc.Texture2D.MipLevels = 1;
 		if (!isSingleMap) srvDesc.Texture2DArray.ArraySize = arraySize;
 
-		return std::make_unique<RenderTexture>(depthMapResource, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, dsvDescriptors, srvDesc, isCubeMap);
+		DescriptorHeapHandle srvHandle = m_HeapManager->AllocatePersistentSRV();
+		m_Device->CreateShaderResourceView(depthMapResource, &srvDesc, srvHandle.GetCPUHandle());
+
+		auto renderTexture = std::make_unique<RenderTexture>(depthMapResource, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, dsvDescriptors, srvDesc, isCubeMap);
+		renderTexture->SetTransientDescriptor(srvHandle);
+		renderTexture->SetPersistentDescriptor(srvHandle);
+		return renderTexture;
 	}
 
 	std::unique_ptr<RenderTexture> ResourceManager::CreateRenderTargetTexture(DirectX::XMINT2 dimensions, DXGI_FORMAT format, UINT mipLevels, DirectX::XMFLOAT4 clearColor)
@@ -492,7 +490,7 @@ namespace DX12Engine
 		rtvDesc.Format = format;
 		rtvDesc.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2D;
 
-		DescriptorHeapHandle rtvHandle = m_HeapManager->GetNewRTVDescriptorHeapHandle();
+		DescriptorHeapHandle rtvHandle = m_HeapManager->AllocatePersistentRTV();
 		m_Device->CreateRenderTargetView(renderTargetResource, &rtvDesc, rtvHandle.GetCPUHandle());
 		rtvDescriptors.push_back(rtvHandle);
 
@@ -502,28 +500,53 @@ namespace DX12Engine
 		srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
 		srvDesc.Texture2D.MipLevels = mipLevels;
 
-		return std::make_unique<RenderTexture>(renderTargetResource, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, rtvDescriptors, srvDesc, false, clearColor);
+		DescriptorHeapHandle srvHandle = m_HeapManager->AllocatePersistentSRV();
+		m_Device->CreateShaderResourceView(renderTargetResource, &srvDesc, srvHandle.GetCPUHandle());
+
+		auto renderTexture = std::make_unique<RenderTexture>(renderTargetResource, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, rtvDescriptors, srvDesc, false, clearColor);
+		renderTexture->SetTransientDescriptor(srvHandle);
+		renderTexture->SetPersistentDescriptor(srvHandle);
+		return renderTexture;
 	}
 
-	void ResourceManager::UpdateSRVDescriptors(std::vector<GPUResource*> resources)
+	DescriptorHeapHandle ResourceManager::UpdateSRVDescriptors(std::vector<GPUResource*> resources)
 	{
-		DescriptorHeapHandle renderBlockStart = m_HeapManager->GetRenderHeapHandleBlock(resources.size());
-		D3D12_CPU_DESCRIPTOR_HANDLE currentCPUHandle = renderBlockStart.GetCPUHandle();
-		D3D12_GPU_DESCRIPTOR_HANDLE currentGPUHandle = renderBlockStart.GetGPUHandle();
+		if (resources.empty())
+			return DescriptorHeapHandle{};
+
+		// Allocate a transient block in the shader-visible render-pass heap for this frame's
+		// descriptor table, then copy from each resource's stable persistent CPU handle.
+		DescriptorHeapHandle transientBlock = m_HeapManager->AllocateTransientSRVBlock(static_cast<UINT>(resources.size()));
+		D3D12_CPU_DESCRIPTOR_HANDLE dstCPU = transientBlock.GetCPUHandle();
+		D3D12_GPU_DESCRIPTOR_HANDLE dstGPU = transientBlock.GetGPUHandle();
 		UINT descriptorSize = m_HeapManager->GetRenderPassHeap().GetDescriptorSize();
+
 		for (GPUResource* resource : resources)
 		{
-			D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = resource->GetSRVDesc();
-			m_Device->CreateShaderResourceView(resource->GetResource(), &srvDesc, currentCPUHandle);
+			DescriptorHeapHandle* persistent = resource->GetPersistentDescriptor();
+			if (persistent && persistent->IsValid())
+			{
+				// Copy from persistent CPU slot into the contiguous transient table slot.
+				m_Device->CopyDescriptorsSimple(1, dstCPU, persistent->GetCPUHandle(), D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+			}
+			else
+			{
+				// Fallback: write SRV directly if no persistent handle exists yet.
+				D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = resource->GetSRVDesc();
+				m_Device->CreateShaderResourceView(resource->GetResource(), &srvDesc, dstCPU);
+			}
 
-			DescriptorHeapHandle currentDescriptor;
-			currentDescriptor.SetCPUHandle(currentCPUHandle);
-			currentDescriptor.SetGPUHandle(currentGPUHandle);
-			resource->SetDescriptor(currentDescriptor);
+			// Expose the transient GPU handle so the pass can bind the table.
+			DescriptorHeapHandle transientHandle;
+			transientHandle.SetCPUHandle(dstCPU);
+			transientHandle.SetGPUHandle(dstGPU);
+			resource->SetTransientDescriptor(transientHandle);
 
-			currentCPUHandle.ptr += descriptorSize;
-			currentGPUHandle.ptr += descriptorSize;
+			dstCPU.ptr += descriptorSize;
+			dstGPU.ptr += descriptorSize;
 		}
+
+		return transientBlock;
 	}
 
 	Microsoft::WRL::ComPtr<ID3D12PipelineState> ResourceManager::CreatePipelineState(const D3D12_GRAPHICS_PIPELINE_STATE_DESC& desc)

@@ -13,6 +13,7 @@
 #include "../Entity/RenderComponent.h"
 #include <array>
 #include <unordered_set>
+#include <cstdio>
 
 namespace DX12Engine
 {
@@ -54,6 +55,15 @@ namespace DX12Engine
 
 	Renderer::~Renderer()
 	{
+#ifdef _DEBUG
+		DescriptorHeapStats stats = m_RenderContext->GetHeapManager().GetStats();
+		char buf[256];
+		_snprintf_s(buf, sizeof(buf), "[Renderer] Shutdown stats: persistent=%u/%u, transientPeak=%u/%u, failures=%u\n",
+			stats.persistentUsed, stats.persistentCapacity,
+			stats.transientPeakThisFrame, stats.transientCapacityPerFrame,
+			stats.allocationFailures);
+		OutputDebugStringA(buf);
+#endif
 	}
 
 	std::unique_ptr<RenderPass> Renderer::CreateRenderPass(RenderPassType type, int count)
@@ -84,6 +94,7 @@ namespace DX12Engine
 
 	void Renderer::ExecutePipeline(RenderPipeline pipeline)
 	{
+		m_RenderContext->GetHeapManager().BeginFrame(m_FrameIndex++);
 		SetSceneData(pipeline);
 		m_RenderContext->GetUploader().UploadAllPending();
 		for (RenderPass* pass : pipeline.RenderPasses)
@@ -275,6 +286,9 @@ namespace DX12Engine
 		m_RenderContext->GetUploader().UploadAllPending();
 		m_QueueManager.GetGraphicsQueue().ResetCommandAllocatorAndList();
 
+		std::vector<GPUResource*> finalTargetVec = { finalRenderTarget };
+		ResourceManager::GetInstance().UpdateSRVDescriptors(finalTargetVec);
+
 		m_CommandList->SetPipelineState(m_PipelineState.Get());
 		m_CommandList->SetGraphicsRootSignature(m_RootSignature.Get());
 
@@ -295,7 +309,7 @@ namespace DX12Engine
 		auto srvHeap = m_RenderHeap.GetHeap();
 		m_CommandList->SetDescriptorHeaps(1, &srvHeap);
 
-		m_CommandList->SetGraphicsRootDescriptorTable(0, finalRenderTarget->GetDescriptor()->GetGPUHandle());
+		m_CommandList->SetGraphicsRootDescriptorTable(0, finalRenderTarget->GetTransientDescriptor()->GetGPUHandle());
 
 		m_CommandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 		m_CommandList->DrawInstanced(3, 1, 0, 0);
@@ -307,5 +321,26 @@ namespace DX12Engine
 
 		m_RenderContext->PresentFrame();
 		m_QueueManager.GetGraphicsQueue().WaitForFenceCPUBlocking(fenceVal);
+
+#ifdef _DEBUG
+		if (m_FrameIndex % 60 == 0)
+		{
+			DescriptorHeapStats stats = m_RenderContext->GetHeapManager().GetStats();
+			char buf[256];
+			_snprintf_s(buf, sizeof(buf),
+				"[Renderer] Frame %u: persistent=%u/%u (%.0f%%), transient=%u/%u (%.0f%%), failures=%u\n",
+				m_FrameIndex,
+				stats.persistentUsed, stats.persistentCapacity,
+				100.0f * stats.persistentUsed / (stats.persistentCapacity ? stats.persistentCapacity : 1),
+				stats.transientUsedThisFrame, stats.transientCapacityPerFrame,
+				100.0f * stats.transientUsedThisFrame / (stats.transientCapacityPerFrame ? stats.transientCapacityPerFrame : 1),
+				stats.allocationFailures);
+			OutputDebugStringA(buf);
+			if (stats.persistentUsed > static_cast<UINT>(stats.persistentCapacity * HEAP_WARN_THRESHOLD_HIGH))
+				OutputDebugStringA("[Renderer] WARNING: Persistent SRV heap above 95% capacity!\n");
+			else if (stats.persistentUsed > static_cast<UINT>(stats.persistentCapacity * HEAP_WARN_THRESHOLD_MED))
+				OutputDebugStringA("[Renderer] WARNING: Persistent SRV heap above 80% capacity.\n");
+		}
+#endif
 	}
 }

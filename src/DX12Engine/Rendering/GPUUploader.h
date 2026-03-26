@@ -7,7 +7,6 @@
 namespace DX12Engine
 {
 	class RenderContext;
-	class RenderPassDescriptorHeap;
 
 	class GPUUploader
 	{
@@ -36,12 +35,9 @@ namespace DX12Engine
 		ID3D12GraphicsCommandList* m_GraphicsCommandList;
 		ID3D12GraphicsCommandList* m_CopyCommandList;
 
-		RenderPassDescriptorHeap& m_RenderHeap;
-
 		int m_UploadCount = 0;
 		bool m_UploadListsRecording = false;
 		std::vector<ID3D12Resource*> m_PendingUploadResources;
 		std::vector<ID3D12Resource*> m_PendingReferencedResources;
 	};
 }
-

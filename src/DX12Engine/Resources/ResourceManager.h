@@ -49,7 +49,10 @@ namespace DX12Engine
 		std::unique_ptr<RenderTexture> CreateDepthMap(DirectX::XMINT3 dimensions, DXGI_FORMAT dsvFormat, DXGI_FORMAT srvFormat, bool isCubeMap = false);
 		std::unique_ptr<RenderTexture> CreateRenderTargetTexture(DirectX::XMINT2 dimensions, DXGI_FORMAT format, UINT mipLevels = 1, DirectX::XMFLOAT4 clearColor = { 0.0f, 0.0f, 0.0f, 1.0f });
 
-		void UpdateSRVDescriptors(std::vector<GPUResource*> resources);
+		// Returns the base DescriptorHeapHandle of the allocated transient block so
+		// callers can compute per-block GPU handles via offset arithmetic instead of
+		// reading back from individual resource descriptors (which other passes clobber).
+		DescriptorHeapHandle UpdateSRVDescriptors(std::vector<GPUResource*> resources);
 
 		Microsoft::WRL::ComPtr<ID3D12PipelineState> CreatePipelineState(const D3D12_GRAPHICS_PIPELINE_STATE_DESC& desc);
 		Microsoft::WRL::ComPtr<ID3D12RootSignature> CreateRootSignature(const D3D12_ROOT_SIGNATURE_DESC& desc);

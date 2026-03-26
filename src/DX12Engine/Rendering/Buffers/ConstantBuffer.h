@@ -7,7 +7,7 @@ namespace DX12Engine
 	class ConstantBuffer : public GPUResource
 	{
 	public:
-		ConstantBuffer(ID3D12Resource* resource, D3D12_RESOURCE_STATES usageState, UINT bufferSize, DescriptorHeapHandle cbvHandle);
+		ConstantBuffer(ID3D12Resource* resource, D3D12_RESOURCE_STATES usageState, UINT bufferSize);
 		~ConstantBuffer() override;
 
 		void Update(void* data, UINT size);	

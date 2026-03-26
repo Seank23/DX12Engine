@@ -22,7 +22,7 @@ namespace DX12Engine
 		Texture(ID3D12Resource* mainResource, ID3D12Resource* uploadResource, D3D12_RESOURCE_STATES usageState, std::vector<D3D12_SUBRESOURCE_DATA> data, DescriptorHeapHandle descriptor, D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc, bool isCubemap);
 		~Texture();
 
-		D3D12_GPU_DESCRIPTOR_HANDLE GetGPUHandle() { return GetDescriptor()->GetGPUHandle(); }
+		D3D12_GPU_DESCRIPTOR_HANDLE GetGPUHandle() { return GetTransientDescriptor()->GetGPUHandle(); }
 		bool IsCubemap() { return m_IsCubemap; }
 
 	private:

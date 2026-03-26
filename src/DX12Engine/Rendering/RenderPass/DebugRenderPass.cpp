@@ -64,7 +64,7 @@ namespace DX12Engine
 		for (int i = 0; i < m_DescriptorTableConfigs.size(); i++)
 		{
 			int resourceIndex = m_DescriptorTableConfigs[i].BaseShaderRegister;
-			m_CommandList.SetGraphicsRootDescriptorTable(startIndex + i, m_InputResources[resourceIndex]->GetDescriptor()->GetGPUHandle());
+			m_CommandList.SetGraphicsRootDescriptorTable(startIndex + i, m_InputResources[resourceIndex]->GetTransientDescriptor()->GetGPUHandle());
 		}
 
 		m_CommandList.IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);

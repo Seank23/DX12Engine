@@ -11,13 +11,13 @@ namespace DX12Engine
 		StagingDescriptorHeap(ID3D12Device* device, D3D12_DESCRIPTOR_HEAP_TYPE heapType, UINT numDescriptors);
 		~StagingDescriptorHeap() final;
 
-		DescriptorHeapHandle GetNewHeapHandle();
-		void FreeHeapHandle(DescriptorHeapHandle handle);
+		DescriptorHeapHandle AllocatePersistentHandle();
+
+		virtual DescriptorHeapStats GetStats() const;
 
 	private:
-		std::vector<UINT> m_FreeDescriptors;
 		UINT m_CurrentDescriptorIndex;
-		UINT m_ActiveHandleCount;
+		UINT m_AllocationFailures;
 	};
 }
 

@@ -1,7 +1,6 @@
 #include "GPUUploader.h"
 #include "../Utils/Constants.h"
 #include "./RenderContext.h"
-#include "Heaps/RenderPassDescriptorHeap.h"
 
 namespace DX12Engine
 {
@@ -18,7 +17,7 @@ namespace DX12Engine
 	}
 
 	GPUUploader::GPUUploader(RenderContext& context)
-		: m_RenderContext(context), m_QueueManager(context.GetQueueManager()), m_RenderHeap(context.GetHeapManager().GetRenderPassHeap())
+		: m_RenderContext(context), m_QueueManager(context.GetQueueManager())
 	{
 		m_GraphicsCommandList = m_QueueManager.GetGraphicsQueue().GetCommandList();
 		m_CopyCommandList = m_QueueManager.GetCopyQueue().GetCommandList();
@@ -46,10 +45,7 @@ namespace DX12Engine
 
 		EnsureUploadListsRecording();
 
-		DescriptorHeapHandle renderBlockStart = m_RenderHeap.GetHeapHandleBlock(texturesToUpload.size());
-		D3D12_CPU_DESCRIPTOR_HANDLE currentCPUHandle = renderBlockStart.GetCPUHandle();
-		D3D12_GPU_DESCRIPTOR_HANDLE currentGPUHandle = renderBlockStart.GetGPUHandle();
-		UINT descriptorSize = m_RenderHeap.GetDescriptorSize();	
+		ID3D12Device* device = m_RenderContext.GetDevice().Get();
 		for (Texture* texture : texturesToUpload)
 		{
 			UpdateSubresources(m_CopyCommandList, texture->GetResource(), texture->m_UploadResource, 0, 0, static_cast<UINT>(texture->m_Data.size()), texture->m_Data.data());
@@ -57,14 +53,17 @@ namespace DX12Engine
 				D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
 			m_GraphicsCommandList->ResourceBarrier(1, &barrier);
 
-			m_RenderContext.GetDevice()->CopyDescriptorsSimple(1, currentCPUHandle, texture->GetDescriptor()->GetCPUHandle(), D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
-			texture->GetDescriptor()->SetGPUHandle(currentGPUHandle);
+			// Write the SRV into the persistent non-shader-visible staging slot so it
+			// can be used as a CopyDescriptorsSimple source every frame.
+			DescriptorHeapHandle* persistentHandle = texture->GetPersistentDescriptor();
+			if (persistentHandle && persistentHandle->IsValid())
+			{
+				D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = texture->GetSRVDesc();
+				device->CreateShaderResourceView(texture->GetResource(), &srvDesc, persistentHandle->GetCPUHandle());
+			}
 
 			texture->SetUsageState(D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
 			texture->SetIsReady(true);
-
-			currentCPUHandle.ptr += descriptorSize;
-			currentGPUHandle.ptr += descriptorSize;
 		}
 		ExecuteUpload();
 

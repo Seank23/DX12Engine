@@ -56,6 +56,7 @@ namespace DX12Engine
 		RenderPassDescriptorHeap& m_RenderHeap;
 
 		Scene* m_CurrentScene;
+		UINT m_FrameIndex = 0;
 
 		Microsoft::WRL::ComPtr<ID3D12RootSignature> m_RootSignature;
 		Microsoft::WRL::ComPtr<ID3D12PipelineState> m_PipelineState;

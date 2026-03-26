@@ -39,6 +39,8 @@ namespace DX12Engine
 		virtual RenderTexture* GetRenderTarget(RenderTargetType type) = 0;
 		RenderPassType GetType() const { return m_Type; }
 
+		void RebuildTransientDescriptors();
+
 		void AddInputResources(std::vector<GPUResource*> resources)
 		{
 			m_InputResources.insert(m_InputResources.end(), resources.begin(), resources.end());
