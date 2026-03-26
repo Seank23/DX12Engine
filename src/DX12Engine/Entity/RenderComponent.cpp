@@ -69,7 +69,7 @@ namespace DX12Engine
 				MaterialAsset* materialAsset = m_Asset->ResolveMaterial(static_cast<std::size_t>(primitive.GetMaterialIndex()));
 				Material* material = materialAsset ? materialAsset->GetMaterial() : nullptr;
 				if (!material)
-					continue;
+					material = ResourceManager::GetInstance().GetDefaultMaterial();
 
 				m_ResolvedPrimitiveBindings.push_back({ &primitive, material });
 			}

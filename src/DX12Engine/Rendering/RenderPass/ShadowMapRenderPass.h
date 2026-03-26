@@ -1,5 +1,6 @@
 #pragma once
 #include "RenderPass.h"
+#include "../DrawItem.h"
 #include <DirectXMath.h>
 
 namespace DX12Engine
@@ -27,6 +28,7 @@ namespace DX12Engine
 		RenderTexture* GetRenderTarget(RenderTargetType type) override;
 
 		void SetLights(std::vector<Light*> lights) { m_Lights = lights; }
+		void SetDrawItems(const std::vector<DrawItem>& drawItems) { m_DrawItems = drawItems; }
 
 		RenderTexture* GetShadowMapOutput() { return m_RenderTargets[0].get(); }
 
@@ -38,6 +40,7 @@ namespace DX12Engine
 		int m_ShadowMapCount;
 		bool m_IsCubeMap;
 		std::vector<Light*> m_Lights;
+		std::vector<DrawItem> m_DrawItems;
 		ShadowMapData m_ShadowMapData;
 
 		Microsoft::WRL::ComPtr<ID3D12RootSignature> m_RootSignature;

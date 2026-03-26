@@ -16,14 +16,14 @@ namespace DX12Engine
 	void BasicMaterial::SetColor(DirectX::XMFLOAT4 color)
 	{
 		m_MaterialData.BaseColor = color;
-		UpdateConstantBufferData(m_MaterialData);
+		UpdateConstantBufferData(&m_MaterialData, sizeof(m_MaterialData));
 	}
 
 	void BasicMaterial::SetTexture(std::shared_ptr<Texture> texture)
 	{
 		m_Texture = texture;
 		m_MaterialData.HasTexture = 1;
-		UpdateConstantBufferData(m_MaterialData);
+		UpdateConstantBufferData(&m_MaterialData, sizeof(m_MaterialData));
 	}
 
 	Texture* BasicMaterial::GetTexture(TextureType type)
@@ -51,8 +51,9 @@ namespace DX12Engine
 	void BasicMaterial::Bind(ID3D12GraphicsCommandList* commandList, int* startIndex)
 	{
 		Material::Bind(commandList, startIndex);
-		if (HasTexture(TextureType::Albedo))
-			commandList->SetGraphicsRootDescriptorTable(*startIndex, m_Texture->GetGPUHandle());
+		if (HasTextureTable())
+			commandList->SetGraphicsRootDescriptorTable(*startIndex, GetTextureTableHandle());
+		(*startIndex)++;
 	}
 
 	void BasicMaterial::SetAllTextures(std::unordered_map<TextureType, std::shared_ptr<Texture>> textures)

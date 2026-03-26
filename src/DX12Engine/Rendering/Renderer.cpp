@@ -11,8 +11,11 @@
 #include "RenderPipelineConfig.h"
 #include "../Entity/GameObject.h"
 #include "../Entity/RenderComponent.h"
+#include "DrawItem.h"
 #include <array>
+#include <algorithm>
 #include <unordered_set>
+#include <cstdint>
 #include <cstdio>
 
 namespace DX12Engine
@@ -239,6 +242,8 @@ namespace DX12Engine
 		std::vector<RenderComponent*> renderComponents = m_CurrentScene->GetSceneObjects().GetAllComponents<RenderComponent>();
 		Camera* sceneCamera = m_CurrentScene->GetCamera();
 		LightBuffer* lightBuffer = m_CurrentScene->GetLightBuffer();
+
+		std::vector<DrawItem> drawItems;
 		for (auto& comp : renderComponents)
 		{
 			if (!comp)
@@ -250,6 +255,19 @@ namespace DX12Engine
 				Material* material = binding.Material;
 				if (!material)
 					continue;
+
+				DrawItem item{};
+				item.Primitive    = binding.Primitive;
+				item.Material     = material;
+				item.CBVAddress   = comp->GetCBVAddress();
+				item.IndexCount   = binding.Primitive->GetIndexCount();
+				item.FirstIndex   = binding.Primitive->GetFirstIndex();
+				item.BaseVertex   = binding.Primitive->GetBaseVertex();
+				item.ModelMatrix  = comp->GetModelMatrix();
+				item.PipelineKey  = 0; // single PSO variant for now
+				item.MaterialKey  = reinterpret_cast<uint64_t>(material);
+				item.MeshKey      = reinterpret_cast<uint64_t>(binding.Primitive);
+				drawItems.push_back(item);
 
 				for (int i = 0; i < 5; i++)
 				{
@@ -266,12 +284,28 @@ namespace DX12Engine
 		if (!texturesToUpload.empty())
 			m_RenderContext->GetUploader().UploadTextureBatch(texturesToUpload);
 
+		// primary key: PSO variant, secondary: material, tertiary: mesh, quaternary: CBV (object).
+		std::sort(drawItems.begin(), drawItems.end(), [](const DrawItem& a, const DrawItem& b)
+		{
+			if (a.PipelineKey != b.PipelineKey) return a.PipelineKey < b.PipelineKey;
+			if (a.MaterialKey  != b.MaterialKey)  return a.MaterialKey  < b.MaterialKey;
+			if (a.MeshKey      != b.MeshKey)      return a.MeshKey      < b.MeshKey;
+			return a.CBVAddress < b.CBVAddress;
+		});
+
 		for (auto& renderPass : pipeline.RenderPasses)
 		{
 			renderPass->SetRenderObjects(renderComponents);
 			renderPass->SetCamera(sceneCamera);
-			switch (renderPass->GetType())
+		switch (renderPass->GetType())
 			{
+			case RenderPassType::Geometry:
+				static_cast<GeometryRenderPass*>(renderPass)->SetDrawItems(drawItems);
+				break;
+			case RenderPassType::ShadowMap:
+			case RenderPassType::CubeShadowMap:
+				static_cast<ShadowMapRenderPass*>(renderPass)->SetDrawItems(drawItems);
+				break;
 			case RenderPassType::Lighting:
 				static_cast<LightingRenderPass*>(renderPass)->SetLightBuffer(lightBuffer);
 				break;

@@ -27,12 +27,24 @@ namespace DX12Engine
 
 		virtual void SetAllTextures(std::unordered_map<TextureType, std::shared_ptr<Texture>> textures) = 0;
 
+		// Per-frame transient GPU handle for the material's texture table (set by the
+		// geometry pass before issuing draws so Bind() can call SetGraphicsRootDescriptorTable).
+		void SetTextureTableHandle(D3D12_GPU_DESCRIPTOR_HANDLE handle) { m_TextureTableHandle = handle; m_HasTextureTable = true; }
+		D3D12_GPU_DESCRIPTOR_HANDLE GetTextureTableHandle() const { return m_TextureTableHandle; }
+		bool HasTextureTable() const { return m_HasTextureTable; }
+		void ClearTextureTable() { m_HasTextureTable = false; }
+
 		PipelineStateBuilder PipelineStateBuilder;
 		RootSignatureBuilder RootSignatureBuilder;
 
 	protected:
-		void UpdateConstantBufferData(MaterialData materialData);
+		explicit Material(UINT bufferSize);
+		void UpdateConstantBufferData(const void* data, UINT size);
 
 		std::unique_ptr<ConstantBuffer> m_ConstantBuffer;
+
+	private:
+		D3D12_GPU_DESCRIPTOR_HANDLE m_TextureTableHandle{};
+		bool m_HasTextureTable = false;
 	};
 }

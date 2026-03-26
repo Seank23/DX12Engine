@@ -50,18 +50,12 @@ namespace DX12EngineDemo
 		//m_LightBuffer->AddLight(spotLight);
 
 		DX12Engine::TextureLoader textureLoader;
-		DX12Engine::GPUUploader& uploader = m_RenderContext->GetUploader();
-
 		m_SkyboxCubemap = textureLoader.LoadCubemapDDS(DX12Engine::ResourceManager::GetMaterialPath("skybox/skybox_cubemap.dds"));
 		m_SkyboxIrradiance = textureLoader.LoadCubemapDDS(DX12Engine::ResourceManager::GetMaterialPath("skybox/skybox_irradiance.dds"));
-		uploader.UploadTextureBatch({ m_SkyboxCubemap.get(), m_SkyboxIrradiance.get() });
 
 		auto brickTextures = textureLoader.LoadMaterial(DX12Engine::ResourceManager::GetMaterialPath("dark-worn-stone-ue"));
-		uploader.UploadTextureBatch(DX12Engine::TextureLoader::GetTextureArray(brickTextures));
 		auto goldTextures = textureLoader.LoadMaterial(DX12Engine::ResourceManager::GetMaterialPath("hammered-gold-ue"));
-		uploader.UploadTextureBatch(DX12Engine::TextureLoader::GetTextureArray(goldTextures));
 		auto wornMetalTextures = textureLoader.LoadMaterial(DX12Engine::ResourceManager::GetMaterialPath("worn-shiny-metal-ue"));
-		uploader.UploadTextureBatch(DX12Engine::TextureLoader::GetTextureArray(wornMetalTextures));
 
 		std::shared_ptr<DX12Engine::PBRMaterial> pbrBrick = std::make_shared<DX12Engine::PBRMaterial>();
 		pbrBrick->SetAllTextures(brickTextures);
@@ -77,7 +71,7 @@ namespace DX12EngineDemo
 
 		auto cubeModel = std::make_shared<DX12Engine::ModelAsset>("Cube");
 		size_t cubeMeshIdx = cubeModel->AddMesh(cubeMesh);
-		size_t cubeMaterialIdx = cubeModel->AddMaterial(std::make_shared<DX12Engine::MaterialAsset>("Material", pbrBrick));
+		cubeModel->AddMaterial(std::make_shared<DX12Engine::MaterialAsset>("Material", pbrBrick));
 		DX12Engine::ModelNode cubeRoot; cubeRoot.Name = "Root"; cubeRoot.ParentIndex = -1; cubeRoot.MeshIndex = -1;
 		size_t cubeRootIdx = cubeModel->AddNode(cubeRoot);
 		DX12Engine::ModelNode cubeNode; cubeNode.Name = "Cube"; cubeNode.ParentIndex = (int)cubeRootIdx; cubeNode.MeshIndex = cubeMeshIdx;
@@ -85,7 +79,7 @@ namespace DX12EngineDemo
 
 		auto sphereModel = std::make_shared<DX12Engine::ModelAsset>("Sphere");
 		size_t sphereMeshIdx = sphereModel->AddMesh(sphereMesh);
-		size_t sphereMaterialIdx = sphereModel->AddMaterial(std::make_shared<DX12Engine::MaterialAsset>("Material", pbrGold));
+		sphereModel->AddMaterial(std::make_shared<DX12Engine::MaterialAsset>("Material", pbrGold));
 		DX12Engine::ModelNode sphereRoot; sphereRoot.Name = "Root"; sphereRoot.ParentIndex = -1; sphereRoot.MeshIndex = -1;
 		size_t sphereRootIdx = sphereModel->AddNode(sphereRoot);
 		DX12Engine::ModelNode sphereNode; sphereNode.Name = "Sphere"; sphereNode.ParentIndex = (int)sphereRootIdx; sphereNode.MeshIndex = sphereMeshIdx;
@@ -93,7 +87,7 @@ namespace DX12EngineDemo
 
 		auto floorModel = std::make_shared<DX12Engine::ModelAsset>("Floor");
 		size_t floorMeshIdx = floorModel->AddMesh(floorMesh);
-		size_t floorMaterialIdx = floorModel->AddMaterial(std::make_shared<DX12Engine::MaterialAsset>("Material", pbrWornMetal));
+		floorModel->AddMaterial(std::make_shared<DX12Engine::MaterialAsset>("Material", pbrWornMetal));
 		DX12Engine::ModelNode floorRoot; floorRoot.Name = "Root"; floorRoot.ParentIndex = -1; floorRoot.MeshIndex = -1;
 		size_t floorRootIdx = floorModel->AddNode(floorRoot);
 		DX12Engine::ModelNode floorNode; floorNode.Name = "Floor"; floorNode.ParentIndex = (int)floorRootIdx; floorNode.MeshIndex = floorMeshIdx;
@@ -156,8 +150,6 @@ namespace DX12EngineDemo
 		//m_SceneObjects.Get("Ball")->GetComponent<DX12Engine::PhysicsComponent>()->ApplyForce(DX12Engine::Force{ { -200.0, 300.0f, 0.0f }, 0.05f, { 0.5f, 0.7f, -0.2f }, true, true });
 		m_SceneObjects.Get("Cube")->GetComponent<DX12Engine::PhysicsComponent>()->ApplyForce(DX12Engine::Force{ { 500.0f, 700.0f, 0.0f }, 0.05f });
 		m_SceneObjects.Get("Ball")->GetComponent<DX12Engine::PhysicsComponent>()->ApplyForce(DX12Engine::Force{ { -200.0, 300.0f, 0.0f }, 0.05f });
-
-		uploader.UploadAllPending();
 
 		m_SceneObjects.Init();
 	}

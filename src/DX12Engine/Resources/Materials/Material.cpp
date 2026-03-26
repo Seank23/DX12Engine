@@ -8,6 +8,11 @@ namespace DX12Engine
 		m_ConstantBuffer = ResourceManager::GetInstance().CreateConstantBuffer(sizeof(MaterialData));
 	}
 
+	Material::Material(UINT bufferSize)
+	{
+		m_ConstantBuffer = ResourceManager::GetInstance().CreateConstantBuffer(bufferSize);
+	}
+
 	Material::~Material()
 	{
 	}
@@ -17,8 +22,8 @@ namespace DX12Engine
 		commandList->SetGraphicsRootConstantBufferView((*startIndex)++, GetCBVAddress());
 	}
 
-	void Material::UpdateConstantBufferData(MaterialData materialData)
+	void Material::UpdateConstantBufferData(const void* data, UINT size)
 	{
-		m_ConstantBuffer->Update(&materialData, sizeof(materialData));
+		m_ConstantBuffer->Update(const_cast<void*>(data), size);
 	}
 }

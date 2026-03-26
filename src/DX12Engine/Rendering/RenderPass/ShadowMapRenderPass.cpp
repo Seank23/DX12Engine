@@ -4,6 +4,7 @@
 #include "../../Resources/ResourceManager.h"
 #include "../../Utils/Constants.h"
 #include "../../Entity/RenderComponent.h"
+#include "../../Asset/MeshPrimitive.h"
 #include "../../Resources/Light.h"
 #include "../../Utils/EngineUtils.h"
 
@@ -124,26 +125,26 @@ namespace DX12Engine
 
 		m_CommandList.IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
-		for (RenderComponent* object : m_RenderObjects)
+		MeshPrimitive* lastPrimitive = nullptr;
+		for (const DrawItem& item : m_DrawItems)
 		{
-			if (!object)
+			if (!item.Primitive)
 				continue;
 
-			DirectX::XMMATRIX mvpMatrix = DirectX::XMMatrixMultiply(object->GetModelMatrix(), m_Lights[lightIndex]->GetViewProjMatrix());
+			DirectX::XMMATRIX mvpMatrix = DirectX::XMMatrixMultiply(item.ModelMatrix, m_Lights[lightIndex]->GetViewProjMatrix());
 			m_ShadowMapData.LightMVPMatrix = mvpMatrix;
-
 			m_CommandList.SetGraphicsRoot32BitConstants(0, sizeof(ShadowMapData) / 4, &m_ShadowMapData, 0);
-			for (const ResolvedPrimitiveBinding& binding : object->GetResolvedPrimitiveBindings())
-			{
-				if (!binding.Primitive)
-					continue;
 
-				auto vertexBufferView = binding.Primitive->GetVertexBufferView();
-				auto indexBufferView = binding.Primitive->GetIndexBufferView();
+			if (item.Primitive != lastPrimitive)
+			{
+				auto vertexBufferView = item.Primitive->GetVertexBufferView();
+				auto indexBufferView  = item.Primitive->GetIndexBufferView();
 				m_CommandList.IASetVertexBuffers(0, 1, &vertexBufferView);
 				m_CommandList.IASetIndexBuffer(&indexBufferView);
-				m_CommandList.DrawIndexedInstanced(binding.Primitive->GetIndexCount(), 1, binding.Primitive->GetFirstIndex(), binding.Primitive->GetBaseVertex(), 0);
+				lastPrimitive = item.Primitive;
 			}
+
+			m_CommandList.DrawIndexedInstanced(item.IndexCount, 1, item.FirstIndex, item.BaseVertex, 0);
 		}
 		barrier = CD3DX12_RESOURCE_BARRIER::Transition(
 			shadowMap->GetResource(),
@@ -200,28 +201,29 @@ namespace DX12Engine
 
 			m_CommandList.IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
-			for (RenderComponent* object : m_RenderObjects)
+			// Reset the mesh cache: each cube face uses a fresh command list.
+			MeshPrimitive* lastPrimitive = nullptr;
+			for (const DrawItem& item : m_DrawItems)
 			{
-				if (!object)
+				if (!item.Primitive)
 					continue;
 
-				DirectX::XMMATRIX mvpMatrix = DirectX::XMMatrixMultiply(object->GetModelMatrix(), lightViewProj);
+				DirectX::XMMATRIX mvpMatrix = DirectX::XMMatrixMultiply(item.ModelMatrix, lightViewProj);
 				m_ShadowMapData.LightMVPMatrix = mvpMatrix;
-				m_ShadowMapData.ModelMatrix = object->GetModelMatrix();
+				m_ShadowMapData.ModelMatrix = item.ModelMatrix;
 				m_ShadowMapData.LightPos = m_Lights[lightIndex]->GetLightData().Position;
-
 				m_CommandList.SetGraphicsRoot32BitConstants(0, sizeof(ShadowMapData) / 4, &m_ShadowMapData, 0);
-				for (const ResolvedPrimitiveBinding& binding : object->GetResolvedPrimitiveBindings())
-				{
-					if (!binding.Primitive)
-						continue;
 
-					auto vertexBufferView = binding.Primitive->GetVertexBufferView();
-					auto indexBufferView = binding.Primitive->GetIndexBufferView();
+				if (item.Primitive != lastPrimitive)
+				{
+					auto vertexBufferView = item.Primitive->GetVertexBufferView();
+					auto indexBufferView = item.Primitive->GetIndexBufferView();
 					m_CommandList.IASetVertexBuffers(0, 1, &vertexBufferView);
 					m_CommandList.IASetIndexBuffer(&indexBufferView);
-					m_CommandList.DrawIndexedInstanced(binding.Primitive->GetIndexCount(), 1, binding.Primitive->GetFirstIndex(), binding.Primitive->GetBaseVertex(), 0);
+					lastPrimitive = item.Primitive;
 				}
+
+				m_CommandList.DrawIndexedInstanced(item.IndexCount, 1, item.FirstIndex, item.BaseVertex, 0);
 			}
 			barrier = CD3DX12_RESOURCE_BARRIER::Transition(
 				shadowMap->GetResource(),

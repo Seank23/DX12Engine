@@ -22,6 +22,7 @@
 #include "../Rendering/PipelineStateCache.h"
 #include "../Rendering/RootSignatureCache.h"
 #include "../IO/TextureLoader.h"
+#include "Materials/PBRMaterial.h"
 
 namespace DX12Engine
 {
@@ -40,6 +41,8 @@ namespace DX12Engine
 		~ResourceManager();
 
 	public:
+		Material* GetDefaultMaterial() const { return m_DefaultMaterial.get(); }
+
 		std::unique_ptr<VertexBuffer> CreateVertexBuffer(const std::vector<Vertex>& vertices);
 		std::unique_ptr<IndexBuffer> CreateIndexBuffer(const std::vector<UINT>& indices);
 		std::unique_ptr<ConstantBuffer> CreateConstantBuffer(const UINT bufferSize);
@@ -71,6 +74,7 @@ namespace DX12Engine
 		std::unique_ptr<PipelineStateCache> m_PipelineStateCache;
 		std::unique_ptr<RootSignatureCache> m_RootSignatureCache;
 		std::unordered_map<std::string, std::unique_ptr<Shader>> m_Shaders;
+		std::unique_ptr<PBRMaterial> m_DefaultMaterial;
 	};
 }
 

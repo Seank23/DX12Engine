@@ -1,5 +1,6 @@
 #pragma once
 #include "RenderPass.h"
+#include "../DrawItem.h"
 
 namespace DX12Engine
 {
@@ -14,6 +15,8 @@ namespace DX12Engine
 
 		RenderTexture* GetRenderTarget(RenderTargetType type) override;
 
+		void SetDrawItems(const std::vector<DrawItem>& drawItems) { m_DrawItems = drawItems; }
+
 	private:
 		void CreateGeometryPassPSO();
 
@@ -22,6 +25,8 @@ namespace DX12Engine
 
 		Microsoft::WRL::ComPtr<ID3D12RootSignature> m_RootSignature;
 		Microsoft::WRL::ComPtr<ID3D12PipelineState> m_PipelineState;
+
+		std::vector<DrawItem> m_DrawItems;
 	};
 }
 

@@ -4,8 +4,9 @@
 namespace DX12Engine
 {
 	PBRMaterial::PBRMaterial()
-		: Material()
+		: Material(sizeof(PBRMaterialData))
 	{
+		UpdateConstantBufferData(&m_MaterialData, sizeof(m_MaterialData));
 	}
 
 	PBRMaterial::~PBRMaterial()
@@ -52,8 +53,9 @@ namespace DX12Engine
 	void PBRMaterial::Bind(ID3D12GraphicsCommandList* commandList, int* startIndex)
 	{
 		Material::Bind(commandList, startIndex);
-		if (HasTexture(TextureType::Albedo))
-			commandList->SetGraphicsRootDescriptorTable((*startIndex)++, m_AlbedoMap->GetGPUHandle());
+		if (HasTextureTable())
+			commandList->SetGraphicsRootDescriptorTable(*startIndex, GetTextureTableHandle());
+		(*startIndex)++;
 	}
 
 	void PBRMaterial::SetAllTextures(std::unordered_map<TextureType, std::shared_ptr<Texture>> textures)
@@ -81,33 +83,68 @@ namespace DX12Engine
 		}
 	}
 
+	void PBRMaterial::SetAlbedoMap(std::shared_ptr<Texture> texture)
+	{
+		m_AlbedoMap = texture;
+		m_MaterialData.HasAlbedoMap = texture ? 1 : 0;
+		UpdateConstantBufferData(&m_MaterialData, sizeof(m_MaterialData));
+	}
+
+	void PBRMaterial::SetNormalMap(std::shared_ptr<Texture> texture)
+	{
+		m_NormalMap = texture;
+		m_MaterialData.HasNormalMap = texture ? 1 : 0;
+		UpdateConstantBufferData(&m_MaterialData, sizeof(m_MaterialData));
+	}
+
+	void PBRMaterial::SetMetallicMap(std::shared_ptr<Texture> texture)
+	{
+		m_MetallicMap = texture;
+		m_MaterialData.HasMetallicMap = texture ? 1 : 0;
+		UpdateConstantBufferData(&m_MaterialData, sizeof(m_MaterialData));
+	}
+
+	void PBRMaterial::SetRoughnessMap(std::shared_ptr<Texture> texture)
+	{
+		m_RoughnessMap = texture;
+		m_MaterialData.HasRoughnessMap = texture ? 1 : 0;
+		UpdateConstantBufferData(&m_MaterialData, sizeof(m_MaterialData));
+	}
+
+	void PBRMaterial::SetAOMap(std::shared_ptr<Texture> texture)
+	{
+		m_AOMap = texture;
+		m_MaterialData.HasAOMap = texture ? 1 : 0;
+		UpdateConstantBufferData(&m_MaterialData, sizeof(m_MaterialData));
+	}
+
 	void PBRMaterial::SetAlbedo(DirectX::XMFLOAT3 albedo)
 	{
 		m_MaterialData.Albedo = albedo;
-		UpdateConstantBufferData(m_MaterialData);
+		UpdateConstantBufferData(&m_MaterialData, sizeof(m_MaterialData));
 	}
 
 	void PBRMaterial::SetMetallic(float metallic)
 	{
 		m_MaterialData.Metallic = metallic;
-		UpdateConstantBufferData(m_MaterialData);
+		UpdateConstantBufferData(&m_MaterialData, sizeof(m_MaterialData));
 	}
 
 	void PBRMaterial::SetRoughness(float roughness)
 	{
 		m_MaterialData.Roughness = roughness;
-		UpdateConstantBufferData(m_MaterialData);
+		UpdateConstantBufferData(&m_MaterialData, sizeof(m_MaterialData));
 	}
 
 	void PBRMaterial::SetAO(float ao)
 	{
 		m_MaterialData.AO = ao;
-		UpdateConstantBufferData(m_MaterialData);
+		UpdateConstantBufferData(&m_MaterialData, sizeof(m_MaterialData));
 	}
 
 	void PBRMaterial::SetEmissive(DirectX::XMFLOAT3 emissive)
 	{
 		m_MaterialData.Emissive = emissive;
-		UpdateConstantBufferData(m_MaterialData);
+		UpdateConstantBufferData(&m_MaterialData, sizeof(m_MaterialData));
 	}
 }

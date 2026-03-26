@@ -2,6 +2,7 @@
 #include "../../Resources/ResourceManager.h"
 #include "../RenderContext.h"
 #include "../../Entity/RenderComponent.h"
+#include "../../Asset/MeshPrimitive.h"
 #include <unordered_set>
 
 namespace DX12Engine
@@ -41,30 +42,42 @@ namespace DX12Engine
     {
 		RenderPass::Execute();
 
-		// Populate transient shader-visible handles for all ready material textures so
-		// that material->Bind() can call SetGraphicsRootDescriptorTable with a valid GPU
-		// handle for the current frame. Deduplicate via a set so shared textures only
-		// consume one transient slot each.
-		std::vector<GPUResource*> materialTextures;
+		// For each unique material, upload its textures as a contiguous block of
+		// exactly 5 slots (one per TextureType in order) into the transient heap.
+		// This lets a single SetGraphicsRootDescriptorTable call cover t0..t4.
+		// Materials with no textures at all skip the upload and leave the table unset.
 		{
-			std::unordered_set<Texture*> seen;
-			for (RenderComponent* object : m_RenderObjects)
+			std::unordered_set<Material*> seen;
+			for (const DrawItem& item : m_DrawItems)
 			{
-				if (!object) continue;
-				for (const ResolvedPrimitiveBinding& binding : object->GetResolvedPrimitiveBindings())
+				if (!item.Material || !seen.insert(item.Material).second)
+					continue;
+
+				item.Material->ClearTextureTable();
+
+				std::vector<GPUResource*> block;
+				block.reserve(5);
+				for (int i = 0; i < 5; i++)
 				{
-					if (!binding.Material) continue;
-					for (int i = 0; i < 5; i++)
-					{
-						Texture* tex = binding.Material->GetTexture(static_cast<TextureType>(i));
-						if (tex && tex->GetIsReady() && seen.insert(tex).second)
-							materialTextures.push_back(tex);
-					}
+					Texture* tex = item.Material->GetTexture(static_cast<TextureType>(i));
+					if (tex && tex->GetIsReady())
+						block.push_back(tex);
+				}
+
+				if (!block.empty())
+				{
+					// Pad to exactly 5 slots so the table always covers t0..t4.
+					// Missing slots are filled by repeating the first ready texture —
+					// the shader's HasTexture flags prevent sampling them.
+					GPUResource* padding = block.front();
+					while (block.size() < 5)
+						block.push_back(padding);
+
+					DescriptorHeapHandle base = ResourceManager::GetInstance().UpdateSRVDescriptors(block);
+					item.Material->SetTextureTableHandle(base.GetGPUHandle());
 				}
 			}
 		}
-		if (!materialTextures.empty())
-			ResourceManager::GetInstance().UpdateSRVDescriptors(materialTextures);
 
 		m_CommandList.SetPipelineState(m_PipelineState.Get());
 		m_CommandList.SetGraphicsRootSignature(m_RootSignature.Get());
@@ -108,27 +121,38 @@ namespace DX12Engine
         auto srvHeap = m_RenderContext.GetHeapManager().GetRenderPassHeap().GetHeap();
         m_CommandList.SetDescriptorHeaps(1, &srvHeap);
 
-        for (RenderComponent* object : m_RenderObjects)
+		D3D12_GPU_VIRTUAL_ADDRESS lastCBV      = 0;
+		Material*                lastMaterial  = nullptr;
+		MeshPrimitive*           lastPrimitive = nullptr;
+
+        for (const DrawItem& item : m_DrawItems)
         {
-            if (!object)
+            if (!item.Primitive || !item.Material)
                 continue;
 
-            m_CommandList.SetGraphicsRootConstantBufferView(0, object->GetCBVAddress());
-
-            for (const ResolvedPrimitiveBinding& binding : object->GetResolvedPrimitiveBindings())
+            if (item.CBVAddress != lastCBV)
             {
-                if (!binding.Primitive || !binding.Material)
-                    continue;
+                m_CommandList.SetGraphicsRootConstantBufferView(0, item.CBVAddress);
+                lastCBV = item.CBVAddress;
+            }
 
+            if (item.Material != lastMaterial)
+            {
                 int startIndex = 1;
-				binding.Material->Bind(&m_CommandList, &startIndex);
+                item.Material->Bind(&m_CommandList, &startIndex);
+                lastMaterial = item.Material;
+            }
 
-                auto vertexBufferView = binding.Primitive->GetVertexBufferView();
-                auto indexBufferView = binding.Primitive->GetIndexBufferView();
+            if (item.Primitive != lastPrimitive)
+            {
+                auto vertexBufferView = item.Primitive->GetVertexBufferView();
+                auto indexBufferView  = item.Primitive->GetIndexBufferView();
                 m_CommandList.IASetVertexBuffers(0, 1, &vertexBufferView);
                 m_CommandList.IASetIndexBuffer(&indexBufferView);
-                m_CommandList.DrawIndexedInstanced(binding.Primitive->GetIndexCount(), 1, binding.Primitive->GetFirstIndex(), binding.Primitive->GetBaseVertex(), 0);
+                lastPrimitive = item.Primitive;
             }
+
+            m_CommandList.DrawIndexedInstanced(item.IndexCount, 1, item.FirstIndex, item.BaseVertex, 0);
         }
         for (int i = 0; i < m_RenderTargets.size(); i++)
         {
@@ -175,7 +199,7 @@ namespace DX12Engine
             .SetRenderTargets({ DXGI_FORMAT_R8G8B8A8_UNORM, DXGI_FORMAT_R16G16B16A16_FLOAT, DXGI_FORMAT_R16G16B16A16_FLOAT, DXGI_FORMAT_R16G16B16A16_FLOAT, DXGI_FORMAT_R16G16B16A16_FLOAT })
             .SetDepthStencilFormat(DXGI_FORMAT_D32_FLOAT);
 
-        DescriptorTableConfig config(m_RenderTargets.size(), D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 0);
+        DescriptorTableConfig config(5, D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 0);
         rootSignatureBuilder = rootSignatureBuilder.AddConstantBuffer(0)
             .AddConstantBuffer(1)
             .AddDescriptorTables({ config })

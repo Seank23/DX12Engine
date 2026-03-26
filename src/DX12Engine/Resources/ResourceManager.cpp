@@ -1,4 +1,5 @@
 #include "ResourceManager.h"
+#include "Materials/PBRMaterial.h"
 #include "../Rendering/Heaps/DescriptorHeapManager.h"
 #include "../Utils/EngineUtils.h"
 #include "../Utils/Constants.h"
@@ -49,6 +50,10 @@ namespace DX12Engine
 		m_GPUUploader = &(context.GetUploader());
 		m_PipelineStateCache = std::make_unique<PipelineStateCache>(m_Device.Get());
 		m_RootSignatureCache = std::make_unique<RootSignatureCache>(m_Device.Get());
+		m_DefaultMaterial = std::make_unique<PBRMaterial>();
+		m_DefaultMaterial->SetAlbedo({ 1.0f, 0.0f, 1.0f });
+		m_DefaultMaterial->SetMetallic(0.0f);
+		m_DefaultMaterial->SetRoughness(0.8f);
 	}
 
 	std::unique_ptr<VertexBuffer> ResourceManager::CreateVertexBuffer(const std::vector<Vertex>& vertices)

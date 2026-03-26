@@ -17,11 +17,11 @@ namespace DX12Engine
 
 		virtual void SetAllTextures(std::unordered_map<TextureType, std::shared_ptr<Texture>> textures) override;
 
-		void SetAlbedoMap(std::shared_ptr<Texture> albedoMap) { m_AlbedoMap = albedoMap; }
-		void SetNormalMap(std::shared_ptr<Texture> normalMap) { m_NormalMap = normalMap; }
-		void SetMetallicMap(std::shared_ptr<Texture> metallicMap) { m_MetallicMap = metallicMap; }
-		void SetRoughnessMap(std::shared_ptr<Texture> roughnessMap) { m_RoughnessMap = roughnessMap; }
-		void SetAOMap(std::shared_ptr<Texture> aoMap) { m_AOMap = aoMap; }
+		void SetAlbedoMap(std::shared_ptr<Texture> texture);
+		void SetNormalMap(std::shared_ptr<Texture> texture);
+		void SetMetallicMap(std::shared_ptr<Texture> texture);
+		void SetRoughnessMap(std::shared_ptr<Texture> texture);
+		void SetAOMap(std::shared_ptr<Texture> texture);
 
 		void SetAlbedo(DirectX::XMFLOAT3 albedo);
 		void SetMetallic(float metallic);
