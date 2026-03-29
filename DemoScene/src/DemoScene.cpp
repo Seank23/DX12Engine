@@ -21,7 +21,7 @@ namespace DX12EngineDemo
 
 	void DemoScene::Init()
 	{
-		m_Camera = std::make_unique<DX12Engine::Camera>(m_WindowSize.x / m_WindowSize.y, 1.0f, 100.0f);
+		m_Camera = std::make_unique<DX12Engine::Camera>(m_WindowSize.x / m_WindowSize.y, 0.1f, 100.0f);
 		m_Camera->SetPosition({ 5.0f, 1.0f, -10.0f });
 		m_Camera->SetRotation(5.0f, 115.0f);
 		m_Camera->SetSpeed(5.0f);

@@ -101,7 +101,6 @@ float ShadowPCF(int lightIndex, float4 lightSpacePos, float softRadius)
     float3 texSize;
     shadowMaps.GetDimensions(texSize.x, texSize.y, texSize.z);
     float texelSize = 1.0 / texSize.x;
-    float radius = texelSize * softRadius;
     
     float depth = lightSpacePos.z / lightSpacePos.w;
     float2 shadowUV = (lightSpacePos.xy / lightSpacePos.w) * 0.5 + 0.5;
@@ -109,19 +108,35 @@ float ShadowPCF(int lightIndex, float4 lightSpacePos, float softRadius)
     
     if (shadowUV.x < 0.0 || shadowUV.x > 1.0 || shadowUV.y < 0.0 || shadowUV.y > 1.0 || depth < 0.0 || depth > 1.0)
         return 1.0;
-    
-    float shadow = 0.0f;
-    for (int y = -1; y <= 1; y++)
+
+    // 16-tap Poisson disk — irregular spacing breaks up the banding
+    // that a regular grid produces at the shadow penumbra edge.
+    static const float2 poissonDisk[16] =
     {
-        for (int x = -1; x <= 1; x++)
-        {
-            float2 transformedUV = shadowUV + float2(x, y) * radius;
-            shadow += shadowMaps.SampleCmpLevelZero(shadowSampler, float3(transformedUV, lightIndex), depth);
-        }
-    }
-    shadow /= 9.0;
-    
-    return shadow;
+        float2(-0.94201624,  -0.39906216),
+        float2( 0.94558609,  -0.76890725),
+        float2(-0.09418410,  -0.92938870),
+        float2( 0.34495938,   0.29387760),
+        float2(-0.91588581,   0.45771432),
+        float2(-0.81544232,  -0.87912464),
+        float2(-0.38277543,   0.27676845),
+        float2( 0.97484398,   0.75648379),
+        float2( 0.44323325,  -0.97511554),
+        float2( 0.53742981,  -0.47373420),
+        float2(-0.26496911,  -0.41893023),
+        float2( 0.79197514,   0.19090188),
+        float2(-0.24188840,   0.99706507),
+        float2(-0.81409955,   0.91437590),
+        float2( 0.19984126,   0.78641367),
+        float2( 0.14383161,  -0.14100790)
+    };
+
+    float radius = texelSize * softRadius;
+    float shadow = 0.0;
+    [unroll]
+    for (int k = 0; k < 16; k++)
+        shadow += shadowMaps.SampleCmpLevelZero(shadowSampler, float3(shadowUV + poissonDisk[k] * radius, lightIndex), depth);
+    return shadow / 16.0;
 }
 
 float PointLightShadowPCF(float3 worldPos, float3 lightPos, float softRadius, float3 normal, float farPlane)
@@ -163,7 +178,7 @@ float4 main(PSInput input) : SV_TARGET
     float3 albedo = albedoMap.Sample(samp, input.texCoord);
     float3 worldNormal = worldNormalMap.Sample(samp, input.texCoord);
     float3 objectNormal = objectNormalMap.Sample(samp, input.texCoord);
-    float roughness = materialMap.Sample(samp, input.texCoord).r;
+    float roughness = 1.0 - materialMap.Sample(samp, input.texCoord).r;
     float metallic = materialMap.Sample(samp, input.texCoord).g;
     float ao = materialMap.Sample(samp, input.texCoord).b;
     float depth = depthMap.Sample(samp, input.texCoord).r;
@@ -195,7 +210,7 @@ float4 main(PSInput input) : SV_TARGET
         if (Lights[i].Type == 0) // Directional Light
         {
             lightContribution = PBRLighting(albedo, metallic, roughness, ao, worldNormal, V, normalize(-Lights[i].Direction), Lights[i]);
-            shadowFactor = ShadowPCF(i, lightSpacePosition, 2.0);
+            shadowFactor = ShadowPCF(i, lightSpacePosition, 15.0);
             ambientShadow = min(ambientShadow, shadowFactor);
         }
         else if (Lights[i].Type == 1) // Point Light
@@ -220,6 +235,10 @@ float4 main(PSInput input) : SV_TARGET
         }
         finalColor += lightContribution * shadowFactor;
     }
-    finalColor += indirectDiffuse * ambientShadow;
-	return float4(finalColor, 1.0f);
+    // Apply the shadow-to-ambient gradient once on the accumulated result so the
+    // full 0..1 PCF range maps smoothly to the min/max ambient levels.
+    float smoothShadow = smoothstep(0.0, 1.0, ambientShadow);
+    float remappedShadow = lerp(0.25, 1.0, smoothShadow);
+    finalColor += indirectDiffuse * remappedShadow;
+    return float4(finalColor, 1.0f);
 }

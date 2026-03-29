@@ -249,22 +249,26 @@ namespace DX12Engine
 			if (!comp)
 				continue;
 
-			comp->UpdateConstantBufferData(sceneCamera->GetViewMatrix(), sceneCamera->GetProjectionMatrix(), sceneCamera->GetPosition());
-			for (const ResolvedPrimitiveBinding& binding : comp->GetResolvedPrimitiveBindings())
+		for (ResolvedPrimitiveBinding& binding : comp->GetResolvedPrimitiveBindings())
 			{
 				Material* material = binding.Material;
-				if (!material)
+				if (!material || !binding.PrimitiveConstantBuffer)
 					continue;
+
+				DirectX::XMMATRIX nodeWorldTransform = DirectX::XMLoadFloat4x4(&binding.NodeWorldTransform);
+				DirectX::XMMATRIX modelMatrix = nodeWorldTransform * comp->GetModelMatrix();
+				comp->UpdateConstantBufferData(*binding.PrimitiveConstantBuffer, modelMatrix,
+					sceneCamera->GetViewMatrix(), sceneCamera->GetProjectionMatrix(), sceneCamera->GetPosition());
 
 				DrawItem item{};
 				item.Primitive    = binding.Primitive;
 				item.Material     = material;
-				item.CBVAddress   = comp->GetCBVAddress();
+				item.CBVAddress   = binding.CBVAddress;
 				item.IndexCount   = binding.Primitive->GetIndexCount();
 				item.FirstIndex   = binding.Primitive->GetFirstIndex();
 				item.BaseVertex   = binding.Primitive->GetBaseVertex();
-				item.ModelMatrix  = comp->GetModelMatrix();
-				item.PipelineKey  = 0; // single PSO variant for now
+				item.ModelMatrix  = modelMatrix;
+				item.PipelineKey  = 0;
 				item.MaterialKey  = reinterpret_cast<uint64_t>(material);
 				item.MeshKey      = reinterpret_cast<uint64_t>(binding.Primitive);
 				drawItems.push_back(item);

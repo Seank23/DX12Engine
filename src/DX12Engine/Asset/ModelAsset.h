@@ -75,6 +75,15 @@ namespace DX12Engine
 			return m_Materials[index].get();
 		}
 
+		MaterialAsset* GetMaterial(std::string name) const
+		{
+			auto matIt = std::find_if(m_Materials.begin(), m_Materials.end(),
+				[&name](const std::shared_ptr<MaterialAsset>& mat) { return mat && mat->GetName() == name; });
+			if (matIt == m_Materials.end() || *matIt == nullptr)
+				return nullptr;
+			return (*matIt).get();
+		}
+
 		ModelNode* GetNode(std::size_t index)
 		{
 			if (index >= m_Nodes.size())

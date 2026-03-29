@@ -2,6 +2,8 @@
 
 #include <windowsx.h>
 
+#include "DemoScene.h"
+#include "ComplexDemoScene.h"
 #include "DX12Engine/Rendering/RenderPipelineConfig.h"
 
 namespace DX12EngineDemo

@@ -42,10 +42,10 @@ PSOutput main(PSInput input)
 {
     PSOutput output;
 
-    float3 baseColor = HasAlbedoMap   ? (float3)albedoMap.Sample(samp, input.uv)    : Albedo;
-    float  metallic  = HasMetallicMap ? (float)metallicMap.Sample(samp, input.uv).r  : Metallic;
-    float  roughness = HasRoughnessMap? (float)roughnessMap.Sample(samp, input.uv).r : Roughness;
-    float  ao        = HasAOMap       ? (float)aoMap.Sample(samp, input.uv).r        : AO;
+    float3 baseColor = HasAlbedoMap    ? (float3)albedoMap.Sample(samp, input.uv)     : Albedo;
+    float  metallic  = HasMetallicMap  ? (float)metallicMap.Sample(samp, input.uv).b  : Metallic;
+    float  roughness = HasRoughnessMap ? (float)roughnessMap.Sample(samp, input.uv).g : Roughness;
+    float  ao        = HasAOMap        ? (float)aoMap.Sample(samp, input.uv).r        : AO;
 
     float3 worldNormal;
     if (HasNormalMap)
@@ -59,10 +59,10 @@ PSOutput main(PSInput input)
         worldNormal = normalize(input.normal);
     }
 
-    output.albedo      = float4(baseColor, 1.0);
-    output.worldNormal = float4(worldNormal, 1.0);
-    output.objectNormal= float4(input.normal, 1.0);
-    output.material    = float4(roughness, metallic, ao, 1.0);
-    output.position    = float4(input.worldPos, 1.0);
+    output.albedo       = float4(baseColor, 1.0);
+    output.worldNormal  = float4(worldNormal, 1.0);
+    output.objectNormal = float4(input.normal, 1.0);
+    output.material     = float4(roughness, metallic, ao, 1.0);
+    output.position     = float4(input.worldPos, 1.0);
     return output;
 }

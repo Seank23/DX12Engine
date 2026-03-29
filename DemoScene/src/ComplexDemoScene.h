@@ -12,11 +12,11 @@ namespace DX12Engine
 
 namespace DX12EngineDemo
 {
-	class DemoScene : public DX12Engine::Scene
+	class ComplexDemoScene : public DX12Engine::Scene
 	{
 	public:
-		DemoScene(std::shared_ptr<DX12Engine::RenderContext> renderContext, std::shared_ptr<DX12Engine::PhysicsEngine> physicsEngine, DirectX::XMFLOAT2 windowSize);
-		~DemoScene() = default;
+		ComplexDemoScene(std::shared_ptr<DX12Engine::RenderContext> renderContext, std::shared_ptr<DX12Engine::PhysicsEngine> physicsEngine, DirectX::XMFLOAT2 windowSize);
+		~ComplexDemoScene() = default;
 
 		virtual void Init() override;
 		virtual void Update(float ts, float elapsed) override;
@@ -26,7 +26,5 @@ namespace DX12EngineDemo
 		std::shared_ptr<DX12Engine::RenderContext> m_RenderContext;
 		std::shared_ptr<DX12Engine::PhysicsEngine> m_PhysicsEngine;
 		DirectX::XMFLOAT2 m_WindowSize;
-		std::shared_ptr<DX12Engine::GameObject> m_Cube;
-		std::shared_ptr<DX12Engine::GameObject> m_Ball;
 	};
 }

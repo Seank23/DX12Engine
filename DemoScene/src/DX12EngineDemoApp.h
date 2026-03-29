@@ -6,7 +6,7 @@
 #include "DX12Engine/Rendering/RenderContext.h"
 #include "DX12Engine/Rendering/Renderer.h"
 #include "DX12Engine/Physics/PhysicsEngine.h"
-#include "DemoScene.h"
+#include "DX12Engine/Entity/Scene.h"
 #include "Input/DemoInputHandler.h"
 
 namespace DX12EngineDemo
@@ -25,7 +25,7 @@ namespace DX12EngineDemo
 		void OnResize(DirectX::XMFLOAT2 newSize);
 
 		std::unique_ptr<DemoInputHandler> m_InputHandler;
-		std::unique_ptr<DemoScene> m_Scene;
+		std::unique_ptr<DX12Engine::Scene> m_Scene;
 		std::unique_ptr<DX12Engine::Renderer> m_Renderer;
 		DX12Engine::RenderPipeline m_RenderPipeline;
 

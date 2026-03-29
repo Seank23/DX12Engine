@@ -30,6 +30,15 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(tinyobjloader)
 
+set(TINYGLTF_HEADER_ONLY ON CACHE INTERNAL "" FORCE)
+set(TINYGLTF_INSTALL OFF CACHE INTERNAL "" FORCE)
+FetchContent_Declare(
+  tinygltf
+  GIT_REPOSITORY https://github.com/syoyo/tinygltf.git
+  GIT_TAG        release
+)
+FetchContent_MakeAvailable(tinygltf)
+
 file(GLOB_RECURSE ENGINE_SOURCES CONFIGURE_DEPENDS
     src/*.cpp
     src/*.h
@@ -57,6 +66,7 @@ target_link_libraries(DX12Engine PUBLIC
 # Include headers
 target_include_directories(DX12Engine PRIVATE
     ${directx-headers_SOURCE_DIR}/include/directx
+    ${tinygltf_SOURCE_DIR}
 )
 
 foreach(SHADER ${ENGINE_SOURCES})
