@@ -12,6 +12,11 @@ cbuffer MaterialData : register(b1)
     float Roughness;
     float AO;
     float3 Emissive;
+    float BaseColorAlpha;
+    float NormalScale;
+    float OcclusionStrength;
+    int AlphaMode;
+    float AlphaCutoff;
     int HasAlbedoMap;
     int HasNormalMap;
     int HasMetallicMap;
@@ -38,15 +43,31 @@ struct PSOutput
     float4 position : SV_Target4;
 };
 
+float3 sRGBToLinear(float3 color)
+{
+    return pow(max(color, 0.0), 2.2);
+}
+
 PSOutput main(PSInput input)
 {
     PSOutput output;
 
-    float3 baseColor = HasAlbedoMap    ? (float3)albedoMap.Sample(samp, input.uv)     : Albedo;
+    float3 baseColor = HasAlbedoMap ? sRGBToLinear((float3) albedoMap.Sample(samp, input.uv)) : Albedo;
     float  metallic  = HasMetallicMap  ? (float)metallicMap.Sample(samp, input.uv).b  : Metallic;
     float  roughness = HasRoughnessMap ? (float)roughnessMap.Sample(samp, input.uv).g : Roughness;
     float  ao        = HasAOMap        ? (float)aoMap.Sample(samp, input.uv).r        : AO;
+    float  alpha     = HasAlbedoMap    ? (float)albedoMap.Sample(samp, input.uv).a * BaseColorAlpha : BaseColorAlpha;
 
+    float4 outputAlbedo = float4(baseColor, alpha);
+    if (AlphaMode == 1) // Mask
+    {
+        clip(alpha - AlphaCutoff);
+    }
+    else if (AlphaMode == 2) // Blend
+    {
+        outputAlbedo = float4(baseColor * BaseColorAlpha, alpha);
+    }
+    
     float3 worldNormal;
     if (HasNormalMap)
     {
@@ -58,8 +79,10 @@ PSOutput main(PSInput input)
     {
         worldNormal = normalize(input.normal);
     }
+    
+    ao = lerp(1.0, ao, OcclusionStrength);
 
-    output.albedo       = float4(baseColor, 1.0);
+    output.albedo       = outputAlbedo;
     output.worldNormal  = float4(worldNormal, 1.0);
     output.objectNormal = float4(input.normal, 1.0);
     output.material     = float4(roughness, metallic, ao, 1.0);

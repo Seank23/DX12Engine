@@ -39,7 +39,7 @@ namespace DX12Engine
 		m_PixelShaderName = m_PixelShaderName.empty() ? "PBRLightingDeferred_PS" : m_PixelShaderName;
 
 		DirectX::XMINT2 windowSize = m_RenderContext.GetWindowSize();
-		m_RenderTargets.emplace_back(ResourceManager::GetInstance().CreateRenderTargetTexture(windowSize, DXGI_FORMAT_R8G8B8A8_UNORM));
+		m_RenderTargets.emplace_back(ResourceManager::GetInstance().CreateRenderTargetTexture(windowSize, DXGI_FORMAT_R16G16B16A16_FLOAT));
 
 		m_Viewport = { 0.0f, 0.0f, (float)windowSize.x, (float)windowSize.y, -1.0f, 1.0f };
 		m_ScissorRect = { 0, 0, (LONG)windowSize.x, (LONG)windowSize.y };
@@ -117,7 +117,7 @@ namespace DX12Engine
 		pipelineStateBuilder = pipelineStateBuilder.SetBlendState(CD3DX12_BLEND_DESC(D3D12_DEFAULT))
 			.SetRasterizerState(CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT))
 			.SetPrimitiveTopologyType(D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE)
-			.SetRenderTargets({ DXGI_FORMAT_R8G8B8A8_UNORM })
+			.SetRenderTargets({ DXGI_FORMAT_R16G16B16A16_FLOAT })
 			.SetSampleDesc(UINT_MAX, 1, 0).SetVertexShader(ResourceManager::GetInstance().GetShader(m_VertexShaderName))
 			.SetPixelShader(ResourceManager::GetInstance().GetShader(m_PixelShaderName));
 

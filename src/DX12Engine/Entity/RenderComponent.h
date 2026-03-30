@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 #include "Component.h"
 #include "../Rendering/Buffers/VertexBuffer.h"
 #include "../Rendering/Buffers/IndexBuffer.h"
@@ -11,6 +11,7 @@
 namespace DX12Engine
 {
 	class MeshPrimitive;
+	class MaterialAsset;
 
 	struct RenderComponentData
 	{
@@ -30,7 +31,7 @@ namespace DX12Engine
 	struct ResolvedPrimitiveBinding
 	{
 		MeshPrimitive* Primitive = nullptr;
-		Material* Material = nullptr;
+		MaterialAsset* MaterialAsset = nullptr;
 		DirectX::XMFLOAT4X4 NodeWorldTransform = [](){
 			DirectX::XMFLOAT4X4 m{};
 			DirectX::XMStoreFloat4x4(&m, DirectX::XMMatrixIdentity());

@@ -79,9 +79,6 @@ namespace DX12Engine
 			}
 		}
 
-		m_CommandList.SetPipelineState(m_PipelineState.Get());
-		m_CommandList.SetGraphicsRootSignature(m_RootSignature.Get());
-
         m_CommandList.RSSetViewports(1, &m_Viewport);
         m_CommandList.RSSetScissorRects(1, &m_ScissorRect);
 
@@ -121,14 +118,34 @@ namespace DX12Engine
         auto srvHeap = m_RenderContext.GetHeapManager().GetRenderPassHeap().GetHeap();
         m_CommandList.SetDescriptorHeaps(1, &srvHeap);
 
-		D3D12_GPU_VIRTUAL_ADDRESS lastCBV      = 0;
-		Material*                lastMaterial  = nullptr;
-		MeshPrimitive*           lastPrimitive = nullptr;
+		D3D12_GPU_VIRTUAL_ADDRESS lastCBV = 0;
+		Material* lastMaterial = nullptr;
+		MeshPrimitive* lastPrimitive = nullptr;
+        uint64_t lastPipelineKey = -1;
 
         for (const DrawItem& item : m_DrawItems)
         {
             if (!item.Primitive || !item.Material)
                 continue;
+
+            //if (item.Template->GetBlendPolicy() == BlendPolicy::Blend)
+            //    continue;
+
+            if (item.PipelineKey == 0)
+            {
+                m_CommandList.SetPipelineState(m_PipelineState.Get());
+                m_CommandList.SetGraphicsRootSignature(m_RootSignature.Get());
+                lastCBV = 0;
+                lastMaterial = nullptr;
+            }
+            else if (item.PipelineKey != lastPipelineKey)
+            {
+                m_CommandList.SetPipelineState(item.Template->GetPipelineState());
+                m_CommandList.SetGraphicsRootSignature(item.Template->GetRootSignature());
+				lastPipelineKey = item.PipelineKey;
+				lastCBV = 0;
+				lastMaterial = nullptr;
+            }
 
             if (item.CBVAddress != lastCBV)
             {
@@ -195,12 +212,19 @@ namespace DX12Engine
         PipelineStateBuilder pipelineStateBuilder;
         RootSignatureBuilder rootSignatureBuilder;
 
-        pipelineStateBuilder = pipelineStateBuilder.ConfigureFromDefault(ResourceManager::GetInstance().GetShader(m_VertexShaderName), ResourceManager::GetInstance().GetShader(m_PixelShaderName))
-            .SetRenderTargets({ DXGI_FORMAT_R8G8B8A8_UNORM, DXGI_FORMAT_R16G16B16A16_FLOAT, DXGI_FORMAT_R16G16B16A16_FLOAT, DXGI_FORMAT_R16G16B16A16_FLOAT, DXGI_FORMAT_R16G16B16A16_FLOAT })
+        pipelineStateBuilder = pipelineStateBuilder
+            .ConfigureFromDefault(ResourceManager::GetInstance().GetShader(m_VertexShaderName), ResourceManager::GetInstance().GetShader(m_PixelShaderName))
+            .SetRenderTargets({
+                DXGI_FORMAT_R8G8B8A8_UNORM,
+                DXGI_FORMAT_R16G16B16A16_FLOAT,
+                DXGI_FORMAT_R16G16B16A16_FLOAT,
+                DXGI_FORMAT_R16G16B16A16_FLOAT,
+                DXGI_FORMAT_R16G16B16A16_FLOAT })
             .SetDepthStencilFormat(DXGI_FORMAT_D32_FLOAT);
 
         DescriptorTableConfig config(5, D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 0);
-        rootSignatureBuilder = rootSignatureBuilder.AddConstantBuffer(0)
+        rootSignatureBuilder = rootSignatureBuilder
+            .AddConstantBuffer(0)
             .AddConstantBuffer(1)
             .AddDescriptorTables({ config })
             .AddSampler(0, D3D12_FILTER_ANISOTROPIC);

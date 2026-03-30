@@ -28,6 +28,11 @@ namespace DX12Engine
 		void SetRoughness(float roughness);
 		void SetAO(float ao);
 		void SetEmissive(DirectX::XMFLOAT3 emissive);
+		void SetBaseColorAlpha(float alpha);
+		void SetNormalScale(float scale);
+		void SetOcclusionStrength(float strength);
+		void SetAlphaMode(int mode);
+		void SetAlphaCutoff(float cutoff);
 
 	private:
 		PBRMaterialData m_MaterialData;

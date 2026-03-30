@@ -28,10 +28,9 @@ namespace DX12EngineDemo
 
 		m_LightBuffer = std::make_unique<DX12Engine::LightBuffer>();
 		std::shared_ptr<DX12Engine::Light> sunLight = std::make_shared<DX12Engine::Light>();
-		sunLight->SetType((int)DX12Engine::LightType::Directional);
-		sunLight->SetDirection({ 0.2f, -0.5f, 0.2f });
-		sunLight->SetIntensity(2.0f);
-		//sunLight->SetColor({ 0.9f, 0.95f, 1.0f });
+		sunLight->SetDirection({ 0.45f, -0.577f, 0.577f });
+		sunLight->SetIntensity(5.0f);
+		sunLight->SetColor({ 1.0f, 0.85f, 0.8f });
 		m_LightBuffer->AddLight(sunLight);
 		std::shared_ptr<DX12Engine::Light> pointLight = std::make_shared<DX12Engine::Light>();
 		pointLight->SetType((int)DX12Engine::LightType::Point);
@@ -50,8 +49,8 @@ namespace DX12EngineDemo
 		//m_LightBuffer->AddLight(spotLight);
 
 		DX12Engine::TextureLoader textureLoader;
-		m_SkyboxCubemap = textureLoader.LoadCubemapDDS(DX12Engine::ResourceManager::GetMaterialPath("skybox/skybox2_cubemap.dds"));
-		m_SkyboxIrradiance = textureLoader.LoadCubemapDDS(DX12Engine::ResourceManager::GetMaterialPath("skybox/skybox2_irradiance.dds"));
+		m_SkyboxCubemap = textureLoader.LoadCubemapDDS(DX12Engine::ResourceManager::GetMaterialPath("skybox/skybox_cubemap.dds"));
+		m_SkyboxIrradiance = textureLoader.LoadCubemapDDS(DX12Engine::ResourceManager::GetMaterialPath("skybox/skybox_irradiance.dds"));
 
 		auto wornMetalTextures = textureLoader.LoadMaterial(DX12Engine::ResourceManager::GetMaterialPath("worn-shiny-metal-ue"));
 

@@ -147,4 +147,34 @@ namespace DX12Engine
 		m_MaterialData.Emissive = emissive;
 		UpdateConstantBufferData(&m_MaterialData, sizeof(m_MaterialData));
 	}
+
+	void PBRMaterial::SetBaseColorAlpha(float alpha)
+	{
+		m_MaterialData.BaseColorAlpha = alpha;
+		UpdateConstantBufferData(&m_MaterialData, sizeof(m_MaterialData));
+	}
+
+	void PBRMaterial::SetNormalScale(float scale)
+	{
+		m_MaterialData.NormalScale = scale;
+		UpdateConstantBufferData(&m_MaterialData, sizeof(m_MaterialData));
+	}
+
+	void PBRMaterial::SetOcclusionStrength(float strength)
+	{
+		m_MaterialData.OcclusionStrength = strength;
+		UpdateConstantBufferData(&m_MaterialData, sizeof(m_MaterialData));
+	}
+
+	void PBRMaterial::SetAlphaMode(int mode)
+	{
+		m_MaterialData.AlphaMode = mode;
+		UpdateConstantBufferData(&m_MaterialData, sizeof(m_MaterialData));
+	}
+
+	void PBRMaterial::SetAlphaCutoff(float cutoff)
+	{
+		m_MaterialData.AlphaCutoff = cutoff;
+		UpdateConstantBufferData(&m_MaterialData, sizeof(m_MaterialData));
+	}
 }

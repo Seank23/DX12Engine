@@ -106,9 +106,9 @@ namespace DX12Engine
 				if (!material)
 					material = ResourceManager::GetInstance().GetDefaultMaterial();
 
-			ResolvedPrimitiveBinding binding;
-			binding.Primitive = &primitive;
-				binding.Material = material;
+				ResolvedPrimitiveBinding binding;
+				binding.Primitive = &primitive;
+				binding.MaterialAsset = materialAsset;
 				binding.NodeWorldTransform = nodeWorldTransforms[ni];
 				m_ResolvedPrimitiveBindings.push_back(std::move(binding));
 			}
@@ -138,7 +138,7 @@ namespace DX12Engine
 
 					ResolvedPrimitiveBinding binding;
 					binding.Primitive = &primitive;
-					binding.Material = material;
+					binding.MaterialAsset = materialAsset;
 					binding.NodeWorldTransform = identity;
 					m_ResolvedPrimitiveBindings.push_back(std::move(binding));
 				}

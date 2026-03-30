@@ -249,9 +249,10 @@ namespace DX12Engine
 			if (!comp)
 				continue;
 
-		for (ResolvedPrimitiveBinding& binding : comp->GetResolvedPrimitiveBindings())
+			for (ResolvedPrimitiveBinding& binding : comp->GetResolvedPrimitiveBindings())
 			{
-				Material* material = binding.Material;
+				MaterialTemplate* tmpl = binding.MaterialAsset ? binding.MaterialAsset->GetTemplate() : nullptr;
+				Material* material = binding.MaterialAsset ? binding.MaterialAsset->GetMaterial() : nullptr;
 				if (!material || !binding.PrimitiveConstantBuffer)
 					continue;
 
@@ -260,15 +261,19 @@ namespace DX12Engine
 				comp->UpdateConstantBufferData(*binding.PrimitiveConstantBuffer, modelMatrix,
 					sceneCamera->GetViewMatrix(), sceneCamera->GetProjectionMatrix(), sceneCamera->GetPosition());
 
+				if (tmpl && !tmpl->HasResolvedPSO())
+					tmpl->ResolvePSO();
+
 				DrawItem item{};
 				item.Primitive    = binding.Primitive;
 				item.Material     = material;
+				item.Template     = tmpl;
 				item.CBVAddress   = binding.CBVAddress;
 				item.IndexCount   = binding.Primitive->GetIndexCount();
 				item.FirstIndex   = binding.Primitive->GetFirstIndex();
 				item.BaseVertex   = binding.Primitive->GetBaseVertex();
 				item.ModelMatrix  = modelMatrix;
-				item.PipelineKey  = 0;
+				item.PipelineKey  = tmpl ? tmpl->GetPipelineKey() : 0;
 				item.MaterialKey  = reinterpret_cast<uint64_t>(material);
 				item.MeshKey      = reinterpret_cast<uint64_t>(binding.Primitive);
 				drawItems.push_back(item);

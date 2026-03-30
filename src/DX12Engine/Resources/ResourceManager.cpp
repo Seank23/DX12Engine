@@ -183,7 +183,7 @@ namespace DX12Engine
 		return constantBuffer;
 	}
 
-	std::unique_ptr<Texture> ResourceManager::CreateTexture(const DirectX::ScratchImage* imageData)
+	std::unique_ptr<Texture> ResourceManager::CreateTexture(DirectX::ScratchImage* imageData)
 	{
 		const DirectX::Image* image = imageData->GetImage(0, 0, 0);
 
@@ -251,10 +251,10 @@ namespace DX12Engine
 
 		DescriptorHeapHandle srvHandle = m_HeapManager->AllocatePersistentSRV();
 
-		return std::make_unique<Texture>(textureResource, textureUploadResource, D3D12_RESOURCE_STATE_COPY_DEST, textureData, srvHandle, srvDesc, false);
+		return std::make_unique<Texture>(imageData, textureResource, textureUploadResource, D3D12_RESOURCE_STATE_COPY_DEST, textureData, srvHandle, srvDesc, false);
 	}
 
-	std::unique_ptr<Texture> ResourceManager::CreateCubeMap(const DirectX::ScratchImage* imageData)
+	std::unique_ptr<Texture> ResourceManager::CreateCubeMap(DirectX::ScratchImage* imageData)
 	{
 		const DirectX::TexMetadata& metadata = imageData->GetMetadata();
 
@@ -316,7 +316,7 @@ namespace DX12Engine
 
 		DescriptorHeapHandle srvHandle = m_HeapManager->AllocatePersistentSRV();
 
-		return std::make_unique<Texture>(textureResource, textureUploadResource, D3D12_RESOURCE_STATE_COPY_DEST, cubemapData, srvHandle, srvDesc, true);
+		return std::make_unique<Texture>(imageData, textureResource, textureUploadResource, D3D12_RESOURCE_STATE_COPY_DEST, cubemapData, srvHandle, srvDesc, true);
 	}
 
 	std::unique_ptr<Texture> ResourceManager::CreateDefaultCubeMap()
@@ -376,7 +376,7 @@ namespace DX12Engine
 		DescriptorHeapHandle srvHandle = m_HeapManager->AllocatePersistentSRV();
 		m_Device->CreateShaderResourceView(textureResource, &srvDesc, srvHandle.GetCPUHandle());
 
-		auto texture = std::make_unique<Texture>(textureResource, uploadResource, D3D12_RESOURCE_STATE_COPY_DEST, subresources, srvHandle, srvDesc, true);
+		auto texture = std::make_unique<Texture>(nullptr, textureResource, uploadResource, D3D12_RESOURCE_STATE_COPY_DEST, subresources, srvHandle, srvDesc, true);
 		m_GPUUploader->UploadTextureBatch({ texture.get() });
 
 		return texture;

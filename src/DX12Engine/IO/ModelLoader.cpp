@@ -28,6 +28,7 @@
 #include "../Asset/MeshAsset.h"
 #include "../Asset/ModelAsset.h"
 #include "../Asset/MaterialAsset.h"
+#include "../Asset/MaterialTemplate.h"
 #include "../Resources/ResourceManager.h"
 #include "../Resources/Materials/PBRMaterial.h"
 #include <DirectXTex.h>
@@ -310,17 +311,18 @@ namespace DX12Engine
 
     static std::shared_ptr<Texture> CreateSolidTexture(uint8_t r, uint8_t g, uint8_t b, uint8_t a)
     {
-        // Build a 1x1 RGBA8 ScratchImage and hand it to the ResourceManager.
-        auto* scratch = new DirectX::ScratchImage();
+        // Build a 1x1 RGBA8 ScratchImage. InitializeFromImage copies the pixel
+        // data into the ScratchImage's own buffer, so pixelBuf does not need to
+        // outlive this call. Ownership of scratch is transferred to the Texture.
+        uint8_t pixelBuf[4] = { r, g, b, a };
         DirectX::Image img{};
         img.width      = 1;
         img.height     = 1;
         img.format     = DXGI_FORMAT_R8G8B8A8_UNORM;
         img.rowPitch   = 4;
         img.slicePitch = 4;
-        static thread_local uint8_t pixelBuf[4]; // kept alive until CreateTexture copies the data
-        pixelBuf[0] = r; pixelBuf[1] = g; pixelBuf[2] = b; pixelBuf[3] = a;
-        img.pixels = pixelBuf;
+        img.pixels     = pixelBuf;
+        auto* scratch = new DirectX::ScratchImage();
         scratch->InitializeFromImage(img);
         return ResourceManager::GetInstance().CreateTexture(scratch);
     }
@@ -522,12 +524,16 @@ namespace DX12Engine
             const tinygltf::PbrMetallicRoughness& pbr = gltfMat.pbrMetallicRoughness;
 
             auto pbrMat = std::make_shared<PBRMaterial>();
+			auto matTemplate = std::make_shared<MaterialTemplate>();
 
             // --- base colour factor ---
-            if (pbr.baseColorFactor.size() == 4)
+            if (pbr.baseColorFactor.size() == 4) 
+            {
                 pbrMat->SetAlbedo({ static_cast<float>(pbr.baseColorFactor[0]),
                                     static_cast<float>(pbr.baseColorFactor[1]),
                                     static_cast<float>(pbr.baseColorFactor[2]) });
+                pbrMat->SetBaseColorAlpha(static_cast<float>(pbr.baseColorFactor[3]));
+            }
 
             // --- metallic / roughness factors ---
             pbrMat->SetMetallic(static_cast<float>(pbr.metallicFactor));
@@ -538,6 +544,19 @@ namespace DX12Engine
                 pbrMat->SetEmissive({ static_cast<float>(gltfMat.emissiveFactor[0]),
                                       static_cast<float>(gltfMat.emissiveFactor[1]),
                                       static_cast<float>(gltfMat.emissiveFactor[2]) });
+
+			pbrMat->SetAlphaMode(gltfMat.alphaMode == "MASK" ? 1 : (gltfMat.alphaMode == "BLEND" ? 2 : 0));
+			matTemplate->SetBlendPolicy(gltfMat.alphaMode == "MASK" ? BlendPolicy::Masked : (gltfMat.alphaMode == "BLEND" ? BlendPolicy::Blend : BlendPolicy::Opaque));
+            if (gltfMat.alphaMode == "MASK")
+				pbrMat->SetAlphaCutoff(static_cast<float>(gltfMat.alphaCutoff));
+            RasterizerPolicy rasterPolicy;
+            if (gltfMat.doubleSided)
+				rasterPolicy.CullMode = D3D12_CULL_MODE_NONE;
+			matTemplate->SetRasterizerPolicy(rasterPolicy);
+
+			pbrMat->SetNormalScale(static_cast<float>(gltfMat.normalTexture.scale));
+			pbrMat->SetOcclusionStrength(static_cast<float>(gltfMat.occlusionTexture.strength));
+
 
             // --- albedo texture ---
             std::shared_ptr<Texture> albedoTex = resolveTexture(pbr.baseColorTexture.index);
@@ -570,19 +589,12 @@ namespace DX12Engine
             std::shared_ptr<Texture> aoTex = resolveTexture(gltfMat.occlusionTexture.index);
             pbrMat->SetAOMap(aoTex ? aoTex : ctx.defaultAO);
 
-            // --- alpha mode ---
-            AlphaMode alphaMode = AlphaMode::Opaque;
-            if (gltfMat.alphaMode == "MASK")
-                alphaMode = AlphaMode::Masked;
-            else if (gltfMat.alphaMode == "BLEND")
-                alphaMode = AlphaMode::Blend;
-
             std::string matName = gltfMat.name.empty()
                 ? ("material_" + std::to_string(mi))
                 : gltfMat.name;
 
             auto matAsset = std::make_shared<MaterialAsset>(matName, std::move(pbrMat));
-            matAsset->SetAlphaMode(alphaMode);
+			matAsset->SetTemplate(std::move(matTemplate));
             matAsset->SetAlphaCutoff(static_cast<float>(gltfMat.alphaCutoff));
             matAsset->SetDoubleSided(gltfMat.doubleSided);
 

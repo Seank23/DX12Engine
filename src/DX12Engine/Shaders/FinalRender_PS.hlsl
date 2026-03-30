@@ -10,5 +10,6 @@ SamplerState samp : register(s0);
 float4 main(PSInput input) : SV_TARGET
 {
     float3 output = finalRenderMap.Sample(samp, input.texCoord).rgb;
+    output = pow(output, 1.0 / 2.2); // Gamma correction
     return float4(output, 1.0);
 }

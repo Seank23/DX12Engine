@@ -49,6 +49,11 @@ TextureCube shadowCubeMap : register(t9);
 SamplerState samp : register(s0);
 SamplerComparisonState shadowSampler : register(s1);
 
+float3 sRGBToLinear(float3 color)
+{
+    return pow(max(color, 0.0), 2.2);
+}
+
 float3 FresnelSchlick(float cosTheta, float3 F0)
 {
     return F0 + (1.0 - F0) * pow(1.0 - cosTheta, 5.0);
@@ -85,9 +90,10 @@ float3 PBRLighting(float3 albedo, float metallic, float roughness, float ao, flo
     float3 specularLight = numerator / denominator;
     
     float3 reflectionVector = reflect(-V, N);
-    float3 specularEnv = environmentMap.SampleLevel(samp, reflectionVector, roughness * 12).rgb;
+    float perceptualRoughness = roughness * roughness;
+    float3 specularEnv = environmentMap.SampleLevel(samp, reflectionVector, perceptualRoughness * 12).rgb;
     
-    float3 specular = specularLight * specularEnv;
+    float3 specular = specularLight * specularEnv * F;
     
     float3 radiance = light.Color * NdotL * light.Intensity;
     float3 kD = (1.0 - F) * (1.0 - metallic);
@@ -178,7 +184,7 @@ float4 main(PSInput input) : SV_TARGET
     float3 albedo = albedoMap.Sample(samp, input.texCoord);
     float3 worldNormal = worldNormalMap.Sample(samp, input.texCoord);
     float3 objectNormal = objectNormalMap.Sample(samp, input.texCoord);
-    float roughness = 1.0 - materialMap.Sample(samp, input.texCoord).r;
+    float roughness = materialMap.Sample(samp, input.texCoord).r;
     float metallic = materialMap.Sample(samp, input.texCoord).g;
     float ao = materialMap.Sample(samp, input.texCoord).b;
     float depth = depthMap.Sample(samp, input.texCoord).r;
@@ -194,10 +200,10 @@ float4 main(PSInput input) : SV_TARGET
     {
         float3 viewRay = GetViewRay(input.texCoord);
         float3 worldDir = mul((float3x3)InvViewMatrix, viewRay);
-        return float4(environmentMap.Sample(samp, worldDir).rgb, 1.0);
+        return float4(sRGBToLinear(environmentMap.Sample(samp, worldDir).rgb), 0.0);
     }
     
-    float3 indirectDiffuse = albedo * irradianceMap.Sample(samp, worldNormal).rgb;
+    float3 indirectDiffuse = albedo * sRGBToLinear(irradianceMap.Sample(samp, worldNormal).rgb);
     
     for (int i = 0; i < LightCount; i++)
     {
@@ -210,7 +216,7 @@ float4 main(PSInput input) : SV_TARGET
         if (Lights[i].Type == 0) // Directional Light
         {
             lightContribution = PBRLighting(albedo, metallic, roughness, ao, worldNormal, V, normalize(-Lights[i].Direction), Lights[i]);
-            shadowFactor = ShadowPCF(i, lightSpacePosition, 15.0);
+            shadowFactor = ShadowPCF(i, lightSpacePosition, 10.0);
             ambientShadow = min(ambientShadow, shadowFactor);
         }
         else if (Lights[i].Type == 1) // Point Light
@@ -238,7 +244,7 @@ float4 main(PSInput input) : SV_TARGET
     // Apply the shadow-to-ambient gradient once on the accumulated result so the
     // full 0..1 PCF range maps smoothly to the min/max ambient levels.
     float smoothShadow = smoothstep(0.0, 1.0, ambientShadow);
-    float remappedShadow = lerp(0.25, 1.0, smoothShadow);
+    float remappedShadow = lerp(0.05, 1.0, smoothShadow);
     finalColor += indirectDiffuse * remappedShadow;
     return float4(finalColor, 1.0f);
 }

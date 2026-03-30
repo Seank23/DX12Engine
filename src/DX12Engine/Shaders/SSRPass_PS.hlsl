@@ -30,15 +30,16 @@ struct PSOutput
 
 // External textures
 TextureCube irradianceMap  : register(t0);
+TextureCube environmentMap : register(t1);
 // G-buffer inputs
-Texture2D   albedoMap      : register(t1);
-Texture2D   normalMap      : register(t2);
-Texture2D   materialMap    : register(t3);
-Texture2D   positionMap    : register(t4);
-Texture2D   depthMap       : register(t5);
-Texture2D   pipelineOutputMap : register(t6);
+Texture2D   albedoMap      : register(t2);
+Texture2D   normalMap      : register(t3);
+Texture2D   materialMap    : register(t4);
+Texture2D   positionMap    : register(t5);
+Texture2D   depthMap       : register(t6);
+Texture2D   pipelineOutputMap : register(t7);
 // Temporal history (read-only, previous frame result)
-Texture2D   historyMap     : register(t7);
+Texture2D   historyMap     : register(t8);
 
 SamplerState samp : register(s0);
 
@@ -88,8 +89,9 @@ void ComputePositionAndReflection(
     float3 reflDir     = reflect(sampleDirVS, normalVS);
 
     // Apply roughness-based cone jitter in view space.
-    // roughnessBias is a signed scalar in [-1,1] per axis, pre-scaled by roughness.
-    float3 jitterDir   = normalize(reflDir + float3(roughnessBias, roughnessBias * 0.7, roughnessBias * 0.3) * 0.05);
+    // Scale jitter by roughness² for perceptually linear spread width.
+    float coneSpread = roughnessBias * roughnessBias * 0.4;
+    float3 jitterDir   = normalize(reflDir + float3(roughnessBias, roughnessBias * 0.7, roughnessBias * 0.3) * coneSpread);
     reflectedDirVS     = jitterDir;
 
     float4 reflectedRayEndVS = samplePosVS4 + float4(jitterDir, 0.0);
@@ -223,8 +225,11 @@ float2 ReprojectUV(float3 positionWS)
 float3 SampleIrradianceFallback(float3 normalWS, float3 viewDirWS, float roughness)
 {
     float3 reflWS = reflect(viewDirWS, normalWS);
-    // Sample at a mip proportional to roughness to avoid over-sharpening the fallback
-    return irradianceMap.SampleLevel(samp, reflWS, roughness * 4.0).rgb;
+    float perceptualRoughness = roughness * roughness;
+    // Sample the specular environment map (not the diffuse irradiance map) at a
+    // mip driven by perceptual roughness so rough misses blend to a correctly
+    // blurred specular environment rather than a flat diffuse average.
+    return environmentMap.SampleLevel(samp, reflWS, perceptualRoughness * 12.0).rgb;
 }
 
 // ---------------------------------------------------------------------------
@@ -235,9 +240,12 @@ float4 ComputeReflectedColor(
     float  confidence, float3 intersectionPosTS,
     float3 sceneColor, float  metallic,
     float3 normalWS,   float3 viewDirWS,
-    float3 positionVS, float  roughness)
+    float3 positionVS, float  roughness,
+    float3 albedo)
 {
-    float3 F0 = lerp(float3(0.04, 0.04, 0.04), sceneColor, metallic);
+    float albedoFactor = 0.5;
+    // F0 is the reflectance at normal incidence: 0.04 for dielectrics, albedo for metals.
+    float3 F0 = lerp(float3(0.04, 0.04, 0.04), sceneColor * (1 - albedoFactor) + albedo * albedoFactor, metallic);
     float3 viewDirVS = normalize(positionVS);
     float  NdotV     = saturate(-dot(normalize(mul(ViewMatrix, float4(normalWS, 0.0)).xyz), viewDirVS));
     float3 fresnel   = FresnelSchlick(NdotV, F0);
@@ -248,7 +256,9 @@ float4 ComputeReflectedColor(
     // Blend SSR and fallback based on ray confidence
     float3 reflectionColor = lerp(fallbackSample, ssrSample, confidence);
 
-    return float4(reflectionColor * fresnel * metallic, confidence);
+    // Fresnel alone drives the reflection weight; metallic is already encoded in
+    // F0 so multiplying by metallic again would double-darken dielectric reflections.
+    return float4(reflectionColor * fresnel, confidence);
 }
 
 PSOutput main(PSInput input)
@@ -259,6 +269,7 @@ PSOutput main(PSInput input)
     float3 sceneColor = pipelineOutputMap.Sample(samp, texCoord).rgb;
     float  roughness  = materialMap.Sample(samp, texCoord).r;
     float  metallic   = materialMap.Sample(samp, texCoord).g;
+    float3 albedo     = albedoMap.Sample(samp, texCoord).rgb;
 
     if (metallic < 0.01)
     {
@@ -293,7 +304,8 @@ PSOutput main(PSInput input)
     float4 currentSSR = ComputeReflectedColor(
         confidence, intersectionPosTS,
         sceneColor, metallic,
-        normalWS, viewDirWS, positionVS, roughness);
+        normalWS, viewDirWS, positionVS, roughness,
+        albedo);
 
     // ------------------------------------------------------------------
     // Temporal accumulation
