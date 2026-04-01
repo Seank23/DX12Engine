@@ -65,9 +65,9 @@ namespace DX12Engine
 		int startIndex = 1;
 		for (ConstantBuffer* cb : m_ExternalCBs)
 			m_CommandList.SetGraphicsRootConstantBufferView(startIndex++, cb->GetGPUAddress());
-		for (int i = 0; i < m_InputResourceBlockHandles.size(); i++)
+		for (const auto& [type, handle] : m_InputResourceBlockHandles)
 		{
-			m_CommandList.SetGraphicsRootDescriptorTable(startIndex + i, m_InputResourceBlockHandles[i].GetGPUHandle());
+			m_CommandList.SetGraphicsRootDescriptorTable(startIndex++, handle.GetGPUHandle());
 		}
 
 		m_CommandList.IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);

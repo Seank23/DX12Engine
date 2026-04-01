@@ -21,6 +21,15 @@ namespace DX12Engine
 
 	void SSRRenderPass::Init()
 	{
+		const bool hasEnvMap = m_ResourceBlocks.find(InputResourceType::EnvironmentMap) != m_ResourceBlocks.end();
+		if (!hasEnvMap)
+		{
+			m_FallbackEnvMap = ResourceManager::GetInstance().CreateDefaultCubeMap();
+			m_InputResources.insert(m_InputResources.begin(),
+				std::shared_ptr<GPUResource>(m_FallbackEnvMap.get(), [](GPUResource*) {}));
+			m_ResourceBlocks.insert({ InputResourceType::EnvironmentMap, 1 });
+		}
+
 		RenderPass::Init();
 
 		m_VertexShaderName = m_VertexShaderName.empty() ? "RenderTriangle_VS" : m_VertexShaderName;
@@ -41,7 +50,7 @@ namespace DX12Engine
 		m_TemporalData.PrevViewMatrix = DirectX::XMMatrixIdentity();
 		m_TemporalData.PrevProjectionMatrix = DirectX::XMMatrixIdentity();
 
-		m_Viewport = { 0.0f, 0.0f, (float)windowSize.x, (float)windowSize.y, -1.0f, 1.0f };
+		m_Viewport = { 0.0f, 0.0f, (float)windowSize.x, (float)windowSize.y, 0.0f, 1.0f };
 		m_ScissorRect = { 0, 0, (LONG)windowSize.x, (LONG)windowSize.y };
 
 		CreateSSRPassPSO();
@@ -123,18 +132,16 @@ namespace DX12Engine
 		m_CommandList.SetGraphicsRootConstantBufferView(0, m_ScreenDataCB->GetGPUAddress());
 		m_CommandList.SetGraphicsRootConstantBufferView(1, m_TemporalCB->GetGPUAddress());
 		int startIndex = 2;
-		for (int i = 0; i < (int)m_InputResourceBlockHandles.size(); i++)
+		for (const auto& [type, handle] : m_InputResourceBlockHandles)
 		{
-			m_CommandList.SetGraphicsRootDescriptorTable(startIndex + i, m_InputResourceBlockHandles[i].GetGPUHandle());
+			m_CommandList.SetGraphicsRootDescriptorTable(startIndex++, handle.GetGPUHandle());
 		}
 		// Bind the history read buffer as the last descriptor table.
 		// Use a fresh UpdateSRVDescriptors call so the handle is always from the
 		// current frame's transient region rather than a stale per-resource descriptor.
 		std::vector<GPUResource*> historyVec = { historyRead };
 		DescriptorHeapHandle historyBlock = ResourceManager::GetInstance().UpdateSRVDescriptors(historyVec);
-		m_CommandList.SetGraphicsRootDescriptorTable(
-			startIndex + (int)m_InputResourceBlockHandles.size(),
-			historyBlock.GetGPUHandle());
+		m_CommandList.SetGraphicsRootDescriptorTable(startIndex++, historyBlock.GetGPUHandle());
 
 		m_CommandList.IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 		m_CommandList.DrawInstanced(3, 1, 0, 0);

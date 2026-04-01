@@ -22,6 +22,7 @@ namespace DX12Engine
 		void SetMetallicMap(std::shared_ptr<Texture> texture);
 		void SetRoughnessMap(std::shared_ptr<Texture> texture);
 		void SetAOMap(std::shared_ptr<Texture> texture);
+		void SetEmissiveMap(std::shared_ptr<Texture> texture);
 
 		void SetAlbedo(DirectX::XMFLOAT3 albedo);
 		void SetMetallic(float metallic);
@@ -33,6 +34,11 @@ namespace DX12Engine
 		void SetOcclusionStrength(float strength);
 		void SetAlphaMode(int mode);
 		void SetAlphaCutoff(float cutoff);
+		void SetTransmission(float transmission);
+		void SetIOR(float ior);
+		void SetEmissiveStrength(float strength);
+		void SetClearcoat(float clearcoat);
+		void SetClearcoatRoughness(float clearcoatRoughness);
 
 	private:
 		PBRMaterialData m_MaterialData;
@@ -41,6 +47,7 @@ namespace DX12Engine
 		std::shared_ptr<Texture> m_MetallicMap;
 		std::shared_ptr<Texture> m_RoughnessMap;
 		std::shared_ptr<Texture> m_AOMap;
+		std::shared_ptr<Texture> m_EmissiveMap;
 	};
 }
 

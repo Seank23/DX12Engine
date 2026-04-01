@@ -17,10 +17,10 @@ namespace DX12Engine
 		// No transient allocation here -- RebuildTransientDescriptors allocates fresh
 		// shader-visible slots every frame from the current frame's transient region.
 		UINT baseRegister = 0;
-		for (UINT size : m_ResourceBlockSizes)
+		for (auto& block : m_ResourceBlocks)
 		{
-			AddDescriptorTableConfig({ size, D3D12_DESCRIPTOR_RANGE_TYPE_SRV, baseRegister });
-			baseRegister += size;
+			AddDescriptorTableConfig({ block.second, D3D12_DESCRIPTOR_RANGE_TYPE_SRV, baseRegister });
+			baseRegister += block.second;
 		}
 
 		DirectX::XMINT2 windowSize = m_RenderContext.GetWindowSize();
@@ -42,7 +42,7 @@ namespace DX12Engine
 
 		UINT descriptorSize = m_RenderContext.GetHeapManager().GetRenderPassHeap().GetDescriptorSize();
 		UINT baseRegister = 0;
-		for (UINT size : m_ResourceBlockSizes)
+		for (auto& [type, size] : m_ResourceBlocks)
 		{
 			if (size > 0 && baseRegister < static_cast<UINT>(m_InputResources.size()))
 			{
@@ -54,7 +54,7 @@ namespace DX12Engine
 				blockStart.SetCPUHandle(cpu);
 				blockStart.SetGPUHandle(gpu);
 				blockStart.SetHeapIndex(blockBase.GetHeapIndex() + baseRegister);
-				m_InputResourceBlockHandles.push_back(blockStart);
+				m_InputResourceBlockHandles[type] = blockStart;
 			}
 			baseRegister += size;
 		}

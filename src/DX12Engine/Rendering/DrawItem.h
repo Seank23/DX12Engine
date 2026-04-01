@@ -8,6 +8,7 @@ namespace DX12Engine
 	class MeshPrimitive;
 	class Material;
 	class MaterialTemplate;
+	enum class AlphaMode : uint8_t;
 
 	struct DrawItem
 	{
@@ -25,5 +26,7 @@ namespace DX12Engine
 		uint64_t PipelineKey;
 		uint64_t MaterialKey;
 		uint64_t MeshKey;
+
+		AlphaMode BlendMode;
 	};
 }

@@ -3,25 +3,36 @@ Texture2D normalMap : register(t1);
 Texture2D metallicMap : register(t2);
 Texture2D roughnessMap : register(t3);
 Texture2D aoMap : register(t4);
+Texture2D emissiveMap : register(t5);
 SamplerState samp : register(s0);
 
 cbuffer MaterialData : register(b1)
 {
     float3 Albedo;
+    float BaseColorAlpha;
+    float3 Emissive;
+    float EmissiveStrength;
+    
     float Metallic;
     float Roughness;
     float AO;
-    float3 Emissive;
-    float BaseColorAlpha;
-    float NormalScale;
     float OcclusionStrength;
+    float Transmission;
+    float IOR;
+    float Clearcoat;
+    float ClearcoatRoughness;
+    
+    float NormalScale;
+    float RefractionScale;
     int AlphaMode;
     float AlphaCutoff;
+    
     int HasAlbedoMap;
     int HasNormalMap;
     int HasMetallicMap;
     int HasRoughnessMap;
     int HasAOMap;
+    int HasEmissiveMap;
 };
 
 struct PSInput
@@ -41,6 +52,7 @@ struct PSOutput
     float4 objectNormal : SV_Target2;
     float4 material : SV_Target3; // roughness, metallic, ao
     float4 position : SV_Target4;
+    float4 emissive : SV_Target5;
 };
 
 float3 sRGBToLinear(float3 color)
@@ -57,6 +69,10 @@ PSOutput main(PSInput input)
     float  roughness = HasRoughnessMap ? (float)roughnessMap.Sample(samp, input.uv).g : Roughness;
     float  ao        = HasAOMap        ? (float)aoMap.Sample(samp, input.uv).r        : AO;
     float  alpha     = HasAlbedoMap    ? (float)albedoMap.Sample(samp, input.uv).a * BaseColorAlpha : BaseColorAlpha;
+    
+    float3 emissiveColor = Emissive * EmissiveStrength;
+    if (HasEmissiveMap)
+        emissiveColor *= sRGBToLinear(emissiveMap.Sample(samp, input.uv).rgb);
 
     float4 outputAlbedo = float4(baseColor, alpha);
     if (AlphaMode == 1) // Mask
@@ -87,5 +103,6 @@ PSOutput main(PSInput input)
     output.objectNormal = float4(input.normal, 1.0);
     output.material     = float4(roughness, metallic, ao, 1.0);
     output.position     = float4(input.worldPos, 1.0);
+    output.emissive     = float4(emissiveColor, 1.0);
     return output;
 }

@@ -13,17 +13,17 @@ namespace DX12Engine
 	{
 		m_Shaders.insert({ "BasicLighting_VS", std::make_unique<Shader>(GetShaderPath("BasicLighting_VS.hlsl"), ShaderType::Vertex) });
 		m_Shaders.insert({ "BasicLighting_PS", std::make_unique<Shader>(GetShaderPath("BasicLighting_PS.hlsl"), ShaderType::Pixel) });
-		m_Shaders.insert({ "PBRLighting_VS", std::make_unique<Shader>(GetShaderPath("PBRLighting_VS.hlsl"), ShaderType::Vertex) });
-		m_Shaders.insert({ "PBRLighting_PS", std::make_unique<Shader>(GetShaderPath("PBRLighting_PS.hlsl"), ShaderType::Pixel) });
 		m_Shaders.insert({ "ShadowMap_VS", std::make_unique<Shader>(GetShaderPath("ShadowMap_VS.hlsl"), ShaderType::Vertex) });
 		m_Shaders.insert({ "ShadowCubeMap_VS", std::make_unique<Shader>(GetShaderPath("ShadowCubeMap_VS.hlsl"), ShaderType::Vertex) });
 		m_Shaders.insert({ "ShadowCubeMap_PS", std::make_unique<Shader>(GetShaderPath("ShadowCubeMap_PS.hlsl"), ShaderType::Pixel) });
 		m_Shaders.insert({ "Geometry_VS", std::make_unique<Shader>(GetShaderPath("Geometry_VS.hlsl"), ShaderType::Vertex) });
 		m_Shaders.insert({ "Geometry_PS", std::make_unique<Shader>(GetShaderPath("Geometry_PS.hlsl"), ShaderType::Pixel) });
 		m_Shaders.insert({ "RenderTriangle_VS", std::make_unique<Shader>(GetShaderPath("RenderTriangle_VS.hlsl"), ShaderType::Vertex) });
+		m_Shaders.insert({ "PBRTransparent_VS", std::make_unique<Shader>(GetShaderPath("PBRTransparent_VS.hlsl"), ShaderType::Vertex) });
 		m_Shaders.insert({ "PBRLightingDeferred_PS", std::make_unique<Shader>(GetShaderPath("PBRLightingDeferred_PS.hlsl"), ShaderType::Pixel) });
 		m_Shaders.insert({ "FinalRender_PS", std::make_unique<Shader>(GetShaderPath("FinalRender_PS.hlsl"), ShaderType::Pixel) });
 		m_Shaders.insert({ "SSRPass_PS", std::make_unique<Shader>(GetShaderPath("SSRPass_PS.hlsl"), ShaderType::Pixel) });
+		m_Shaders.insert({ "PBRTransparent_PS", std::make_unique<Shader>(GetShaderPath("PBRTransparent_PS.hlsl"), ShaderType::Pixel) });
 	}
 
 	ResourceManager::~ResourceManager()
@@ -358,11 +358,11 @@ namespace DX12Engine
 			nullptr,
 			IID_PPV_ARGS(&uploadResource)));
 
-		static constexpr UINT32 blackPixel = 0x00000000;
+		static constexpr UINT32 grayPixel = 0xFF404040;
 		std::vector<D3D12_SUBRESOURCE_DATA> subresources(arraySize);
 		for (UINT i = 0; i < arraySize; i++)
 		{
-			subresources[i].pData = &blackPixel;
+			subresources[i].pData = &grayPixel;
 			subresources[i].RowPitch = sizeof(UINT32);
 			subresources[i].SlicePitch = sizeof(UINT32);
 		}

@@ -1,16 +1,17 @@
 #pragma once
 #include "RenderPass.h"
 #include "../../Resources/Texture.h"
+#include "../DrawItem.h"
 
 namespace DX12Engine
 {
 	class LightBuffer;
 
-	class LightingRenderPass : public RenderPass
+	class TransparentRenderPass : public RenderPass
 	{
 	public:
-		LightingRenderPass(RenderContext& context);
-		~LightingRenderPass();
+		TransparentRenderPass(RenderContext& context);
+		~TransparentRenderPass();
 
 		void Init() override;
 		void Execute() override;
@@ -18,8 +19,10 @@ namespace DX12Engine
 
 		void SetLightBuffer(LightBuffer* lightBuffer) { m_LightBuffer = lightBuffer; }
 
+		void SetDrawItems(const std::vector<DrawItem>& drawItems) { m_DrawItems = drawItems; }
+
 	private:
-		void CreateLightingPassPSO();
+		void CreateTransparentPassPSO();
 
 		Microsoft::WRL::ComPtr<ID3D12RootSignature> m_RootSignature;
 		Microsoft::WRL::ComPtr<ID3D12PipelineState> m_PipelineState;
@@ -29,8 +32,9 @@ namespace DX12Engine
 
 		LightBuffer* m_LightBuffer;
 
+		std::vector<DrawItem> m_DrawItems;
+
 		std::unique_ptr<Texture> m_FallbackEnvMap;
-		std::unique_ptr<Texture> m_FallbackIrradianceMap;
 	};
 }
 

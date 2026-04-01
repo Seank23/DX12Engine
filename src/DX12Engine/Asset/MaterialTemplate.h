@@ -19,7 +19,7 @@ namespace DX12Engine
 	};
 
 	// Blend policy: maps to a D3D12 blend desc and controls transparency behaviour.
-	enum class BlendPolicy : uint8_t
+	enum class AlphaMode : uint8_t
 	{
 		Opaque  = 0,
 		Masked  = 1,
@@ -30,10 +30,11 @@ namespace DX12Engine
 	enum class PassTarget : uint8_t
 	{
 		Geometry = 0, // deferred GBuffer pass (5 MRT + depth)
+		Transparent = 1, // forward transparent composite pass (single RT + depth test)
 	};
 
 	// MaterialTemplate owns shader references and PSO configuration policy.
-	// Many MaterialAssets can share one template (e.g. all opaque PBR car parts).
+	// Many MaterialAssets can share one template.
 	// The actual PSO is resolved once via ResolvePSO() and cached here.
 	class MaterialTemplate
 	{
@@ -49,11 +50,11 @@ namespace DX12Engine
 
 		// ----- PSO policy -----
 		void SetRasterizerPolicy(RasterizerPolicy policy) { m_RasterizerPolicy = policy; InvalidateCache(); }
-		void SetBlendPolicy(BlendPolicy policy)           { m_BlendPolicy      = policy; InvalidateCache(); }
+		void SetBlendPolicy(AlphaMode policy)           { m_BlendPolicy      = policy; InvalidateCache(); }
 		void SetPassTarget(PassTarget target)             { m_PassTarget       = target; InvalidateCache(); }
 
 		const RasterizerPolicy& GetRasterizerPolicy() const { return m_RasterizerPolicy; }
-		BlendPolicy             GetBlendPolicy()      const { return m_BlendPolicy;      }
+		AlphaMode               GetBlendPolicy()      const { return m_BlendPolicy;      }
 		PassTarget              GetPassTarget()       const { return m_PassTarget;       }
 
 		// A stable integer key that uniquely identifies this template's PSO variant.
@@ -79,7 +80,7 @@ namespace DX12Engine
 		std::string       m_VertexShaderName = "Geometry_VS";
 		std::string       m_PixelShaderName  = "Geometry_PS";
 		RasterizerPolicy  m_RasterizerPolicy;
-		BlendPolicy       m_BlendPolicy = BlendPolicy::Opaque;
+		AlphaMode         m_BlendPolicy = AlphaMode::Opaque;
 		PassTarget        m_PassTarget  = PassTarget::Geometry;
 		uint64_t          m_PipelineKey = 0;
 

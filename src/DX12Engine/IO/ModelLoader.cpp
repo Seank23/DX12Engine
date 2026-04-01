@@ -196,15 +196,17 @@ namespace DX12Engine
             const DirectX::XMFLOAT3& t = tan1[i];
 
             // Gram-Schmidt orthogonalize
-            vertices[i].Tangent =
+            DirectX::XMFLOAT3 ortho =
             {
                 t.x - n.x * DirectX::XMVector3Dot(XMLoadFloat3(&n), XMLoadFloat3(&t)).m128_f32[0],
                 t.y - n.y * DirectX::XMVector3Dot(XMLoadFloat3(&n), XMLoadFloat3(&t)).m128_f32[0],
                 t.z - n.z * DirectX::XMVector3Dot(XMLoadFloat3(&n), XMLoadFloat3(&t)).m128_f32[0]
             };
 
-            // Normalize the tangent
-            DirectX::XMStoreFloat3(&vertices[i].Tangent, DirectX::XMVector3Normalize(XMLoadFloat3(&vertices[i].Tangent)));
+            DirectX::XMFLOAT3 normalised;
+            DirectX::XMStoreFloat3(&normalised, DirectX::XMVector3Normalize(XMLoadFloat3(&ortho)));
+            // OBJ has no mirror/handedness info, so use w=+1.0.
+            vertices[i].Tangent = { normalised.x, normalised.y, normalised.z, 1.0f };
         }
 
         MeshPrimitive prim(
@@ -397,8 +399,10 @@ namespace DX12Engine
             const DirectX::XMFLOAT3& t = tan1[i];
             float dot = DirectX::XMVector3Dot(XMLoadFloat3(&n), XMLoadFloat3(&t)).m128_f32[0];
             DirectX::XMFLOAT3 tangent = { t.x - n.x * dot, t.y - n.y * dot, t.z - n.z * dot };
-            DirectX::XMStoreFloat3(&vertices[i].Tangent,
-                DirectX::XMVector3Normalize(XMLoadFloat3(&tangent)));
+            DirectX::XMFLOAT3 normalised;
+            DirectX::XMStoreFloat3(&normalised, DirectX::XMVector3Normalize(XMLoadFloat3(&tangent)));
+            // Computed tangents have no mirror information; use w=+1.0.
+            vertices[i].Tangent = { normalised.x, normalised.y, normalised.z, 1.0f };
         }
     }
 
@@ -422,6 +426,7 @@ namespace DX12Engine
         std::shared_ptr<Texture> defaultNormal;       // flat (128,128,255)
         std::shared_ptr<Texture> defaultMetalRough;   // metallic=0, roughness=1 encoded as G/B  -> white
         std::shared_ptr<Texture> defaultAO;           // white
+        std::shared_ptr<Texture> defaultEmissive;     // black
 
         // Counters for final log
         int skippedPrimitives = 0;
@@ -546,7 +551,13 @@ namespace DX12Engine
                                       static_cast<float>(gltfMat.emissiveFactor[2]) });
 
 			pbrMat->SetAlphaMode(gltfMat.alphaMode == "MASK" ? 1 : (gltfMat.alphaMode == "BLEND" ? 2 : 0));
-			matTemplate->SetBlendPolicy(gltfMat.alphaMode == "MASK" ? BlendPolicy::Masked : (gltfMat.alphaMode == "BLEND" ? BlendPolicy::Blend : BlendPolicy::Opaque));
+			matTemplate->SetBlendPolicy(gltfMat.alphaMode == "MASK" ? AlphaMode::Masked : (gltfMat.alphaMode == "BLEND" ? AlphaMode::Blend : AlphaMode::Opaque));
+
+			if (gltfMat.alphaMode == "BLEND")
+				matTemplate->SetPassTarget(PassTarget::Transparent);
+			else
+				matTemplate->SetPassTarget(PassTarget::Geometry);
+
             if (gltfMat.alphaMode == "MASK")
 				pbrMat->SetAlphaCutoff(static_cast<float>(gltfMat.alphaCutoff));
             RasterizerPolicy rasterPolicy;
@@ -557,10 +568,56 @@ namespace DX12Engine
 			pbrMat->SetNormalScale(static_cast<float>(gltfMat.normalTexture.scale));
 			pbrMat->SetOcclusionStrength(static_cast<float>(gltfMat.occlusionTexture.strength));
 
+			// --- KHR_materials_transmission ---
+			{
+				auto it = gltfMat.extensions.find("KHR_materials_transmission");
+				if (it != gltfMat.extensions.end() && it->second.IsObject())
+				{
+					const auto& tf = it->second.Get("transmissionFactor");
+					if (tf.IsReal() || tf.IsInt())
+						pbrMat->SetTransmission(static_cast<float>(tf.GetNumberAsDouble()));
+				}
+			}
+
+			// --- KHR_materials_ior ---
+			{
+				auto it = gltfMat.extensions.find("KHR_materials_ior");
+				if (it != gltfMat.extensions.end() && it->second.IsObject())
+				{
+					const auto& ior = it->second.Get("ior");
+					if (ior.IsReal() || ior.IsInt())
+						pbrMat->SetIOR(static_cast<float>(ior.GetNumberAsDouble()));
+				}
+			}
+
+			// --- KHR_materials_emissive_strength ---
+			{
+				auto it = gltfMat.extensions.find("KHR_materials_emissive_strength");
+				if (it != gltfMat.extensions.end() && it->second.IsObject())
+				{
+					const auto& es = it->second.Get("emissiveStrength");
+					if (es.IsReal() || es.IsInt())
+						pbrMat->SetEmissiveStrength(static_cast<float>(es.GetNumberAsDouble()));
+				}
+			}
+
+			// --- KHR_materials_clearcoat ---
+			{
+				auto it = gltfMat.extensions.find("KHR_materials_clearcoat");
+				if (it != gltfMat.extensions.end() && it->second.IsObject())
+				{
+					const auto& cf = it->second.Get("clearcoatFactor");
+					if (cf.IsReal() || cf.IsInt())
+						pbrMat->SetClearcoat(static_cast<float>(cf.GetNumberAsDouble()));
+					const auto& crf = it->second.Get("clearcoatRoughnessFactor");
+					if (crf.IsReal() || crf.IsInt())
+						pbrMat->SetClearcoatRoughness(static_cast<float>(crf.GetNumberAsDouble()));
+				}
+			}
 
             // --- albedo texture ---
             std::shared_ptr<Texture> albedoTex = resolveTexture(pbr.baseColorTexture.index);
-            pbrMat->SetAlbedoMap(albedoTex ? albedoTex : ctx.defaultAlbedo);
+            if (albedoTex) pbrMat->SetAlbedoMap(albedoTex);
 
             // --- normal texture ---
             std::shared_ptr<Texture> normalTex = resolveTexture(gltfMat.normalTexture.index);
@@ -588,6 +645,9 @@ namespace DX12Engine
             // --- occlusion texture ---
             std::shared_ptr<Texture> aoTex = resolveTexture(gltfMat.occlusionTexture.index);
             pbrMat->SetAOMap(aoTex ? aoTex : ctx.defaultAO);
+
+            std::shared_ptr<Texture> emissiveTex = resolveTexture(gltfMat.emissiveTexture.index);
+            pbrMat->SetEmissiveMap(emissiveTex ? emissiveTex : ctx.defaultEmissive);
 
             std::string matName = gltfMat.name.empty()
                 ? ("material_" + std::to_string(mi))
@@ -717,7 +777,8 @@ namespace DX12Engine
                     {
                         const uint8_t* tp = AccessorElement(model, *tangentAcc, vi);
                         DirectX::XMFLOAT4 t4 = ReadVec4(tp, tangentAcc->componentType, tangentAcc->normalized);
-                        vertices[vi].Tangent = { t4.x, t4.y, -t4.z };
+                        // Negate Z for RH->LH conversion; preserve W (handedness sign).
+                        vertices[vi].Tangent = { t4.x, t4.y, -t4.z, t4.w };
                     }
                 }
 
@@ -977,6 +1038,7 @@ namespace DX12Engine
         ctx.defaultNormal     = CreateSolidTexture(128, 128, 255, 255);
         ctx.defaultMetalRough = CreateSolidTexture(0, 200, 0, 255);
         ctx.defaultAO         = CreateSolidTexture(255, 255, 255, 255);
+        ctx.defaultEmissive   = CreateSolidTexture(0, 0, 0, 255);
 
         ImportTextures(ctx);
         ImportMaterials(ctx);

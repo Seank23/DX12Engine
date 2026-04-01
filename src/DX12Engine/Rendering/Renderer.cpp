@@ -6,6 +6,7 @@
 #include "RenderPass/ShadowMapRenderPass.h"
 #include "RenderPass/GeometryRenderPass.h"
 #include "RenderPass/LightingRenderPass.h"
+#include "RenderPass/TransparentRenderPass.h"
 #include "RenderPass/SSRRenderPass.h"
 #include "RenderPass/UIRenderPass.h"
 #include "RenderPipelineConfig.h"
@@ -22,12 +23,14 @@ namespace DX12Engine
 {
 	namespace
 	{
-		constexpr std::array<InputResourceType, 7> kOrderedCommonInputs = {
-			InputResourceType::ExternalTextures,
+		constexpr std::array<InputResourceType, 9> kOrderedCommonInputs = {
+			InputResourceType::EnvironmentMap,
 			InputResourceType::RenderTargets_Geometry,
 			InputResourceType::RenderTargets_ShadowMap,
 			InputResourceType::RenderTargets_CubeShadowMap,
 			InputResourceType::RenderTargets_Lighting,
+			InputResourceType::RenderTargets_Transparent,
+			InputResourceType::RenderTargets_SSR,
 			InputResourceType::VertexShader,
 			InputResourceType::PixelShader,
 		};
@@ -81,6 +84,8 @@ namespace DX12Engine
 			return std::make_unique<GeometryRenderPass>(*m_RenderContext);
 		case RenderPassType::Lighting:
 			return std::make_unique<LightingRenderPass>(*m_RenderContext);
+		case RenderPassType::Transparent:
+			return std::make_unique<TransparentRenderPass>(*m_RenderContext);
 		case RenderPassType::ScreenSpaceReflection:
 			return std::make_unique<SSRRenderPass>(*m_RenderContext);
 		case RenderPassType::UI:
@@ -138,29 +143,58 @@ namespace DX12Engine
 						case InputResourceType::RenderTargets_ShadowMap:
 							for (auto& target : *static_cast<std::vector<RenderTargetType>*>(inputResource))
 								renderPass->AddInputResources({ pipeline.RenderPasses[renderPassOrder[RenderPassType::ShadowMap]]->GetRenderTarget(target) });
-							renderPass->AddResourceBlock(static_cast<UINT>(static_cast<std::vector<RenderTargetType>*>(inputResource)->size()));
+							renderPass->AddResourceBlock(
+								InputResourceType::RenderTargets_ShadowMap,
+								static_cast<UINT>(static_cast<std::vector<RenderTargetType>*>(inputResource)->size())
+							);
 							break;
 						case InputResourceType::RenderTargets_CubeShadowMap:
 							for (auto& target : *static_cast<std::vector<RenderTargetType>*>(inputResource))
 								renderPass->AddInputResources({ pipeline.RenderPasses[renderPassOrder[RenderPassType::CubeShadowMap]]->GetRenderTarget(target) });
-							renderPass->AddResourceBlock(static_cast<UINT>(static_cast<std::vector<RenderTargetType>*>(inputResource)->size()));
+							renderPass->AddResourceBlock(
+								InputResourceType::RenderTargets_CubeShadowMap,
+								static_cast<UINT>(static_cast<std::vector<RenderTargetType>*>(inputResource)->size())
+							);
 							break;
 						case InputResourceType::RenderTargets_Geometry:
 							for (auto& target : *static_cast<std::vector<RenderTargetType>*>(inputResource))
 								renderPass->AddInputResources({ pipeline.RenderPasses[renderPassOrder[RenderPassType::Geometry]]->GetRenderTarget(target) });
-							renderPass->AddResourceBlock(static_cast<UINT>(static_cast<std::vector<RenderTargetType>*>(inputResource)->size()));
+							renderPass->AddResourceBlock(
+								InputResourceType::RenderTargets_Geometry,
+								static_cast<UINT>(static_cast<std::vector<RenderTargetType>*>(inputResource)->size())
+							);
 							break;
 						case InputResourceType::RenderTargets_Lighting:
 							for (auto& target : *static_cast<std::vector<RenderTargetType>*>(inputResource))
 								renderPass->AddInputResources({ pipeline.RenderPasses[renderPassOrder[RenderPassType::Lighting]]->GetRenderTarget(target) });
-							renderPass->AddResourceBlock(static_cast<UINT>(static_cast<std::vector<RenderTargetType>*>(inputResource)->size()));
+							renderPass->AddResourceBlock(
+								InputResourceType::RenderTargets_Lighting,
+								static_cast<UINT>(static_cast<std::vector<RenderTargetType>*>(inputResource)->size())
+							);
 							break;
-						case InputResourceType::ExternalTextures:
+						case InputResourceType::RenderTargets_Transparent:
+							for (auto& target : *static_cast<std::vector<RenderTargetType>*>(inputResource))
+								renderPass->AddInputResources({ pipeline.RenderPasses[renderPassOrder[RenderPassType::Transparent]]->GetRenderTarget(target) });
+							renderPass->AddResourceBlock(
+								InputResourceType::RenderTargets_Transparent,
+								static_cast<UINT>(static_cast<std::vector<RenderTargetType>*>(inputResource)->size())
+							);
+							break;
+						case InputResourceType::RenderTargets_SSR:
+							for (auto& target : *static_cast<std::vector<RenderTargetType>*>(inputResource))
+								renderPass->AddInputResources({ pipeline.RenderPasses[renderPassOrder[RenderPassType::ScreenSpaceReflection]]->GetRenderTarget(target) });
+							renderPass->AddResourceBlock(
+								InputResourceType::RenderTargets_SSR,
+								static_cast<UINT>(static_cast<std::vector<RenderTargetType>*>(inputResource)->size())
+							);
+							break;
+						case InputResourceType::EnvironmentMap:
 							for (auto& texture : *static_cast<std::vector<Texture*>*>(inputResource))
 								renderPass->AddInputResources({ texture });
-							renderPass->AddResourceBlock(static_cast<UINT>(static_cast<std::vector<Texture*>*>(inputResource)->size()));
-							if (passConfig.Type == RenderPassType::Lighting)
-								static_cast<LightingRenderPass*>(renderPass)->SetHasSkybox(true);
+							renderPass->AddResourceBlock(
+								InputResourceType::EnvironmentMap,
+								static_cast<UINT>(static_cast<std::vector<Texture*>*>(inputResource)->size())
+							);
 							break;
 						case InputResourceType::VertexShader:
 							renderPass->SetVertexShader(*static_cast<std::string*>(inputResource));
@@ -216,7 +250,7 @@ namespace DX12Engine
 		viewport.TopLeftY = 0.0f;
 		viewport.Width = static_cast<float>(windowSize.x);
 		viewport.Height = static_cast<float>(windowSize.y);
-		viewport.MinDepth = -1.0f;
+		viewport.MinDepth = 0.0f;
 		viewport.MaxDepth = 1.0f;
 		return viewport;
 	}
@@ -243,7 +277,8 @@ namespace DX12Engine
 		Camera* sceneCamera = m_CurrentScene->GetCamera();
 		LightBuffer* lightBuffer = m_CurrentScene->GetLightBuffer();
 
-		std::vector<DrawItem> drawItems;
+		std::vector<DrawItem> geometryPassDrawItems;
+		std::vector<DrawItem> transparentPassDrawItems;
 		for (auto& comp : renderComponents)
 		{
 			if (!comp)
@@ -276,7 +311,12 @@ namespace DX12Engine
 				item.PipelineKey  = tmpl ? tmpl->GetPipelineKey() : 0;
 				item.MaterialKey  = reinterpret_cast<uint64_t>(material);
 				item.MeshKey      = reinterpret_cast<uint64_t>(binding.Primitive);
-				drawItems.push_back(item);
+				item.BlendMode    = tmpl ? tmpl->GetBlendPolicy() : AlphaMode::Opaque;
+
+				if (item.BlendMode == AlphaMode::Blend)
+					transparentPassDrawItems.push_back(item);
+				else
+					geometryPassDrawItems.push_back(item);
 
 				for (int i = 0; i < 5; i++)
 				{
@@ -294,12 +334,29 @@ namespace DX12Engine
 			m_RenderContext->GetUploader().UploadTextureBatch(texturesToUpload);
 
 		// primary key: PSO variant, secondary: material, tertiary: mesh, quaternary: CBV (object).
-		std::sort(drawItems.begin(), drawItems.end(), [](const DrawItem& a, const DrawItem& b)
+		std::sort(geometryPassDrawItems.begin(), geometryPassDrawItems.end(), [](const DrawItem& a, const DrawItem& b)
 		{
 			if (a.PipelineKey != b.PipelineKey) return a.PipelineKey < b.PipelineKey;
 			if (a.MaterialKey  != b.MaterialKey)  return a.MaterialKey  < b.MaterialKey;
 			if (a.MeshKey      != b.MeshKey)      return a.MeshKey      < b.MeshKey;
 			return a.CBVAddress < b.CBVAddress;
+		});
+
+		auto cameraPos = sceneCamera->GetPosition();
+		std::sort(transparentPassDrawItems.begin(), transparentPassDrawItems.end(), [cameraPos](const DrawItem& a, const DrawItem& b)
+		{
+			DirectX::XMVECTOR camVec = DirectX::XMLoadFloat3(&cameraPos);
+
+			DirectX::XMVECTOR posA = a.ModelMatrix.r[3];
+			DirectX::XMVECTOR posB = b.ModelMatrix.r[3];
+
+			DirectX::XMVECTOR diffA = DirectX::XMVectorSubtract(posA, camVec);
+			DirectX::XMVECTOR diffB = DirectX::XMVectorSubtract(posB, camVec);
+
+			float distSqA = DirectX::XMVectorGetX(DirectX::XMVector3Dot(diffA, diffA));
+			float distSqB = DirectX::XMVectorGetX(DirectX::XMVector3Dot(diffB, diffB));
+
+			return distSqA > distSqB; // back-to-front
 		});
 
 		for (auto& renderPass : pipeline.RenderPasses)
@@ -309,14 +366,17 @@ namespace DX12Engine
 		switch (renderPass->GetType())
 			{
 			case RenderPassType::Geometry:
-				static_cast<GeometryRenderPass*>(renderPass)->SetDrawItems(drawItems);
+				static_cast<GeometryRenderPass*>(renderPass)->SetDrawItems(geometryPassDrawItems);
 				break;
 			case RenderPassType::ShadowMap:
 			case RenderPassType::CubeShadowMap:
-				static_cast<ShadowMapRenderPass*>(renderPass)->SetDrawItems(drawItems);
+				static_cast<ShadowMapRenderPass*>(renderPass)->SetDrawItems(geometryPassDrawItems);
 				break;
 			case RenderPassType::Lighting:
 				static_cast<LightingRenderPass*>(renderPass)->SetLightBuffer(lightBuffer);
+				break;
+			case RenderPassType::Transparent:
+				static_cast<TransparentRenderPass*>(renderPass)->SetDrawItems(transparentPassDrawItems);
 				break;
 			default:
 				break;

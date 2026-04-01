@@ -27,6 +27,8 @@ namespace DX12Engine
 			return m_RoughnessMap.get();
 		case TextureType::AOMap:
 			return m_AOMap.get();
+		case TextureType::Emissive:
+			return m_EmissiveMap.get();
 		default:
 			return nullptr;
 		}
@@ -46,6 +48,8 @@ namespace DX12Engine
 			return m_RoughnessMap != nullptr;
 		case TextureType::AOMap:
 			return m_AOMap != nullptr;
+		case TextureType::Emissive:
+			return m_EmissiveMap != nullptr;
 		default:
 			return false;
 		}
@@ -78,6 +82,9 @@ namespace DX12Engine
 				break;
 			case TextureType::AOMap:
 				SetAOMap(texture.second);
+				break;
+			case TextureType::Emissive:
+				SetEmissiveMap(texture.second);
 				break;
 			}
 		}
@@ -115,6 +122,13 @@ namespace DX12Engine
 	{
 		m_AOMap = texture;
 		m_MaterialData.HasAOMap = texture ? 1 : 0;
+		UpdateConstantBufferData(&m_MaterialData, sizeof(m_MaterialData));
+	}
+
+	void PBRMaterial::SetEmissiveMap(std::shared_ptr<Texture> texture)
+	{
+		m_EmissiveMap = texture;
+		m_MaterialData.HasEmissiveMap = texture ? 1 : 0;
 		UpdateConstantBufferData(&m_MaterialData, sizeof(m_MaterialData));
 	}
 
@@ -175,6 +189,36 @@ namespace DX12Engine
 	void PBRMaterial::SetAlphaCutoff(float cutoff)
 	{
 		m_MaterialData.AlphaCutoff = cutoff;
+		UpdateConstantBufferData(&m_MaterialData, sizeof(m_MaterialData));
+	}
+
+	void PBRMaterial::SetTransmission(float transmission)
+	{
+		m_MaterialData.Transmission = transmission;
+		UpdateConstantBufferData(&m_MaterialData, sizeof(m_MaterialData));
+	}
+
+	void PBRMaterial::SetIOR(float ior)
+	{
+		m_MaterialData.IOR = ior;
+		UpdateConstantBufferData(&m_MaterialData, sizeof(m_MaterialData));
+	}
+
+	void PBRMaterial::SetEmissiveStrength(float strength)
+	{
+		m_MaterialData.EmissiveStrength = strength;
+		UpdateConstantBufferData(&m_MaterialData, sizeof(m_MaterialData));
+	}
+
+	void PBRMaterial::SetClearcoat(float clearcoat)
+	{
+		m_MaterialData.Clearcoat = clearcoat;
+		UpdateConstantBufferData(&m_MaterialData, sizeof(m_MaterialData));
+	}
+
+	void PBRMaterial::SetClearcoatRoughness(float clearcoatRoughness)
+	{
+		m_MaterialData.ClearcoatRoughness = clearcoatRoughness;
 		UpdateConstantBufferData(&m_MaterialData, sizeof(m_MaterialData));
 	}
 }

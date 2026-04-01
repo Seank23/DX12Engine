@@ -7,13 +7,6 @@
 
 namespace DX12Engine
 {
-	enum class AlphaMode : uint8_t
-	{
-		Opaque = 0,
-		Masked = 1,
-		Blend  = 2,
-	};
-
 	class MaterialAsset
 	{
 	public:

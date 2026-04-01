@@ -16,7 +16,8 @@ namespace DX12Engine
 		Material,
 		Position,
 		Depth,
-		Composite
+		Composite,
+		Emissive
 	};
 
 	class RenderComponent;
@@ -49,7 +50,7 @@ namespace DX12Engine
 		{
 			m_InputResources.insert(m_InputResources.end(), resources.begin(), resources.end());
 		}
-		void AddResourceBlock(UINT size) { m_ResourceBlockSizes.push_back(size); }
+		void AddResourceBlock(InputResourceType type, UINT size) { m_ResourceBlocks[type] = size; }
 		void SetVertexShader(const std::string& name) { m_VertexShaderName = name; }
 		void SetPixelShader(const std::string& name) { m_PixelShaderName = name; }
 		void SetRenderObjects(std::vector<RenderComponent*> renderObjects) { m_RenderObjects = renderObjects; }
@@ -71,12 +72,12 @@ namespace DX12Engine
 		RenderPassType m_Type;
 		std::vector<std::shared_ptr<GPUResource>> m_InputResources;
 		std::vector<DescriptorTableConfig> m_DescriptorTableConfigs;
-		std::vector<DescriptorHeapHandle> m_InputResourceBlockHandles;
+		std::unordered_map<InputResourceType, DescriptorHeapHandle> m_InputResourceBlockHandles;
 		std::vector<std::unique_ptr<RenderTexture>> m_RenderTargets;
 		std::vector<RenderComponent*> m_RenderObjects;
 		std::string m_VertexShaderName;
 		std::string m_PixelShaderName;
-		std::vector<UINT> m_ResourceBlockSizes;
+		std::unordered_map<InputResourceType, UINT> m_ResourceBlocks;
 
 		Camera* m_Camera;
 		std::vector<ConstantBuffer*> m_ExternalCBs;

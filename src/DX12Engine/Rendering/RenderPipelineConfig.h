@@ -11,6 +11,7 @@ namespace DX12Engine
 		CubeShadowMap,
 		Geometry,
 		Lighting,
+		Transparent,
 		ScreenSpaceReflection,
 		UI,
 	};
@@ -25,7 +26,9 @@ namespace DX12Engine
 		RenderTargets_CubeShadowMap,
 		RenderTargets_Geometry,
 		RenderTargets_Lighting,
-		ExternalTextures,
+		RenderTargets_Transparent,
+		RenderTargets_SSR,
+		EnvironmentMap,
 		VertexShader,
 		PixelShader,
 	};

@@ -33,6 +33,8 @@ namespace DX12Engine
 		SSRTemporalData m_TemporalData;
 		std::unique_ptr<ConstantBuffer> m_TemporalCB;
 		uint32_t m_FrameIndex = 0;
+
+		std::unique_ptr<Texture> m_FallbackEnvMap;
 	};
 }
 

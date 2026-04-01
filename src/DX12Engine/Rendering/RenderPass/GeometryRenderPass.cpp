@@ -2,8 +2,9 @@
 #include "../../Resources/ResourceManager.h"
 #include "../RenderContext.h"
 #include "../../Entity/RenderComponent.h"
+#include "../../Asset/MaterialTemplate.h"
 #include "../../Asset/MeshPrimitive.h"
-#include <unordered_set>
+#include "../RenderUtils.h"
 
 namespace DX12Engine
 {
@@ -30,9 +31,10 @@ namespace DX12Engine
 		m_RenderTargets.emplace_back(ResourceManager::GetInstance().CreateRenderTargetTexture(windowSize, DXGI_FORMAT_R16G16B16A16_FLOAT)); // Object Normal
 		m_RenderTargets.emplace_back(ResourceManager::GetInstance().CreateRenderTargetTexture(windowSize, DXGI_FORMAT_R16G16B16A16_FLOAT)); // Metallic, Roughness, AO
 		m_RenderTargets.emplace_back(ResourceManager::GetInstance().CreateRenderTargetTexture(windowSize, DXGI_FORMAT_R16G16B16A16_FLOAT)); // Position
+		m_RenderTargets.emplace_back(ResourceManager::GetInstance().CreateRenderTargetTexture(windowSize, DXGI_FORMAT_R16G16B16A16_FLOAT)); // Emissive
 		m_RenderTargets.emplace_back(ResourceManager::GetInstance().CreateDepthMap(DirectX::XMINT3(windowSize.x, windowSize.y, 1), DXGI_FORMAT_D32_FLOAT, DXGI_FORMAT_R32_FLOAT, false)); // Depth
 
-        m_Viewport = { 0.0f, 0.0f, (float)windowSize.x, (float)windowSize.y, -1.0f, 1.0f };
+        m_Viewport = { 0.0f, 0.0f, (float)windowSize.x, (float)windowSize.y, 0.0f, 1.0f };
         m_ScissorRect = { 0, 0, (LONG)windowSize.x, (LONG)windowSize.y };
 
 		CreateGeometryPassPSO();
@@ -42,49 +44,14 @@ namespace DX12Engine
     {
 		RenderPass::Execute();
 
-		// For each unique material, upload its textures as a contiguous block of
-		// exactly 5 slots (one per TextureType in order) into the transient heap.
-		// This lets a single SetGraphicsRootDescriptorTable call cover t0..t4.
-		// Materials with no textures at all skip the upload and leave the table unset.
-		{
-			std::unordered_set<Material*> seen;
-			for (const DrawItem& item : m_DrawItems)
-			{
-				if (!item.Material || !seen.insert(item.Material).second)
-					continue;
-
-				item.Material->ClearTextureTable();
-
-				std::vector<GPUResource*> block;
-				block.reserve(5);
-				for (int i = 0; i < 5; i++)
-				{
-					Texture* tex = item.Material->GetTexture(static_cast<TextureType>(i));
-					if (tex && tex->GetIsReady())
-						block.push_back(tex);
-				}
-
-				if (!block.empty())
-				{
-					// Pad to exactly 5 slots so the table always covers t0..t4.
-					// Missing slots are filled by repeating the first ready texture —
-					// the shader's HasTexture flags prevent sampling them.
-					GPUResource* padding = block.front();
-					while (block.size() < 5)
-						block.push_back(padding);
-
-					DescriptorHeapHandle base = ResourceManager::GetInstance().UpdateSRVDescriptors(block);
-					item.Material->SetTextureTableHandle(base.GetGPUHandle());
-				}
-			}
-		}
+		RenderUtils::UpdateMaterialBindings(m_DrawItems);
 
         m_CommandList.RSSetViewports(1, &m_Viewport);
         m_CommandList.RSSetScissorRects(1, &m_ScissorRect);
 
-		CD3DX12_RESOURCE_BARRIER rtBarriers[6];
-        D3D12_CPU_DESCRIPTOR_HANDLE rtvHandles[5];
-        for (int i = 0; i < 5; i++)
+		CD3DX12_RESOURCE_BARRIER rtBarriers[7];
+        D3D12_CPU_DESCRIPTOR_HANDLE rtvHandles[6];
+        for (int i = 0; i < 6; i++)
         {
 			rtBarriers[i] = CD3DX12_RESOURCE_BARRIER::Transition(
 				m_RenderTargets[i]->GetResource(),
@@ -94,18 +61,17 @@ namespace DX12Engine
 			m_RenderTargets[i]->SetUsageState(D3D12_RESOURCE_STATE_RENDER_TARGET);
             rtvHandles[i] = m_RenderTargets[i]->GetTextureDescriptor().GetCPUHandle();
         }
-		rtBarriers[5] = CD3DX12_RESOURCE_BARRIER::Transition(
-			m_RenderTargets[5]->GetResource(),
-			m_RenderTargets[5]->GetUsageState(),
+		rtBarriers[6] = CD3DX12_RESOURCE_BARRIER::Transition(
+			m_RenderTargets[6]->GetResource(),
+			m_RenderTargets[6]->GetUsageState(),
 			D3D12_RESOURCE_STATE_DEPTH_WRITE
 		);
-        m_RenderTargets[5]->SetUsageState(D3D12_RESOURCE_STATE_DEPTH_WRITE);
+        m_RenderTargets[6]->SetUsageState(D3D12_RESOURCE_STATE_DEPTH_WRITE);
         m_CommandList.ResourceBarrier(m_RenderTargets.size(), rtBarriers);
 
-		auto dsvHandle = m_RenderTargets[5]->GetTextureDescriptor().GetCPUHandle();
-		m_CommandList.OMSetRenderTargets(5, rtvHandles, false, &dsvHandle);
-
-        for (int i = 0; i < 5; i++)
+		auto dsvHandle = m_RenderTargets[6]->GetTextureDescriptor().GetCPUHandle();
+		m_CommandList.OMSetRenderTargets(6, rtvHandles, false, &dsvHandle);
+        for (int i = 0; i < 6; i++)
         {
 			DirectX::XMFLOAT4 rtClearColor = m_RenderTargets[i]->GetClearColor();
             const float clearColor[] = { rtClearColor.x, rtClearColor.y, rtClearColor.z, rtClearColor.w };
@@ -128,23 +94,29 @@ namespace DX12Engine
             if (!item.Primitive || !item.Material)
                 continue;
 
-            //if (item.Template->GetBlendPolicy() == BlendPolicy::Blend)
-            //    continue;
+            if (item.BlendMode == AlphaMode::Blend)
+                continue;
 
-            if (item.PipelineKey == 0)
+            MaterialTemplate* tmpl = item.Template;
+            const bool hasTemplatePSO = tmpl && tmpl->GetPassTarget() == PassTarget::Geometry && tmpl->HasResolvedPSO();
+
+            if (!hasTemplatePSO)
             {
                 m_CommandList.SetPipelineState(m_PipelineState.Get());
                 m_CommandList.SetGraphicsRootSignature(m_RootSignature.Get());
                 lastCBV = 0;
                 lastMaterial = nullptr;
+                lastPipelineKey = UINT64_MAX;
+                lastPrimitive = nullptr;
             }
             else if (item.PipelineKey != lastPipelineKey)
             {
-                m_CommandList.SetPipelineState(item.Template->GetPipelineState());
-                m_CommandList.SetGraphicsRootSignature(item.Template->GetRootSignature());
+                m_CommandList.SetPipelineState(tmpl->GetPipelineState());
+                m_CommandList.SetGraphicsRootSignature(tmpl->GetRootSignature());
 				lastPipelineKey = item.PipelineKey;
 				lastCBV = 0;
 				lastMaterial = nullptr;
+                lastPrimitive = nullptr;
             }
 
             if (item.CBVAddress != lastCBV)
@@ -180,7 +152,7 @@ namespace DX12Engine
             );
             m_RenderTargets[i]->SetUsageState(D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
         }
-        m_CommandList.ResourceBarrier(6, rtBarriers);
+        m_CommandList.ResourceBarrier(static_cast<UINT>(m_RenderTargets.size()), rtBarriers);
 
         UINT fenceVal = m_QueueManager.GetGraphicsQueue().ExecuteCommandList();
         m_QueueManager.GetGraphicsQueue().WaitForFenceCPUBlocking(fenceVal);
@@ -200,8 +172,10 @@ namespace DX12Engine
 			return m_RenderTargets[3].get();
 		case RenderTargetType::Position:
 			return m_RenderTargets[4].get();
-        case RenderTargetType::Depth:
+        case RenderTargetType::Emissive:
             return m_RenderTargets[5].get();
+        case RenderTargetType::Depth:
+            return m_RenderTargets[6].get();
         default:
             return nullptr;
         }
@@ -219,10 +193,11 @@ namespace DX12Engine
                 DXGI_FORMAT_R16G16B16A16_FLOAT,
                 DXGI_FORMAT_R16G16B16A16_FLOAT,
                 DXGI_FORMAT_R16G16B16A16_FLOAT,
+                DXGI_FORMAT_R16G16B16A16_FLOAT,
                 DXGI_FORMAT_R16G16B16A16_FLOAT })
             .SetDepthStencilFormat(DXGI_FORMAT_D32_FLOAT);
 
-        DescriptorTableConfig config(5, D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 0);
+        DescriptorTableConfig config(6, D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 0);
         rootSignatureBuilder = rootSignatureBuilder
             .AddConstantBuffer(0)
             .AddConstantBuffer(1)

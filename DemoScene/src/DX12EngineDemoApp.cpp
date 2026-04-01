@@ -20,7 +20,7 @@ namespace DX12EngineDemo
 
 		m_PhysicsEngine = std::make_shared<DX12Engine::PhysicsEngine>();
 
-		m_Scene = std::make_unique<DemoScene>(m_RenderContext, m_PhysicsEngine, windowSize);
+		m_Scene = std::make_unique<ComplexDemoScene>(m_RenderContext, m_PhysicsEngine, windowSize);
 		m_Scene->Init();
 		m_Renderer->SetCurrentScene(m_Scene.get());
 
@@ -56,20 +56,23 @@ namespace DX12EngineDemo
 			DX12Engine::RenderTargetType::ObjectNormal,
 			DX12Engine::RenderTargetType::Material,
 			DX12Engine::RenderTargetType::Position,
+			DX12Engine::RenderTargetType::Emissive,
 			DX12Engine::RenderTargetType::Depth
 		};
 
-		std::vector<DX12Engine::Texture*> lightingExternalTextures{
+		std::vector<DX12Engine::Texture*> enviroAndIrradiance{
 			m_Scene->GetSkyboxCubemap(),
 			m_Scene->GetSkyboxIrradiance()
 		};
+		std::vector<DX12Engine::Texture*> enviro{ m_Scene->GetSkyboxCubemap() };
 		DX12Engine::RenderPassConfig lightingConfig;
 		lightingConfig.Type = DX12Engine::RenderPassType::Lighting;
-		lightingConfig.InputResources[DX12Engine::InputResourceType::ExternalTextures] = &lightingExternalTextures;
+		lightingConfig.InputResources[DX12Engine::InputResourceType::EnvironmentMap] = &enviroAndIrradiance;
 		lightingConfig.InputResources[DX12Engine::InputResourceType::RenderTargets_Geometry] = &gBufferTypes;
 		lightingConfig.InputResources[DX12Engine::InputResourceType::RenderTargets_ShadowMap] = &shadowBufferTypes;
 		lightingConfig.InputResources[DX12Engine::InputResourceType::RenderTargets_CubeShadowMap] = &cubeShadowBufferTypes;
 
+		std::vector<DX12Engine::RenderTargetType> compositeType{ DX12Engine::RenderTargetType::Composite };
 		std::vector<DX12Engine::RenderTargetType> ssrGBufferTypes{
 			DX12Engine::RenderTargetType::Albedo,
 			DX12Engine::RenderTargetType::WorldNormal,
@@ -77,22 +80,25 @@ namespace DX12EngineDemo
 			DX12Engine::RenderTargetType::Position,
 			DX12Engine::RenderTargetType::Depth
 		};
-	std::vector<DX12Engine::Texture*> ssrExternalTextures = {
-			m_Scene->GetSkyboxIrradiance(),
-			m_Scene->GetSkyboxCubemap()
-		};
-		std::vector<DX12Engine::RenderTargetType> ssrLightingTypes{ DX12Engine::RenderTargetType::Composite };
 		DX12Engine::RenderPassConfig ssrConfig;
 		ssrConfig.Type = DX12Engine::RenderPassType::ScreenSpaceReflection;
-		ssrConfig.InputResources[DX12Engine::InputResourceType::ExternalTextures] = &ssrExternalTextures;
+		ssrConfig.InputResources[DX12Engine::InputResourceType::EnvironmentMap] = &enviro;
 		ssrConfig.InputResources[DX12Engine::InputResourceType::RenderTargets_Geometry] = &ssrGBufferTypes;
-		ssrConfig.InputResources[DX12Engine::InputResourceType::RenderTargets_Lighting] = &ssrLightingTypes;
+		ssrConfig.InputResources[DX12Engine::InputResourceType::RenderTargets_Lighting] = &compositeType;
+
+		std::vector<DX12Engine::RenderTargetType> transparentDepthTypes{ DX12Engine::RenderTargetType::Depth };
+		DX12Engine::RenderPassConfig transparentConfig;
+		transparentConfig.Type = DX12Engine::RenderPassType::Transparent;
+		transparentConfig.InputResources[DX12Engine::InputResourceType::EnvironmentMap] = &enviro;
+		transparentConfig.InputResources[DX12Engine::InputResourceType::RenderTargets_Geometry] = &transparentDepthTypes;
+		transparentConfig.InputResources[DX12Engine::InputResourceType::RenderTargets_SSR] = &compositeType;
 
 		pipelineConfig.Passes.push_back(shadowMapConfig);
 		pipelineConfig.Passes.push_back(cubeShadowMapConfig);
 		pipelineConfig.Passes.push_back(geometryConfig);
 		pipelineConfig.Passes.push_back(lightingConfig);
 		pipelineConfig.Passes.push_back(ssrConfig);
+		pipelineConfig.Passes.push_back(transparentConfig);
 		m_RenderPipeline = m_Renderer->CreateRenderPipeline(pipelineConfig);
 	}
 

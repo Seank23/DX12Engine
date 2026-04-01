@@ -43,9 +43,10 @@ Texture2D worldNormalMap : register(t3);
 Texture2D objectNormalMap : register(t4);
 Texture2D materialMap : register(t5);
 Texture2D positionMap : register(t6);
-Texture2D depthMap : register(t7);
-Texture2DArray shadowMaps : register(t8);
-TextureCube shadowCubeMap : register(t9);
+Texture2D emissiveMap : register(t7);
+Texture2D depthMap : register(t8);
+Texture2DArray shadowMaps : register(t9);
+TextureCube shadowCubeMap : register(t10);
 SamplerState samp : register(s0);
 SamplerComparisonState shadowSampler : register(s1);
 
@@ -188,6 +189,7 @@ float4 main(PSInput input) : SV_TARGET
     float metallic = materialMap.Sample(samp, input.texCoord).g;
     float ao = materialMap.Sample(samp, input.texCoord).b;
     float depth = depthMap.Sample(samp, input.texCoord).r;
+    float3 emissive = emissiveMap.Sample(samp, input.texCoord).rgb;
     float3 worldPos = positionMap.Sample(samp, input.texCoord);
     
     float3 V = normalize(CameraPosition.xyz - worldPos);
@@ -246,5 +248,6 @@ float4 main(PSInput input) : SV_TARGET
     float smoothShadow = smoothstep(0.0, 1.0, ambientShadow);
     float remappedShadow = lerp(0.05, 1.0, smoothShadow);
     finalColor += indirectDiffuse * remappedShadow;
+    finalColor += emissive;
     return float4(finalColor, 1.0f);
 }

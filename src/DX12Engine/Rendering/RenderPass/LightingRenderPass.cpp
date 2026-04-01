@@ -19,9 +19,8 @@ namespace DX12Engine
 
 	void LightingRenderPass::Init()
 	{
-		// If no external textures (skybox cubemaps) were provided, insert black fallback
-		// cubemaps so t0 (environmentMap) and t1 (irradianceMap) always have valid descriptors.
-		if (!m_HasSkybox)
+		const bool hasEnvMap = m_ResourceBlocks.find(InputResourceType::EnvironmentMap) != m_ResourceBlocks.end();
+		if (!hasEnvMap)
 		{
 			m_FallbackEnvMap = ResourceManager::GetInstance().CreateDefaultCubeMap();
 			m_FallbackIrradianceMap = ResourceManager::GetInstance().CreateDefaultCubeMap();
@@ -29,11 +28,10 @@ namespace DX12Engine
 			{ std::shared_ptr<GPUResource>(m_FallbackEnvMap.get(), [](GPUResource*){}),
 			  std::shared_ptr<GPUResource>(m_FallbackIrradianceMap.get(), [](GPUResource*){})
 			});
-			m_ResourceBlockSizes.insert(m_ResourceBlockSizes.begin(), 2);
+			m_ResourceBlocks.insert({ InputResourceType::EnvironmentMap, 2 });
 		}
 
 		RenderPass::Init();
-
 
 		m_VertexShaderName = m_VertexShaderName.empty() ? "RenderTriangle_VS" : m_VertexShaderName;
 		m_PixelShaderName = m_PixelShaderName.empty() ? "PBRLightingDeferred_PS" : m_PixelShaderName;
@@ -78,9 +76,9 @@ namespace DX12Engine
 		m_CommandList.SetGraphicsRootConstantBufferView(0, m_ScreenDataCB->GetGPUAddress());
 		m_CommandList.SetGraphicsRootConstantBufferView(1, m_LightBuffer->GetCBVAddress());
 		int startIndex = 2;
-		for (int i = 0; i < m_InputResourceBlockHandles.size(); i++)
+		for (const auto& [type, handle] : m_InputResourceBlockHandles)
 		{
-			m_CommandList.SetGraphicsRootDescriptorTable(startIndex + i, m_InputResourceBlockHandles[i].GetGPUHandle());
+			m_CommandList.SetGraphicsRootDescriptorTable(startIndex++, handle.GetGPUHandle());
 		}
 
 		m_CommandList.IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);

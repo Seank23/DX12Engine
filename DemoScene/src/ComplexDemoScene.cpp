@@ -58,7 +58,7 @@ namespace DX12EngineDemo
 		pbrWornMetal->SetAllTextures(wornMetalTextures);
 
 		DX12Engine::ModelLoader modelLoader;
-		auto mazdaModel = modelLoader.LoadGlb("C:/Users/seank/Documents/Blender/Mazda 3/Mazda3_Painted2.glb");
+		auto mazdaModel = modelLoader.LoadGlb("C:/Users/seank/Documents/Blender/Mazda 3/Mazda3.glb");
 		auto floorMesh = std::make_shared<DX12Engine::MeshAsset>(modelLoader.LoadObj(DX12Engine::ResourceManager::GetModelPath("floor.obj")));
 
 		auto floorModel = std::make_shared<DX12Engine::ModelAsset>("Floor");

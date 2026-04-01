@@ -29,17 +29,16 @@ struct PSOutput
 };
 
 // External textures
-TextureCube irradianceMap  : register(t0);
-TextureCube environmentMap : register(t1);
+TextureCube environmentMap : register(t0);
 // G-buffer inputs
-Texture2D   albedoMap      : register(t2);
-Texture2D   normalMap      : register(t3);
-Texture2D   materialMap    : register(t4);
-Texture2D   positionMap    : register(t5);
-Texture2D   depthMap       : register(t6);
-Texture2D   pipelineOutputMap : register(t7);
+Texture2D   albedoMap      : register(t1);
+Texture2D   normalMap      : register(t2);
+Texture2D   materialMap    : register(t3);
+Texture2D   positionMap    : register(t4);
+Texture2D   depthMap       : register(t5);
+Texture2D   pipelineOutputMap : register(t6);
 // Temporal history (read-only, previous frame result)
-Texture2D   historyMap     : register(t8);
+Texture2D   historyMap     : register(t7);
 
 SamplerState samp : register(s0);
 

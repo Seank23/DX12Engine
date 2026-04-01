@@ -19,22 +19,47 @@ namespace DX12Engine
 	{
 		m_RootSignatureBuilder = RootSignatureBuilder{};
 
-		// Slot 0: per-object CBV (b0)
-		// Slot 1: per-pass CBV  (b1)
-		// Slot 2: texture table  (t0..t4, 5 SRVs)
-		// Sampler s0: anisotropic wrap
-		DescriptorTableConfig texTable(5, D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 0);
-		m_RootSignatureBuilder
-			.AddConstantBuffer(0)
-			.AddConstantBuffer(1)
-			.AddDescriptorTables({ texTable })
-			.AddSampler(0, D3D12_FILTER_ANISOTROPIC);
+		// Geometry:
+		//   b0 object, b1 material, t0..t5 material textures
+		// Transparent:
+		//   b0 object, b1 material, t0..t5 material textures, t6 opaque scene, t7 env map, t8 depth
+		DescriptorTableConfig materialTexTable(6, D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 0);
+		m_RootSignatureBuilder.AddConstantBuffer(0).AddConstantBuffer(1);
+
+		if (m_PassTarget == PassTarget::Transparent)
+		{
+			DescriptorTableConfig envMapTable(1, D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 6);
+			DescriptorTableConfig depthTable(1, D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 7);
+			DescriptorTableConfig opaqueSceneTable(1, D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 8);
+			m_RootSignatureBuilder
+				.AddConstantBuffer(2)
+				.AddDescriptorTables({ materialTexTable, envMapTable, depthTable, opaqueSceneTable })
+				.AddSampler(0, D3D12_FILTER_ANISOTROPIC)
+				.AddSampler(1, D3D12_FILTER_ANISOTROPIC);
+		}
+		else
+		{
+			m_RootSignatureBuilder
+				.AddDescriptorTables({ materialTexTable })
+				.AddSampler(0, D3D12_FILTER_ANISOTROPIC);
+		}
 
 		return m_RootSignatureBuilder.Build();
 	}
 
 	D3D12_GRAPHICS_PIPELINE_STATE_DESC MaterialTemplate::BuildPSODesc()
 	{
+		if (m_PassTarget == PassTarget::Transparent)
+		{
+			m_VertexShaderName = "PBRTransparent_VS";
+			m_PixelShaderName = "PBRTransparent_PS";
+		}
+		else
+		{
+			m_VertexShaderName = "Geometry_VS";
+			m_PixelShaderName = "Geometry_PS";
+		}
+
 		Shader* vs = ResourceManager::GetInstance().GetShader(m_VertexShaderName);
 		Shader* ps = ResourceManager::GetInstance().GetShader(m_PixelShaderName);
 
@@ -45,7 +70,7 @@ namespace DX12Engine
 		rastDesc.SlopeScaledDepthBias = m_RasterizerPolicy.SlopeScaledDepthBias;
 
 		D3D12_BLEND_DESC blendDesc = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
-		if (m_BlendPolicy == BlendPolicy::Blend)
+		if (m_BlendPolicy == AlphaMode::Blend)
 		{
 			blendDesc.RenderTarget[0].BlendEnable           = TRUE;
 			blendDesc.RenderTarget[0].SrcBlend              = D3D12_BLEND_SRC_ALPHA;
@@ -60,14 +85,32 @@ namespace DX12Engine
 		m_PipelineStateBuilder = PipelineStateBuilder{};
 		m_PipelineStateBuilder.ConfigureFromDefault(vs, ps)
 			.SetRasterizerState(rastDesc)
-			.SetBlendState(blendDesc)
-			.SetRenderTargets({
+			.SetBlendState(blendDesc);
+
+		if (m_PassTarget == PassTarget::Transparent)
+		{
+			D3D12_DEPTH_STENCIL_DESC depthDesc = CD3DX12_DEPTH_STENCIL_DESC(D3D12_DEFAULT);
+			if (m_BlendPolicy == AlphaMode::Blend)
+			{
+				depthDesc.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ZERO;
+				depthDesc.DepthEnable = FALSE;
+			}
+
+			m_PipelineStateBuilder
+				.SetDepthStencilState(depthDesc)
+				.SetRenderTargets({ DXGI_FORMAT_R16G16B16A16_FLOAT });
+		}
+		else
+		{
+			m_PipelineStateBuilder.SetRenderTargets({
 				DXGI_FORMAT_R8G8B8A8_UNORM,
+				DXGI_FORMAT_R16G16B16A16_FLOAT,
 				DXGI_FORMAT_R16G16B16A16_FLOAT,
 				DXGI_FORMAT_R16G16B16A16_FLOAT,
 				DXGI_FORMAT_R16G16B16A16_FLOAT,
 				DXGI_FORMAT_R16G16B16A16_FLOAT })
 			.SetDepthStencilFormat(DXGI_FORMAT_D32_FLOAT);
+		}
 
 		return m_PipelineStateBuilder.Build();
 	}

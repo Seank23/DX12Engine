@@ -12,7 +12,8 @@ namespace DX12Engine
 		Normal,
 		Metallic,
 		Roughness,
-		AOMap
+		AOMap,
+		Emissive
 	};
 
 	class Texture : public GPUResource
