@@ -86,12 +86,12 @@ namespace DX12Engine
 		}
 	}
 
-	RenderTexture* ShadowMapRenderPass::GetRenderTarget(RenderTargetType type)
+	std::shared_ptr<RenderTexture> ShadowMapRenderPass::GetRenderTarget(ResourceSlot type)
 	{
 		switch (type)
 		{
-		case RenderTargetType::Depth:
-			return m_RenderTargets[0].get();
+		case ResourceSlot::Depth:
+			return m_RenderTargets[0];
 		default:
 			return nullptr;
 		}

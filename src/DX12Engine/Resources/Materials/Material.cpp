@@ -17,9 +17,9 @@ namespace DX12Engine
 	{
 	}
 
-	void Material::Bind(ID3D12GraphicsCommandList* commandList, int* startIndex)
+	void Material::Bind(ID3D12GraphicsCommandList* commandList, int cbSlot, int textureSlot)
 	{
-		commandList->SetGraphicsRootConstantBufferView((*startIndex)++, GetCBVAddress());
+		commandList->SetGraphicsRootConstantBufferView(cbSlot, GetCBVAddress());
 	}
 
 	void Material::UpdateConstantBufferData(const void* data, UINT size)

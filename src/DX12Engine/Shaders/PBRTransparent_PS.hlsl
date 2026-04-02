@@ -71,7 +71,7 @@ float3 FresnelSchlick(float cosTheta, float3 F0)
     return F0 + (1.0 - F0) * pow(1.0 - cosTheta, 5.0);
 }
 
-float4 main(PSInput i) : SV_TARGET
+float4 main(PSInput i, bool isFrontFace : SV_IsFrontFace) : SV_TARGET
 {
     // Manual depth test against the G-buffer depth so transparent fragments
     // are correctly occluded by opaque geometry without needing a bound DSV.
@@ -101,20 +101,27 @@ float4 main(PSInput i) : SV_TARGET
     if (HasAOMap != 0)
         ao *= aoMap.Sample(sampWrap, i.uv).r;
 
-    float3 N = normalize(i.normalWS);
+    float faceSign = isFrontFace ? 1.0 : -1.0;
+    float3 N = normalize(i.normalWS) * faceSign;
     if (HasNormalMap != 0)
     {
         float3 nTS = normalMap.Sample(sampWrap, i.uv).xyz * 2.0 - 1.0;
         nTS.xy *= NormalScale;
         nTS = normalize(nTS);
-        float3x3 TBN = float3x3(normalize(i.tangentWS), normalize(i.bitangentWS), N);
+        float3 T = normalize(i.tangentWS) * faceSign;
+        float3 B = normalize(i.bitangentWS) * faceSign;
+        float3x3 TBN = float3x3(T, B, N);
         N = normalize(mul(nTS, TBN));
     }
 
     float3 V = normalize(i.viewDirWS);
     float NdotV = saturate(dot(N, V));
 
-    float3 F0 = lerp(float3(0.04, 0.04, 0.04), baseColor, metallic);
+    float clampedIOR = max(IOR, 1.001);
+    float iorF0 = pow((clampedIOR - 1.0) / (clampedIOR + 1.0), 2.0);
+    float3 F0 = lerp(float3(iorF0, iorF0, iorF0), baseColor, metallic);
+    if (Transmission > 0.0)
+        F0 = float3(iorF0, iorF0, iorF0);
     float3 F = FresnelSchlick(NdotV, F0);
 
     float3 R = reflect(-V, N);
@@ -124,9 +131,9 @@ float4 main(PSInput i) : SV_TARGET
     // Cheap screen-space refraction from existing opaque composite
     float2 screenUV = screenUVdepth;
 
-    float eta = (IOR > 1.001) ? (1.0 / IOR) : 0.66;
+    float eta = isFrontFace ? (1.0 / clampedIOR) : clampedIOR;
     float3 refrDir = refract(-V, N, eta);
-    float2 refrUV = screenUV + refrDir.xy * RefractionScale;
+    float2 refrUV = screenUV + refrDir.xy * saturate(RefractionScale);
     refrUV = saturate(refrUV);
 
     float3 refracted = opaqueScene.Sample(sampClamp, refrUV).rgb;

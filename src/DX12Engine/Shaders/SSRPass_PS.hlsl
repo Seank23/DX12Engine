@@ -318,14 +318,25 @@ PSOutput main(PSInput input)
 
     // Neighbourhood clamping: clamp history into the local colour bounding box
     // of the current SSR sample to suppress ghosting from disoccluded regions.
-    float3 colorMin = currentSSR.rgb * 0.85;
-    float3 colorMax = currentSSR.rgb * 1.15 + float3(0.02, 0.02, 0.02);
+    // Use a tighter clamp (±5% + small epsilon) to prevent car-body colours
+    // from bleeding into floor reflection history at silhouette edges.
+    float3 colorMin = currentSSR.rgb * 0.95;
+    float3 colorMax = currentSSR.rgb * 1.05 + float3(0.005, 0.005, 0.005);
     historySample = clamp(historySample, colorMin, colorMax);
+
+    // Depth disocclusion: compare the depth at the reprojected UV against the
+    // depth reconstructed from the current pixel's world-space position.
+    // If they differ significantly the history sample belongs to a different
+    // surface (e.g. car body vs floor) and should be discarded entirely.
+    float historyDepth  = depthMap.Sample(samp, prevUV).r;
+    float currentDepth  = depthMap.Sample(samp, texCoord).r;
+    bool  disoccluded   = abs(historyDepth - currentDepth) > 0.005;
 
     // Blend weight: high confidence → blend more of the current frame for fast
     // convergence. Low confidence → lean on history more to smooth out misses.
-    // Discard history entirely on the first frame, or when the reprojected UV is outside the screen.
-    float blendAlpha = (FrameIndex == 0 || offScreen) ? 1.0 : lerp(0.05, 0.2, confidence);
+    // Discard history entirely on the first frame, when the reprojected UV is
+    // outside the screen, or when a depth disocclusion is detected.
+    float blendAlpha = (FrameIndex == 0 || offScreen || disoccluded) ? 1.0 : lerp(0.05, 0.2, confidence);
     float3 accumulatedSSR = lerp(historySample, currentSSR.rgb, blendAlpha);
 
     float3 finalColor = sceneColor + accumulatedSSR;

@@ -24,11 +24,11 @@ namespace DX12Engine
 		{
 			m_FallbackEnvMap = ResourceManager::GetInstance().CreateDefaultCubeMap();
 			m_FallbackIrradianceMap = ResourceManager::GetInstance().CreateDefaultCubeMap();
-		m_InputResources.insert(m_InputResources.begin(),
-			{ std::shared_ptr<GPUResource>(m_FallbackEnvMap.get(), [](GPUResource*){}),
-			  std::shared_ptr<GPUResource>(m_FallbackIrradianceMap.get(), [](GPUResource*){})
-			});
-			m_ResourceBlocks.insert({ InputResourceType::EnvironmentMap, 2 });
+			m_InputResources.insert(m_InputResources.begin(),
+				{ std::shared_ptr<GPUResource>(m_FallbackEnvMap.get(), [](GPUResource*) {}),
+				  std::shared_ptr<GPUResource>(m_FallbackIrradianceMap.get(), [](GPUResource*) {})
+				});
+			AddResourceBlock(InputResourceType::EnvironmentMap, 2);
 		}
 
 		RenderPass::Init();
@@ -73,13 +73,16 @@ namespace DX12Engine
 		auto srvHeap = m_RenderContext.GetHeapManager().GetRenderPassHeap().GetHeap();
 		m_CommandList.SetDescriptorHeaps(1, &srvHeap);
 
-		m_CommandList.SetGraphicsRootConstantBufferView(0, m_ScreenDataCB->GetGPUAddress());
-		m_CommandList.SetGraphicsRootConstantBufferView(1, m_LightBuffer->GetCBVAddress());
-		int startIndex = 2;
-		for (const auto& [type, handle] : m_InputResourceBlockHandles)
+		auto bindPassInputTables = [this]()
 		{
-			m_CommandList.SetGraphicsRootDescriptorTable(startIndex++, handle.GetGPUHandle());
-		}
+			m_CommandList.SetGraphicsRootConstantBufferView(0, m_ScreenDataCB->GetGPUAddress());
+			m_CommandList.SetGraphicsRootConstantBufferView(1, m_LightBuffer->GetCBVAddress());
+			m_CommandList.SetGraphicsRootDescriptorTable(2, m_InputResourceBlockHandles[InputResourceType::EnvironmentMap].GetGPUHandle());
+			m_CommandList.SetGraphicsRootDescriptorTable(3, m_InputResourceBlockHandles[InputResourceType::RenderTargets_Geometry].GetGPUHandle());
+			m_CommandList.SetGraphicsRootDescriptorTable(4, m_InputResourceBlockHandles[InputResourceType::RenderTargets_ShadowMap].GetGPUHandle());
+			m_CommandList.SetGraphicsRootDescriptorTable(5, m_InputResourceBlockHandles[InputResourceType::RenderTargets_CubeShadowMap].GetGPUHandle());
+		};
+		bindPassInputTables();
 
 		m_CommandList.IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 		m_CommandList.DrawInstanced(3, 1, 0, 0);
@@ -96,12 +99,12 @@ namespace DX12Engine
 		m_QueueManager.GetGraphicsQueue().WaitForFenceCPUBlocking(fenceVal);
 	}
 
-	RenderTexture* LightingRenderPass::GetRenderTarget(RenderTargetType type)
+	std::shared_ptr<RenderTexture> LightingRenderPass::GetRenderTarget(ResourceSlot type)
 	{
 		switch (type)
 		{
-		case RenderTargetType::Composite:
-			return m_RenderTargets[0].get();
+		case ResourceSlot::Composite:
+			return m_RenderTargets[0];
 		default:
 			return nullptr;
 		}

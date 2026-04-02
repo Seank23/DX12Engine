@@ -31,7 +31,7 @@ namespace DX12Engine
 		float ClearcoatRoughness = 0.0f;
 
 		float NormalScale = 1.0f;
-		float RefractionScale = 1.0f;
+		float RefractionScale = 0.02f;
 		int AlphaMode = 0; // 0=Opaque, 1=Masked, 2=Blend
 		float AlphaCutoff = 0.5f;
 

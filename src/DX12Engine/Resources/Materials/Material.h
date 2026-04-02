@@ -23,7 +23,7 @@ namespace DX12Engine
 		virtual Texture* GetTexture(TextureType type) = 0;
 		virtual bool HasTexture(TextureType type) = 0;
 
-		virtual void Bind(ID3D12GraphicsCommandList* commandList, int* startIndex);
+		virtual void Bind(ID3D12GraphicsCommandList* commandList, int cbSlot, int textureSlot);
 
 		virtual void SetAllTextures(std::unordered_map<TextureType, std::shared_ptr<Texture>> textures) = 0;
 

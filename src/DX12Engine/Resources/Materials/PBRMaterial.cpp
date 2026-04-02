@@ -54,12 +54,11 @@ namespace DX12Engine
 			return false;
 		}
 	}
-	void PBRMaterial::Bind(ID3D12GraphicsCommandList* commandList, int* startIndex)
+	void PBRMaterial::Bind(ID3D12GraphicsCommandList* commandList, int cbSlot, int textureSlot)
 	{
-		Material::Bind(commandList, startIndex);
+		Material::Bind(commandList, cbSlot, textureSlot);
 		if (HasTextureTable())
-			commandList->SetGraphicsRootDescriptorTable(*startIndex, GetTextureTableHandle());
-		(*startIndex)++;
+			commandList->SetGraphicsRootDescriptorTable(textureSlot, GetTextureTableHandle());
 	}
 
 	void PBRMaterial::SetAllTextures(std::unordered_map<TextureType, std::shared_ptr<Texture>> textures)
@@ -90,45 +89,45 @@ namespace DX12Engine
 		}
 	}
 
-	void PBRMaterial::SetAlbedoMap(std::shared_ptr<Texture> texture)
+	void PBRMaterial::SetAlbedoMap(std::shared_ptr<Texture> texture, bool hasMap)
 	{
 		m_AlbedoMap = texture;
-		m_MaterialData.HasAlbedoMap = texture ? 1 : 0;
+		m_MaterialData.HasAlbedoMap = hasMap ? 1 : 0;
 		UpdateConstantBufferData(&m_MaterialData, sizeof(m_MaterialData));
 	}
 
-	void PBRMaterial::SetNormalMap(std::shared_ptr<Texture> texture)
+	void PBRMaterial::SetNormalMap(std::shared_ptr<Texture> texture, bool hasMap)
 	{
 		m_NormalMap = texture;
-		m_MaterialData.HasNormalMap = texture ? 1 : 0;
+		m_MaterialData.HasNormalMap = hasMap ? 1 : 0;
 		UpdateConstantBufferData(&m_MaterialData, sizeof(m_MaterialData));
 	}
 
-	void PBRMaterial::SetMetallicMap(std::shared_ptr<Texture> texture)
+	void PBRMaterial::SetMetallicMap(std::shared_ptr<Texture> texture, bool hasMap)
 	{
 		m_MetallicMap = texture;
-		m_MaterialData.HasMetallicMap = texture ? 1 : 0;
+		m_MaterialData.HasMetallicMap = hasMap ? 1 : 0;
 		UpdateConstantBufferData(&m_MaterialData, sizeof(m_MaterialData));
 	}
 
-	void PBRMaterial::SetRoughnessMap(std::shared_ptr<Texture> texture)
+	void PBRMaterial::SetRoughnessMap(std::shared_ptr<Texture> texture, bool hasMap)
 	{
 		m_RoughnessMap = texture;
-		m_MaterialData.HasRoughnessMap = texture ? 1 : 0;
+		m_MaterialData.HasRoughnessMap = hasMap ? 1 : 0;
 		UpdateConstantBufferData(&m_MaterialData, sizeof(m_MaterialData));
 	}
 
-	void PBRMaterial::SetAOMap(std::shared_ptr<Texture> texture)
+	void PBRMaterial::SetAOMap(std::shared_ptr<Texture> texture, bool hasMap)
 	{
 		m_AOMap = texture;
-		m_MaterialData.HasAOMap = texture ? 1 : 0;
+		m_MaterialData.HasAOMap = hasMap ? 1 : 0;
 		UpdateConstantBufferData(&m_MaterialData, sizeof(m_MaterialData));
 	}
 
-	void PBRMaterial::SetEmissiveMap(std::shared_ptr<Texture> texture)
+	void PBRMaterial::SetEmissiveMap(std::shared_ptr<Texture> texture, bool hasMap)
 	{
 		m_EmissiveMap = texture;
-		m_MaterialData.HasEmissiveMap = texture ? 1 : 0;
+		m_MaterialData.HasEmissiveMap = hasMap ? 1 : 0;
 		UpdateConstantBufferData(&m_MaterialData, sizeof(m_MaterialData));
 	}
 

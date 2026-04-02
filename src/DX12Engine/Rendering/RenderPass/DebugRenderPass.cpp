@@ -61,11 +61,11 @@ namespace DX12Engine
 		m_CommandList.SetDescriptorHeaps(1, &srvHeap);
 
 		int startIndex = 0;
-		for (int i = 0; i < m_DescriptorTableConfigs.size(); i++)
+		/*for (int i = 0; i < m_DescriptorTableConfigs.size(); i++)
 		{
 			int resourceIndex = m_DescriptorTableConfigs[i].BaseShaderRegister;
 			m_CommandList.SetGraphicsRootDescriptorTable(startIndex + i, m_InputResources[resourceIndex]->GetTransientDescriptor()->GetGPUHandle());
-		}
+		}*/
 
 		m_CommandList.IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 		m_CommandList.DrawInstanced(3, 1, 0, 0);
@@ -82,7 +82,7 @@ namespace DX12Engine
 		m_QueueManager.WaitForFenceCPUBlocking(fenceVal);
 	}
 
-	RenderTexture* DebugRenderPass::GetRenderTarget(RenderTargetType type)
+	std::shared_ptr<RenderTexture> DebugRenderPass::GetRenderTarget(ResourceSlot type)
 	{
 		return nullptr;
 	}

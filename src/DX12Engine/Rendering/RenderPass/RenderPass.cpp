@@ -17,10 +17,14 @@ namespace DX12Engine
 		// No transient allocation here -- RebuildTransientDescriptors allocates fresh
 		// shader-visible slots every frame from the current frame's transient region.
 		UINT baseRegister = 0;
-		for (auto& block : m_ResourceBlocks)
+		for (InputResourceType type : m_ResourceBlockOrder)
 		{
-			AddDescriptorTableConfig({ block.second, D3D12_DESCRIPTOR_RANGE_TYPE_SRV, baseRegister });
-			baseRegister += block.second;
+			auto blockIt = m_ResourceBlocks.find(type);
+			if (blockIt == m_ResourceBlocks.end())
+				continue;
+
+			AddDescriptorTableConfig({ blockIt->second, D3D12_DESCRIPTOR_RANGE_TYPE_SRV, baseRegister });
+			baseRegister += blockIt->second;
 		}
 
 		DirectX::XMINT2 windowSize = m_RenderContext.GetWindowSize();
@@ -38,12 +42,20 @@ namespace DX12Engine
 		// Allocate one contiguous transient block for all input resources and capture
 		// the base handle. Block-start GPU handles are computed by offset from this base
 		// so that clobbers from other passes' UpdateSRVDescriptors calls cannot corrupt them.
-		DescriptorHeapHandle blockBase = ResourceManager::GetInstance().UpdateSRVDescriptors(EngineUtils::VectorSharedPtrToPtrs(m_InputResources));
+		std::vector<GPUResource*> inputResources;
+		for (const auto& resource : m_InputResources)
+			inputResources.push_back(resource.get());
+		DescriptorHeapHandle blockBase = ResourceManager::GetInstance().UpdateSRVDescriptors(inputResources);
 
 		UINT descriptorSize = m_RenderContext.GetHeapManager().GetRenderPassHeap().GetDescriptorSize();
 		UINT baseRegister = 0;
-		for (auto& [type, size] : m_ResourceBlocks)
+		for (InputResourceType type : m_ResourceBlockOrder)
 		{
+			auto sizeIt = m_ResourceBlocks.find(type);
+			if (sizeIt == m_ResourceBlocks.end())
+				continue;
+			UINT size = sizeIt->second;
+
 			if (size > 0 && baseRegister < static_cast<UINT>(m_InputResources.size()))
 			{
 				DescriptorHeapHandle blockStart;

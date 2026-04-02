@@ -85,12 +85,12 @@ namespace DX12Engine
 		m_QueueManager.GetGraphicsQueue().WaitForFenceCPUBlocking(fenceVal);
 	}
 
-	RenderTexture* UIRenderPass::GetRenderTarget(RenderTargetType type)
+	std::shared_ptr<RenderTexture> UIRenderPass::GetRenderTarget(ResourceSlot type)
 	{
 		switch (type)
 		{
-		case RenderTargetType::Composite:
-			return m_RenderTargets[0].get();
+		case ResourceSlot::Composite:
+			return m_RenderTargets[0];
 		default:
 			return nullptr;
 		}

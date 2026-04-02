@@ -25,9 +25,8 @@ namespace DX12Engine
 		if (!hasEnvMap)
 		{
 			m_FallbackEnvMap = ResourceManager::GetInstance().CreateDefaultCubeMap();
-			m_InputResources.insert(m_InputResources.begin(),
-				std::shared_ptr<GPUResource>(m_FallbackEnvMap.get(), [](GPUResource*) {}));
-			m_ResourceBlocks.insert({ InputResourceType::EnvironmentMap, 1 });
+			m_InputResources.insert(m_InputResources.begin(), std::shared_ptr<GPUResource>(m_FallbackEnvMap.get(), [](GPUResource*) {}));
+			AddResourceBlock(InputResourceType::EnvironmentMap, 1);
 		}
 
 		RenderPass::Init();
@@ -129,19 +128,19 @@ namespace DX12Engine
 		auto srvHeap = m_RenderContext.GetHeapManager().GetRenderPassHeap().GetHeap();
 		m_CommandList.SetDescriptorHeaps(1, &srvHeap);
 
-		m_CommandList.SetGraphicsRootConstantBufferView(0, m_ScreenDataCB->GetGPUAddress());
-		m_CommandList.SetGraphicsRootConstantBufferView(1, m_TemporalCB->GetGPUAddress());
-		int startIndex = 2;
-		for (const auto& [type, handle] : m_InputResourceBlockHandles)
-		{
-			m_CommandList.SetGraphicsRootDescriptorTable(startIndex++, handle.GetGPUHandle());
-		}
-		// Bind the history read buffer as the last descriptor table.
-		// Use a fresh UpdateSRVDescriptors call so the handle is always from the
-		// current frame's transient region rather than a stale per-resource descriptor.
 		std::vector<GPUResource*> historyVec = { historyRead };
 		DescriptorHeapHandle historyBlock = ResourceManager::GetInstance().UpdateSRVDescriptors(historyVec);
-		m_CommandList.SetGraphicsRootDescriptorTable(startIndex++, historyBlock.GetGPUHandle());
+
+		auto bindPassInputTables = [this, historyBlock]()
+		{
+			m_CommandList.SetGraphicsRootConstantBufferView(0, m_ScreenDataCB->GetGPUAddress());
+			m_CommandList.SetGraphicsRootConstantBufferView(1, m_TemporalCB->GetGPUAddress());
+			m_CommandList.SetGraphicsRootDescriptorTable(2, m_InputResourceBlockHandles[InputResourceType::EnvironmentMap].GetGPUHandle());
+			m_CommandList.SetGraphicsRootDescriptorTable(3, m_InputResourceBlockHandles[InputResourceType::RenderTargets_Geometry].GetGPUHandle());
+			m_CommandList.SetGraphicsRootDescriptorTable(4, m_InputResourceBlockHandles[InputResourceType::RenderTargets_Lighting].GetGPUHandle());
+			m_CommandList.SetGraphicsRootDescriptorTable(5, historyBlock.GetGPUHandle());
+		};
+		bindPassInputTables();
 
 		m_CommandList.IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 		m_CommandList.DrawInstanced(3, 1, 0, 0);
@@ -168,12 +167,12 @@ namespace DX12Engine
 		m_FrameIndex++;
 	}
 
-	RenderTexture* SSRRenderPass::GetRenderTarget(RenderTargetType type)
+	std::shared_ptr<RenderTexture> SSRRenderPass::GetRenderTarget(ResourceSlot type)
 	{
 		switch (type)
 		{
-		case RenderTargetType::Composite:
-			return m_RenderTargets[0].get();
+		case ResourceSlot::Composite:
+			return m_RenderTargets[0];
 		default:
 			return nullptr;
 		}

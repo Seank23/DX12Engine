@@ -28,9 +28,8 @@ namespace DX12Engine
 		if (!hasEnvMap)
 		{
 			m_FallbackEnvMap = ResourceManager::GetInstance().CreateDefaultCubeMap();
-			m_InputResources.insert(m_InputResources.begin(),
-				std::shared_ptr<GPUResource>(m_FallbackEnvMap.get(), [](GPUResource*){}));
-			m_ResourceBlocks.insert({ InputResourceType::EnvironmentMap, 1 });
+			m_InputResources.insert(m_InputResources.begin(), std::shared_ptr<GPUResource>(m_FallbackEnvMap.get(), [](GPUResource*) {}));
+			AddResourceBlock(InputResourceType::EnvironmentMap, 1);
 		}
 
 		RenderPass::Init();
@@ -50,11 +49,9 @@ namespace DX12Engine
 	void TransparentRenderPass::Execute()
 	{
 		RenderPass::Execute();
-		RenderTexture* renderTarget = m_RenderTargets[0].get();
 
-		// Find the lighting composite (block 2 = RenderTargets_Lighting) to copy
-		// into the render target so transparent geometry blends over the opaque scene.
-		RenderTexture* sceneSource = dynamic_cast<RenderTexture*>(m_InputResources[2].get());
+		RenderTexture* renderTarget = m_RenderTargets[0].get();
+		RenderTexture* sceneSource = dynamic_cast<RenderTexture*>(m_InputResources[m_InputResources.size() - 1].get());
 
 		RenderUtils::UpdateMaterialBindings(m_DrawItems);
 
@@ -104,26 +101,11 @@ namespace DX12Engine
 
 		auto bindPassInputTables = [this]()
 		{
-			// Root slots for transparent signatures:
-			//   0: object CBV, 1: screen data CBV, 2: material CBV
-			//   3: material texture table (t0..t4)
-			//   4: env map table (t5), 5: depth map table (t6), 6: opaque scene table (t7)
 			m_CommandList.SetGraphicsRootConstantBufferView(1, m_ScreenDataCB->GetGPUAddress());
-			if (m_InputResourceBlockHandles.size() > 1)
-			{
-				m_CommandList.SetGraphicsRootDescriptorTable(4, m_InputResourceBlockHandles[InputResourceType::EnvironmentMap].GetGPUHandle());
-				m_CommandList.SetGraphicsRootDescriptorTable(6, m_InputResourceBlockHandles[InputResourceType::RenderTargets_SSR].GetGPUHandle());
-			}
-			else if (m_InputResourceBlockHandles.size() == 1)
-			{
-				m_CommandList.SetGraphicsRootDescriptorTable(4, m_InputResourceBlockHandles[InputResourceType::EnvironmentMap].GetGPUHandle());
-			}
-			if (m_InputResourceBlockHandles.size() > 2)
-			{
-				m_CommandList.SetGraphicsRootDescriptorTable(5, m_InputResourceBlockHandles[InputResourceType::RenderTargets_Geometry].GetGPUHandle());
-			}
+			m_CommandList.SetGraphicsRootDescriptorTable(4, m_InputResourceBlockHandles[InputResourceType::EnvironmentMap].GetGPUHandle());
+			m_CommandList.SetGraphicsRootDescriptorTable(5, m_InputResourceBlockHandles[InputResourceType::RenderTargets_Geometry].GetGPUHandle());
+			m_CommandList.SetGraphicsRootDescriptorTable(6, m_InputResourceBlockHandles[InputResourceType::RenderTargets_SSR].GetGPUHandle());
 		};
-
 		bindPassInputTables();
 
 		D3D12_GPU_VIRTUAL_ADDRESS lastCBV = 0;
@@ -171,8 +153,7 @@ namespace DX12Engine
 
 			if (item.Material != lastMaterial)
 			{
-				int startIndex = 2;
-				item.Material->Bind(&m_CommandList, &startIndex);
+				item.Material->Bind(&m_CommandList, 2, 3);
 				lastMaterial = item.Material;
 			}
 
@@ -201,12 +182,12 @@ namespace DX12Engine
 		m_QueueManager.GetGraphicsQueue().WaitForFenceCPUBlocking(fenceVal);
 	}
 
-	RenderTexture* TransparentRenderPass::GetRenderTarget(RenderTargetType type)
+	std::shared_ptr<RenderTexture> TransparentRenderPass::GetRenderTarget(ResourceSlot type)
 	{
 		switch (type)
 		{
-		case RenderTargetType::Composite:
-			return m_RenderTargets[0].get();
+		case ResourceSlot::Composite:
+			return m_RenderTargets[0];
 		default:
 			return nullptr;
 		}

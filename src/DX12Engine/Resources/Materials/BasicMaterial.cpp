@@ -48,12 +48,11 @@ namespace DX12Engine
 		}
 	}
 
-	void BasicMaterial::Bind(ID3D12GraphicsCommandList* commandList, int* startIndex)
+	void BasicMaterial::Bind(ID3D12GraphicsCommandList* commandList, int cbSlot, int textureSlot)
 	{
-		Material::Bind(commandList, startIndex);
+		Material::Bind(commandList, cbSlot, textureSlot);
 		if (HasTextureTable())
-			commandList->SetGraphicsRootDescriptorTable(*startIndex, GetTextureTableHandle());
-		(*startIndex)++;
+			commandList->SetGraphicsRootDescriptorTable(textureSlot, GetTextureTableHandle());
 	}
 
 	void BasicMaterial::SetAllTextures(std::unordered_map<TextureType, std::shared_ptr<Texture>> textures)

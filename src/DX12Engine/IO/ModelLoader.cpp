@@ -617,7 +617,7 @@ namespace DX12Engine
 
             // --- albedo texture ---
             std::shared_ptr<Texture> albedoTex = resolveTexture(pbr.baseColorTexture.index);
-            if (albedoTex) pbrMat->SetAlbedoMap(albedoTex);
+            albedoTex ? pbrMat->SetAlbedoMap(albedoTex) : pbrMat->SetAlbedoMap(ctx.defaultAlbedo, false);
 
             // --- normal texture ---
             std::shared_ptr<Texture> normalTex = resolveTexture(gltfMat.normalTexture.index);
@@ -644,10 +644,10 @@ namespace DX12Engine
 
             // --- occlusion texture ---
             std::shared_ptr<Texture> aoTex = resolveTexture(gltfMat.occlusionTexture.index);
-            pbrMat->SetAOMap(aoTex ? aoTex : ctx.defaultAO);
+            aoTex ? pbrMat->SetAOMap(aoTex) : pbrMat->SetAOMap(ctx.defaultAO, false);
 
             std::shared_ptr<Texture> emissiveTex = resolveTexture(gltfMat.emissiveTexture.index);
-            pbrMat->SetEmissiveMap(emissiveTex ? emissiveTex : ctx.defaultEmissive);
+            emissiveTex ? pbrMat->SetEmissiveMap(emissiveTex) : pbrMat->SetEmissiveMap(ctx.defaultEmissive, false);
 
             std::string matName = gltfMat.name.empty()
                 ? ("material_" + std::to_string(mi))

@@ -25,12 +25,12 @@ namespace DX12Engine
 		void Init() override;
 		void Execute() override;
 
-		RenderTexture* GetRenderTarget(RenderTargetType type) override;
+		std::shared_ptr<RenderTexture> GetRenderTarget(ResourceSlot type) override;
 
 		void SetLights(std::vector<Light*> lights) { m_Lights = lights; }
 		void SetDrawItems(const std::vector<DrawItem>& drawItems) { m_DrawItems = drawItems; }
 
-		RenderTexture* GetShadowMapOutput() { return m_RenderTargets[0].get(); }
+		std::shared_ptr<RenderTexture> GetShadowMapOutput() { return m_RenderTargets[0]; }
 
 	private:
 		void RenderShadowMap(RenderTexture* shadowMap, int lightIndex);

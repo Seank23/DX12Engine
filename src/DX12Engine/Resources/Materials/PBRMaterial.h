@@ -13,16 +13,16 @@ namespace DX12Engine
 		virtual Texture* GetTexture(TextureType type) override;
 		virtual bool HasTexture(TextureType type) override;
 
-		virtual void Bind(ID3D12GraphicsCommandList* commandList, int* startIndex) override;
+		virtual void Bind(ID3D12GraphicsCommandList* commandList, int cbSlot, int textureSlot) override;
 
 		virtual void SetAllTextures(std::unordered_map<TextureType, std::shared_ptr<Texture>> textures) override;
 
-		void SetAlbedoMap(std::shared_ptr<Texture> texture);
-		void SetNormalMap(std::shared_ptr<Texture> texture);
-		void SetMetallicMap(std::shared_ptr<Texture> texture);
-		void SetRoughnessMap(std::shared_ptr<Texture> texture);
-		void SetAOMap(std::shared_ptr<Texture> texture);
-		void SetEmissiveMap(std::shared_ptr<Texture> texture);
+		void SetAlbedoMap(std::shared_ptr<Texture> texture, bool hasMap = true);
+		void SetNormalMap(std::shared_ptr<Texture> texture, bool hasMap = true);
+		void SetMetallicMap(std::shared_ptr<Texture> texture, bool hasMap = true);
+		void SetRoughnessMap(std::shared_ptr<Texture> texture, bool hasMap = true);
+		void SetAOMap(std::shared_ptr<Texture> texture, bool hasMap = true);
+		void SetEmissiveMap(std::shared_ptr<Texture> texture, bool hasMap = true);
 
 		void SetAlbedo(DirectX::XMFLOAT3 albedo);
 		void SetMetallic(float metallic);

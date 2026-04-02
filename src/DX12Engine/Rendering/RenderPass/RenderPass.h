@@ -8,7 +8,7 @@
 
 namespace DX12Engine
 {
-	enum class RenderTargetType
+	enum class ResourceSlot
 	{
 		Albedo,
 		WorldNormal,
@@ -17,7 +17,8 @@ namespace DX12Engine
 		Position,
 		Depth,
 		Composite,
-		Emissive
+		Emissive,
+		EnvironmentMap
 	};
 
 	class RenderComponent;
@@ -37,20 +38,21 @@ namespace DX12Engine
 		virtual void Init();
 		virtual void Execute();
 		virtual void OnResize(DirectX::XMINT2 newSize);
-		virtual RenderTexture* GetRenderTarget(RenderTargetType type) = 0;
+		virtual std::shared_ptr<RenderTexture> GetRenderTarget(ResourceSlot type) = 0;
 		RenderPassType GetType() const { return m_Type; }
 
 		void RebuildTransientDescriptors();
 
-		void AddInputResources(std::vector<GPUResource*> resources)
-		{
-			m_InputResources.insert(m_InputResources.end(), resources.begin(), resources.end());
-		}
 		void AddInputResources(std::vector<std::shared_ptr<GPUResource>> resources)
 		{
 			m_InputResources.insert(m_InputResources.end(), resources.begin(), resources.end());
 		}
-		void AddResourceBlock(InputResourceType type, UINT size) { m_ResourceBlocks[type] = size; }
+		void AddResourceBlock(InputResourceType type, UINT size)
+		{
+			if (m_ResourceBlocks.find(type) == m_ResourceBlocks.end())
+				m_ResourceBlockOrder.push_back(type);
+			m_ResourceBlocks[type] = size;
+		}
 		void SetVertexShader(const std::string& name) { m_VertexShaderName = name; }
 		void SetPixelShader(const std::string& name) { m_PixelShaderName = name; }
 		void SetRenderObjects(std::vector<RenderComponent*> renderObjects) { m_RenderObjects = renderObjects; }
@@ -73,7 +75,8 @@ namespace DX12Engine
 		std::vector<std::shared_ptr<GPUResource>> m_InputResources;
 		std::vector<DescriptorTableConfig> m_DescriptorTableConfigs;
 		std::unordered_map<InputResourceType, DescriptorHeapHandle> m_InputResourceBlockHandles;
-		std::vector<std::unique_ptr<RenderTexture>> m_RenderTargets;
+		std::vector<InputResourceType> m_ResourceBlockOrder;
+		std::vector<std::shared_ptr<RenderTexture>> m_RenderTargets;
 		std::vector<RenderComponent*> m_RenderObjects;
 		std::string m_VertexShaderName;
 		std::string m_PixelShaderName;

@@ -36,34 +36,31 @@ namespace DX12EngineDemo
 		shadowMapConfig.Type = DX12Engine::RenderPassType::ShadowMap;
 		shadowMapConfig.Count = static_cast<int>(shadowCastingLights.size());
 		shadowMapConfig.InputResources[DX12Engine::InputResourceType::LightData] = &shadowCastingLights;
-		std::vector<DX12Engine::RenderTargetType> shadowBufferTypes{
-			DX12Engine::RenderTargetType::Depth
+		std::vector<DX12Engine::ResourceSlot> shadowBufferTypes{
+			DX12Engine::ResourceSlot::Depth
 		};
 
 		DX12Engine::RenderPassConfig cubeShadowMapConfig;
 		cubeShadowMapConfig.Type = DX12Engine::RenderPassType::CubeShadowMap;
 		cubeShadowMapConfig.Count = static_cast<int>(cubeShadowCastingLights.size());
 		cubeShadowMapConfig.InputResources[DX12Engine::InputResourceType::LightData] = &cubeShadowCastingLights;
-		std::vector<DX12Engine::RenderTargetType> cubeShadowBufferTypes{
-			DX12Engine::RenderTargetType::Depth
+		std::vector<DX12Engine::ResourceSlot> cubeShadowBufferTypes{
+			DX12Engine::ResourceSlot::Depth
 		};
 
 		DX12Engine::RenderPassConfig geometryConfig;
 		geometryConfig.Type = DX12Engine::RenderPassType::Geometry;
-		std::vector<DX12Engine::RenderTargetType> gBufferTypes{
-			DX12Engine::RenderTargetType::Albedo,
-			DX12Engine::RenderTargetType::WorldNormal,
-			DX12Engine::RenderTargetType::ObjectNormal,
-			DX12Engine::RenderTargetType::Material,
-			DX12Engine::RenderTargetType::Position,
-			DX12Engine::RenderTargetType::Emissive,
-			DX12Engine::RenderTargetType::Depth
+		std::vector<DX12Engine::ResourceSlot> gBufferTypes{
+			DX12Engine::ResourceSlot::Albedo,
+			DX12Engine::ResourceSlot::WorldNormal,
+			DX12Engine::ResourceSlot::ObjectNormal,
+			DX12Engine::ResourceSlot::Material,
+			DX12Engine::ResourceSlot::Position,
+			DX12Engine::ResourceSlot::Emissive,
+			DX12Engine::ResourceSlot::Depth
 		};
 
-		std::vector<DX12Engine::Texture*> enviroAndIrradiance{
-			m_Scene->GetSkyboxCubemap(),
-			m_Scene->GetSkyboxIrradiance()
-		};
+		std::vector<DX12Engine::Texture*> enviroAndIrradiance{ m_Scene->GetSkyboxCubemap(), m_Scene->GetSkyboxIrradiance() };
 		std::vector<DX12Engine::Texture*> enviro{ m_Scene->GetSkyboxCubemap() };
 		DX12Engine::RenderPassConfig lightingConfig;
 		lightingConfig.Type = DX12Engine::RenderPassType::Lighting;
@@ -72,13 +69,13 @@ namespace DX12EngineDemo
 		lightingConfig.InputResources[DX12Engine::InputResourceType::RenderTargets_ShadowMap] = &shadowBufferTypes;
 		lightingConfig.InputResources[DX12Engine::InputResourceType::RenderTargets_CubeShadowMap] = &cubeShadowBufferTypes;
 
-		std::vector<DX12Engine::RenderTargetType> compositeType{ DX12Engine::RenderTargetType::Composite };
-		std::vector<DX12Engine::RenderTargetType> ssrGBufferTypes{
-			DX12Engine::RenderTargetType::Albedo,
-			DX12Engine::RenderTargetType::WorldNormal,
-			DX12Engine::RenderTargetType::Material,
-			DX12Engine::RenderTargetType::Position,
-			DX12Engine::RenderTargetType::Depth
+		std::vector<DX12Engine::ResourceSlot> compositeType{ DX12Engine::ResourceSlot::Composite };
+		std::vector<DX12Engine::ResourceSlot> ssrGBufferTypes{
+			DX12Engine::ResourceSlot::Albedo,
+			DX12Engine::ResourceSlot::WorldNormal,
+			DX12Engine::ResourceSlot::Material,
+			DX12Engine::ResourceSlot::Position,
+			DX12Engine::ResourceSlot::Depth
 		};
 		DX12Engine::RenderPassConfig ssrConfig;
 		ssrConfig.Type = DX12Engine::RenderPassType::ScreenSpaceReflection;
@@ -86,7 +83,7 @@ namespace DX12EngineDemo
 		ssrConfig.InputResources[DX12Engine::InputResourceType::RenderTargets_Geometry] = &ssrGBufferTypes;
 		ssrConfig.InputResources[DX12Engine::InputResourceType::RenderTargets_Lighting] = &compositeType;
 
-		std::vector<DX12Engine::RenderTargetType> transparentDepthTypes{ DX12Engine::RenderTargetType::Depth };
+		std::vector<DX12Engine::ResourceSlot> transparentDepthTypes{ DX12Engine::ResourceSlot::Depth };
 		DX12Engine::RenderPassConfig transparentConfig;
 		transparentConfig.Type = DX12Engine::RenderPassType::Transparent;
 		transparentConfig.InputResources[DX12Engine::InputResourceType::EnvironmentMap] = &enviro;

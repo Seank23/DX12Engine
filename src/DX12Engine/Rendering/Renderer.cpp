@@ -109,13 +109,13 @@ namespace DX12Engine
 		{
 			pass->Execute();
 		}
-		RenderTexture* finalRenderTarget = pipeline.RenderPasses.back()->GetRenderTarget(DX12Engine::RenderTargetType::Composite);
-		PresentFrame(finalRenderTarget);
+		std::shared_ptr<RenderTexture> finalRenderTarget = pipeline.RenderPasses.back()->GetRenderTarget(DX12Engine::ResourceSlot::Composite);
+		PresentFrame(finalRenderTarget.get());
 	}
 
-	std::unique_ptr<std::vector<RenderTargetType>> Renderer::GetTargets(std::vector<RenderTargetType> targets)
+	std::unique_ptr<std::vector<ResourceSlot>> Renderer::GetTargets(std::vector<ResourceSlot> targets)
 	{
-		return std::make_unique<std::vector<RenderTargetType>>(targets);
+		return std::make_unique<std::vector<ResourceSlot>>(targets);
 	}
 
 	RenderPipeline Renderer::CreateRenderPipeline(RenderPipelineConfig config)
@@ -141,56 +141,56 @@ namespace DX12Engine
 						switch (inputType)
 						{
 						case InputResourceType::RenderTargets_ShadowMap:
-							for (auto& target : *static_cast<std::vector<RenderTargetType>*>(inputResource))
+							for (auto& target : *static_cast<std::vector<ResourceSlot>*>(inputResource))
 								renderPass->AddInputResources({ pipeline.RenderPasses[renderPassOrder[RenderPassType::ShadowMap]]->GetRenderTarget(target) });
 							renderPass->AddResourceBlock(
 								InputResourceType::RenderTargets_ShadowMap,
-								static_cast<UINT>(static_cast<std::vector<RenderTargetType>*>(inputResource)->size())
+								static_cast<UINT>(static_cast<std::vector<ResourceSlot>*>(inputResource)->size())
 							);
 							break;
 						case InputResourceType::RenderTargets_CubeShadowMap:
-							for (auto& target : *static_cast<std::vector<RenderTargetType>*>(inputResource))
+							for (auto& target : *static_cast<std::vector<ResourceSlot>*>(inputResource))
 								renderPass->AddInputResources({ pipeline.RenderPasses[renderPassOrder[RenderPassType::CubeShadowMap]]->GetRenderTarget(target) });
 							renderPass->AddResourceBlock(
 								InputResourceType::RenderTargets_CubeShadowMap,
-								static_cast<UINT>(static_cast<std::vector<RenderTargetType>*>(inputResource)->size())
+								static_cast<UINT>(static_cast<std::vector<ResourceSlot>*>(inputResource)->size())
 							);
 							break;
 						case InputResourceType::RenderTargets_Geometry:
-							for (auto& target : *static_cast<std::vector<RenderTargetType>*>(inputResource))
+							for (auto& target : *static_cast<std::vector<ResourceSlot>*>(inputResource))
 								renderPass->AddInputResources({ pipeline.RenderPasses[renderPassOrder[RenderPassType::Geometry]]->GetRenderTarget(target) });
 							renderPass->AddResourceBlock(
 								InputResourceType::RenderTargets_Geometry,
-								static_cast<UINT>(static_cast<std::vector<RenderTargetType>*>(inputResource)->size())
+								static_cast<UINT>(static_cast<std::vector<ResourceSlot>*>(inputResource)->size())
 							);
 							break;
 						case InputResourceType::RenderTargets_Lighting:
-							for (auto& target : *static_cast<std::vector<RenderTargetType>*>(inputResource))
+							for (auto& target : *static_cast<std::vector<ResourceSlot>*>(inputResource))
 								renderPass->AddInputResources({ pipeline.RenderPasses[renderPassOrder[RenderPassType::Lighting]]->GetRenderTarget(target) });
 							renderPass->AddResourceBlock(
 								InputResourceType::RenderTargets_Lighting,
-								static_cast<UINT>(static_cast<std::vector<RenderTargetType>*>(inputResource)->size())
+								static_cast<UINT>(static_cast<std::vector<ResourceSlot>*>(inputResource)->size())
 							);
 							break;
 						case InputResourceType::RenderTargets_Transparent:
-							for (auto& target : *static_cast<std::vector<RenderTargetType>*>(inputResource))
+							for (auto& target : *static_cast<std::vector<ResourceSlot>*>(inputResource))
 								renderPass->AddInputResources({ pipeline.RenderPasses[renderPassOrder[RenderPassType::Transparent]]->GetRenderTarget(target) });
 							renderPass->AddResourceBlock(
 								InputResourceType::RenderTargets_Transparent,
-								static_cast<UINT>(static_cast<std::vector<RenderTargetType>*>(inputResource)->size())
+								static_cast<UINT>(static_cast<std::vector<ResourceSlot>*>(inputResource)->size())
 							);
 							break;
 						case InputResourceType::RenderTargets_SSR:
-							for (auto& target : *static_cast<std::vector<RenderTargetType>*>(inputResource))
+							for (auto& target : *static_cast<std::vector<ResourceSlot>*>(inputResource))
 								renderPass->AddInputResources({ pipeline.RenderPasses[renderPassOrder[RenderPassType::ScreenSpaceReflection]]->GetRenderTarget(target) });
 							renderPass->AddResourceBlock(
 								InputResourceType::RenderTargets_SSR,
-								static_cast<UINT>(static_cast<std::vector<RenderTargetType>*>(inputResource)->size())
+								static_cast<UINT>(static_cast<std::vector<ResourceSlot>*>(inputResource)->size())
 							);
 							break;
 						case InputResourceType::EnvironmentMap:
 							for (auto& texture : *static_cast<std::vector<Texture*>*>(inputResource))
-								renderPass->AddInputResources({ texture });
+								renderPass->AddInputResources({ std::shared_ptr<Texture>(texture, [](Texture*) {}) });
 							renderPass->AddResourceBlock(
 								InputResourceType::EnvironmentMap,
 								static_cast<UINT>(static_cast<std::vector<Texture*>*>(inputResource)->size())

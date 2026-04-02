@@ -12,7 +12,7 @@ namespace DX12Engine
 	class GameObject;
 	struct RenderPipelineConfig;
 	enum class RenderPassType;
-	enum class RenderTargetType;
+	enum class ResourceSlot;
 
 	struct RenderPipeline
 	{
@@ -37,7 +37,7 @@ namespace DX12Engine
 		bool PollWindow();
 		void ExecutePipeline(RenderPipeline pipeline);
 
-		std::unique_ptr<std::vector<RenderTargetType>> GetTargets(std::vector<RenderTargetType> targets);
+		std::unique_ptr<std::vector<ResourceSlot>> GetTargets(std::vector<ResourceSlot> targets);
 		RenderPipeline CreateRenderPipeline(RenderPipelineConfig config);
 
 		void SetCurrentScene(Scene* scene) { m_CurrentScene = scene; }

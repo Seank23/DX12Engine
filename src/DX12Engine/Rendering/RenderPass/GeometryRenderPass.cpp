@@ -127,8 +127,7 @@ namespace DX12Engine
 
             if (item.Material != lastMaterial)
             {
-                int startIndex = 1;
-                item.Material->Bind(&m_CommandList, &startIndex);
+                item.Material->Bind(&m_CommandList, 1, 2);
                 lastMaterial = item.Material;
             }
 
@@ -158,24 +157,24 @@ namespace DX12Engine
         m_QueueManager.GetGraphicsQueue().WaitForFenceCPUBlocking(fenceVal);
     }
 
-    RenderTexture* GeometryRenderPass::GetRenderTarget(RenderTargetType type)
+    std::shared_ptr<RenderTexture> GeometryRenderPass::GetRenderTarget(ResourceSlot type)
     {
         switch (type)
         {
-		case RenderTargetType::Albedo:
-			return m_RenderTargets[0].get();
-		case RenderTargetType::WorldNormal:
-			return m_RenderTargets[1].get();
-        case RenderTargetType::ObjectNormal:
-            return m_RenderTargets[2].get();
-		case RenderTargetType::Material:
-			return m_RenderTargets[3].get();
-		case RenderTargetType::Position:
-			return m_RenderTargets[4].get();
-        case RenderTargetType::Emissive:
-            return m_RenderTargets[5].get();
-        case RenderTargetType::Depth:
-            return m_RenderTargets[6].get();
+		case ResourceSlot::Albedo:
+			return m_RenderTargets[0];
+		case ResourceSlot::WorldNormal:
+			return m_RenderTargets[1];
+        case ResourceSlot::ObjectNormal:
+            return m_RenderTargets[2];
+		case ResourceSlot::Material:
+			return m_RenderTargets[3];
+		case ResourceSlot::Position:
+			return m_RenderTargets[4];
+        case ResourceSlot::Emissive:
+            return m_RenderTargets[5];
+        case ResourceSlot::Depth:
+            return m_RenderTargets[6];
         default:
             return nullptr;
         }
