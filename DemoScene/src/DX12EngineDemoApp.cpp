@@ -65,9 +65,9 @@ namespace DX12EngineDemo
 		DX12Engine::RenderPassConfig lightingConfig;
 		lightingConfig.Type = DX12Engine::RenderPassType::Lighting;
 		lightingConfig.InputResources[DX12Engine::InputResourceType::EnvironmentMap] = &enviroAndIrradiance;
-		lightingConfig.InputResources[DX12Engine::InputResourceType::RenderTargets_Geometry] = &gBufferTypes;
 		lightingConfig.InputResources[DX12Engine::InputResourceType::RenderTargets_ShadowMap] = &shadowBufferTypes;
 		lightingConfig.InputResources[DX12Engine::InputResourceType::RenderTargets_CubeShadowMap] = &cubeShadowBufferTypes;
+		lightingConfig.InputResources[DX12Engine::InputResourceType::RenderTargets_Geometry] = &gBufferTypes;
 
 		std::vector<DX12Engine::ResourceSlot> compositeType{ DX12Engine::ResourceSlot::Composite };
 		std::vector<DX12Engine::ResourceSlot> ssrGBufferTypes{

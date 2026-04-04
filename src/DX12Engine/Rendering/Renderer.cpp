@@ -21,21 +21,6 @@
 
 namespace DX12Engine
 {
-	namespace
-	{
-		constexpr std::array<InputResourceType, 9> kOrderedCommonInputs = {
-			InputResourceType::EnvironmentMap,
-			InputResourceType::RenderTargets_Geometry,
-			InputResourceType::RenderTargets_ShadowMap,
-			InputResourceType::RenderTargets_CubeShadowMap,
-			InputResourceType::RenderTargets_Lighting,
-			InputResourceType::RenderTargets_Transparent,
-			InputResourceType::RenderTargets_SSR,
-			InputResourceType::VertexShader,
-			InputResourceType::PixelShader,
-		};
-	}
-
 	Renderer::Renderer(std::shared_ptr<RenderContext> context)
 		: m_RenderContext(context), m_RenderHeap(context->GetHeapManager().GetRenderPassHeap()), m_QueueManager(context->GetQueueManager())
 	{
@@ -131,7 +116,7 @@ namespace DX12Engine
 				renderPassOrder[passConfig.Type] = i;
 				if (renderPass)
 				{
-					for (InputResourceType inputType : kOrderedCommonInputs)
+					for (InputResourceType inputType : OrderedInputTypes)
 					{
 						auto inputIt = passConfig.InputResources.find(inputType);
 						if (inputIt == passConfig.InputResources.end())

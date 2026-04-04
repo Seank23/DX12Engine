@@ -33,6 +33,18 @@ namespace DX12Engine
 		PixelShader,
 	};
 
+	static std::vector<InputResourceType> OrderedInputTypes = {
+			InputResourceType::EnvironmentMap,
+			InputResourceType::RenderTargets_Geometry,
+			InputResourceType::RenderTargets_ShadowMap,
+			InputResourceType::RenderTargets_CubeShadowMap,
+			InputResourceType::RenderTargets_Lighting,
+			InputResourceType::RenderTargets_Transparent,
+			InputResourceType::RenderTargets_SSR,
+			InputResourceType::VertexShader,
+			InputResourceType::PixelShader,
+	};
+
 	class GPUResource;
 
 	struct RenderPassConfig

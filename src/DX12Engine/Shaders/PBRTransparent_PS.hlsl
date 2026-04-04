@@ -138,6 +138,13 @@ float4 main(PSInput i, bool isFrontFace : SV_IsFrontFace) : SV_TARGET
 
     float3 refracted = opaqueScene.Sample(sampClamp, refrUV).rgb;
 
+    // Simple Beer-Lambert style tinting so transmissive glass darkens/tints
+    // instead of staying unnaturally bright in shaded regions.
+    float3 absorptionTint = lerp(float3(1.0, 1.0, 1.0), saturate(baseColor), saturate(Transmission));
+    float pathLength = lerp(1.0, 3.0, 1.0 - NdotV);
+    float3 transmittance = pow(max(absorptionTint, float3(0.001, 0.001, 0.001)), pathLength);
+    refracted *= transmittance;
+
     // Fresnel gives the specular reflection weight for this viewing angle.
     // Roughness attenuates it so rough surfaces show more of the diffuse/refracted
     // colour. Transmission blends between the opaque Fresnel reflection and a
@@ -145,6 +152,7 @@ float4 main(PSInput i, bool isFrontFace : SV_IsFrontFace) : SV_TARGET
     float fresnelMax = max(F.r, max(F.g, F.b));
     float roughAttenuation = 1.0 - perceptualRoughness;
     float specularWeight = fresnelMax * roughAttenuation;
+    specularWeight *= lerp(0.55, 1.0, 1.0 - NdotV);
     // For transmissive materials lerp toward the refracted result; for opaque
     // materials the diffuse base colour tints the non-specular portion.
     float3 diffuseOrRefracted = lerp(refracted * baseColor, refracted, Transmission);
@@ -157,7 +165,8 @@ float4 main(PSInput i, bool isFrontFace : SV_IsFrontFace) : SV_TARGET
         emissive *= e;
     }
 
-    float outAlpha = saturate(baseAlpha * (1.0 - Transmission) + Transmission * 0.25 + (1.0 - NdotV) * 0.15);
+    float transmissionAlpha = lerp(0.04, 0.18, 1.0 - NdotV);
+    float outAlpha = saturate(lerp(baseAlpha, transmissionAlpha, saturate(Transmission)));
 
     float3 outColor = glassColor + emissive;
     return float4(outColor, outAlpha);

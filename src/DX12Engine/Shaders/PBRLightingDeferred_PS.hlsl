@@ -1,4 +1,4 @@
-#define MAX_LIGHTS 4
+ï»¿#define MAX_LIGHTS 4
 
 struct Light
 {
@@ -60,6 +60,11 @@ float3 FresnelSchlick(float cosTheta, float3 F0)
     return F0 + (1.0 - F0) * pow(1.0 - cosTheta, 5.0);
 }
 
+float3 FresnelSchlickRoughness(float cosTheta, float3 F0, float roughness)
+{
+    return F0 + (max(float3(1.0 - roughness, 1.0 - roughness, 1.0 - roughness), F0) - F0) * pow(1.0 - cosTheta, 5.0);
+}
+
 float NormalDistribution(float NdotH, float roughness)
 {
     float alpha = roughness * roughness;
@@ -73,7 +78,26 @@ float GeometrySchlickGGX(float NdotV, float NdotL, float roughness)
     return (NdotV / (NdotV * (1.0 - k) + k)) * (NdotL / (NdotL * (1.0 - k) + k));
 }
 
-float3 PBRLighting(float3 albedo, float metallic, float roughness, float ao, float3 N, float3 V, float3 L, Light light)
+float SpecularOcclusion(float NdotV, float ao, float roughness)
+{
+    // Prevent polished metals from glowing in shadow when only env lighting is present.
+    float exponent = exp2(-16.0 * roughness - 1.0);
+    return saturate(pow(saturate(NdotV + ao), exponent) - 1.0 + ao);
+}
+
+float ClearcoatSpecLobe(float NdotV, float NdotL, float NdotH, float HdotV, float clearcoatRoughness)
+{
+    float r = max(0.02, clearcoatRoughness * clearcoatRoughness);
+    float D = NormalDistribution(NdotH, r);
+    float G = GeometrySchlickGGX(NdotV, NdotL, r);
+
+    // glTF clearcoat uses fixed dielectric F0 ~= 0.04
+    float F = FresnelSchlick(HdotV, float3(0.04, 0.04, 0.04)).r;
+
+    return (D * G * F) / max(0.001, 4.0 * NdotV * NdotL);
+}
+
+float3 PBRLighting(float3 albedo, float metallic, float roughness, float clearcoat, float clearcoatRoughness, float3 N, float3 V, float3 L, Light light)
 {
     float3 H = normalize(V + L);
     float NdotV = max(dot(N, V), 0.0);
@@ -81,26 +105,29 @@ float3 PBRLighting(float3 albedo, float metallic, float roughness, float ao, flo
     float NdotH = max(dot(N, H), 0.0);
     float HdotV = max(dot(H, V), 0.0);
     
-    float3 F0 = lerp(0.04, albedo, metallic);
+    float3 F0 = lerp(float3(0.04, 0.04, 0.04), albedo, metallic);
     float3 F = FresnelSchlick(HdotV, F0);
     float D = NormalDistribution(NdotH, roughness);
     float G = GeometrySchlickGGX(NdotV, NdotL, roughness);
     
     float3 numerator = D * F * G;
     float denominator = 4.0 * NdotV * NdotL + 0.001;
-    float3 specularLight = numerator / denominator;
-    
-    float3 reflectionVector = reflect(-V, N);
-    float perceptualRoughness = roughness * roughness;
-    float3 specularEnv = environmentMap.SampleLevel(samp, reflectionVector, perceptualRoughness * 12).rgb;
-    
-    float3 specular = specularLight * specularEnv * F;
-    
+    float3 specular = numerator / denominator;
     float3 radiance = light.Color * NdotL * light.Intensity;
     float3 kD = (1.0 - F) * (1.0 - metallic);
+    float3 diffuse = (kD * albedo) / 3.14159;
+    float3 color = (diffuse + specular) * radiance;
     
-    float3 color = (kD * albedo * ao / 3.14159) + specular;
-    return color * radiance;
+    float FcV = FresnelSchlick(NdotV, float3(0.04, 0.04, 0.04)).r;
+    float baseAtten = 1.0 - clearcoat * FcV;
+    color *= baseAtten;
+    float clearcoatSpec = ClearcoatSpecLobe(NdotV, NdotL, NdotH, HdotV, clearcoatRoughness);
+    color += clearcoat * clearcoatSpec;
+    float3 reflectionVector = reflect(-V, N);
+    float3 clearcoatEnv = sRGBToLinear(environmentMap.SampleLevel(samp, reflectionVector, clearcoatRoughness * 12.0).rgb);
+    color += clearcoat * FcV * clearcoatEnv;
+    
+    return color;
 }
 
 float ShadowPCF(int lightIndex, float4 lightSpacePos, float softRadius)
@@ -116,7 +143,7 @@ float ShadowPCF(int lightIndex, float4 lightSpacePos, float softRadius)
     if (shadowUV.x < 0.0 || shadowUV.x > 1.0 || shadowUV.y < 0.0 || shadowUV.y > 1.0 || depth < 0.0 || depth > 1.0)
         return 1.0;
 
-    // 16-tap Poisson disk — irregular spacing breaks up the banding
+    // 16-tap Poisson disk ï¿½ irregular spacing breaks up the banding
     // that a regular grid produces at the shadow penumbra edge.
     static const float2 poissonDisk[16] =
     {
@@ -182,15 +209,18 @@ float3 GetViewRay(float2 uv)
 
 float4 main(PSInput input) : SV_TARGET
 {
-    float3 albedo = albedoMap.Sample(samp, input.texCoord);
-    float3 worldNormal = worldNormalMap.Sample(samp, input.texCoord);
-    float3 objectNormal = objectNormalMap.Sample(samp, input.texCoord);
-    float roughness = materialMap.Sample(samp, input.texCoord).r;
-    float metallic = materialMap.Sample(samp, input.texCoord).g;
-    float ao = materialMap.Sample(samp, input.texCoord).b;
-    float depth = depthMap.Sample(samp, input.texCoord).r;
+    float3 albedo = albedoMap.Sample(samp, input.texCoord).rgb;
+    float3 worldNormal = normalize(worldNormalMap.Sample(samp, input.texCoord).rgb);
+    float3 objectNormal = objectNormalMap.Sample(samp, input.texCoord).rgb;
+    float4 material = materialMap.Sample(samp, input.texCoord);
+    float roughness = saturate(material.r);
+    float metallic = saturate(material.g);
+    float clearcoat = saturate(material.b);
+    float clearcoatRoughness = saturate(material.a);
     float3 emissive = emissiveMap.Sample(samp, input.texCoord).rgb;
-    float3 worldPos = positionMap.Sample(samp, input.texCoord);
+    float ao = saturate(emissiveMap.Sample(samp, input.texCoord).a);
+    float depth = depthMap.Sample(samp, input.texCoord).r;
+    float3 worldPos = positionMap.Sample(samp, input.texCoord).rgb;
     
     float3 V = normalize(CameraPosition.xyz - worldPos);
     
@@ -205,7 +235,18 @@ float4 main(PSInput input) : SV_TARGET
         return float4(sRGBToLinear(environmentMap.Sample(samp, worldDir).rgb), 0.0);
     }
     
-    float3 indirectDiffuse = albedo * sRGBToLinear(irradianceMap.Sample(samp, worldNormal).rgb);
+    float NdotV = saturate(dot(worldNormal, V));
+    float3 F0 = lerp(float3(0.04, 0.04, 0.04), albedo, metallic);
+    float3 kS = FresnelSchlickRoughness(NdotV, F0, roughness);
+    float3 kD = (1.0 - kS) * (1.0 - metallic);
+    float3 diffuseIBL = albedo * sRGBToLinear(irradianceMap.Sample(samp, worldNormal).rgb);
+    float3 reflectionVector = reflect(-V, worldNormal);
+    float perceptualRoughness = roughness;
+    float3 prefilteredEnv = sRGBToLinear(environmentMap.SampleLevel(samp, reflectionVector, perceptualRoughness * 12.0).rgb);
+    float specularWeight = (1.0 - roughness) * (1.0 - roughness);
+    float specOcc = SpecularOcclusion(NdotV, ao, roughness);
+    float3 diffuseAmbient = (kD * diffuseIBL) * ao;
+    float3 specularAmbient = prefilteredEnv * kS * specularWeight * specOcc;
     
     for (int i = 0; i < LightCount; i++)
     {
@@ -217,7 +258,7 @@ float4 main(PSInput input) : SV_TARGET
         
         if (Lights[i].Type == 0) // Directional Light
         {
-            lightContribution = PBRLighting(albedo, metallic, roughness, ao, worldNormal, V, normalize(-Lights[i].Direction), Lights[i]);
+            lightContribution = PBRLighting(albedo, metallic, roughness, clearcoat, clearcoatRoughness, worldNormal, V, normalize(-Lights[i].Direction), Lights[i]);
             shadowFactor = ShadowPCF(i, lightSpacePosition, 10.0);
             ambientShadow = min(ambientShadow, shadowFactor);
         }
@@ -227,7 +268,7 @@ float4 main(PSInput input) : SV_TARGET
             float distOverRange = dist / Lights[i].Range;
             float window = saturate(1.0 - distOverRange * distOverRange * distOverRange * distOverRange);
             float attenuation = (window * window) / (dist * dist + 1.0);
-            lightContribution = PBRLighting(albedo, metallic, roughness, ao, worldNormal, V, lightDir, Lights[i]) * attenuation;
+            lightContribution = PBRLighting(albedo, metallic, roughness, clearcoat, clearcoatRoughness, worldNormal, V, lightDir, Lights[i]) * attenuation;
             shadowFactor = PointLightShadowPCF(worldPos, Lights[i].Position, 3.0, worldNormal, Lights[i].Padding.x);
         }
         else if (Lights[i].Type == 2) // Spot Light
@@ -237,7 +278,7 @@ float4 main(PSInput input) : SV_TARGET
             float intensity = saturate((theta - cos(Lights[i].SpotAngle * 0.9)) / epsilon);
             float dist = length(Lights[i].Position - worldPos);
             float attenuation = saturate(1.0 - (dist * dist) / (Lights[i].Range * Lights[i].Range));
-            lightContribution = PBRLighting(albedo, metallic, roughness, ao, worldNormal, V, lightDir, Lights[i]) * intensity * attenuation;
+            lightContribution = PBRLighting(albedo, metallic, roughness, clearcoat, clearcoatRoughness, worldNormal, V, lightDir, Lights[i]) * intensity * attenuation;
             shadowFactor = ShadowPCF(i, lightSpacePosition, 2.0);
             ambientShadow = min(ambientShadow, shadowFactor);
         }
@@ -246,8 +287,10 @@ float4 main(PSInput input) : SV_TARGET
     // Apply the shadow-to-ambient gradient once on the accumulated result so the
     // full 0..1 PCF range maps smoothly to the min/max ambient levels.
     float smoothShadow = smoothstep(0.0, 1.0, ambientShadow);
-    float remappedShadow = lerp(0.05, 1.0, smoothShadow);
-    finalColor += indirectDiffuse * remappedShadow;
+    float remappedDiffuseShadow = lerp(0.2, 1.0, smoothShadow);
+    float remappedSpecularShadow = lerp(0.05, 1.0, smoothShadow);
+    finalColor += diffuseAmbient * remappedDiffuseShadow;
+    finalColor += specularAmbient * remappedSpecularShadow;
     finalColor += emissive;
     return float4(finalColor, 1.0f);
 }

@@ -49,7 +49,7 @@ namespace DX12Engine
 
 		UINT descriptorSize = m_RenderContext.GetHeapManager().GetRenderPassHeap().GetDescriptorSize();
 		UINT baseRegister = 0;
-		for (InputResourceType type : m_ResourceBlockOrder)
+		for (InputResourceType type : OrderedInputTypes)
 		{
 			auto sizeIt = m_ResourceBlocks.find(type);
 			if (sizeIt == m_ResourceBlocks.end())

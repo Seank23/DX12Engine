@@ -101,8 +101,8 @@ PSOutput main(PSInput input)
     output.albedo       = outputAlbedo;
     output.worldNormal  = float4(worldNormal, 1.0);
     output.objectNormal = float4(input.normal, 1.0);
-    output.material     = float4(roughness, metallic, ao, 1.0);
+    output.material     = float4(roughness, metallic, Clearcoat, ClearcoatRoughness);
     output.position     = float4(input.worldPos, 1.0);
-    output.emissive     = float4(emissiveColor, 1.0);
+    output.emissive     = float4(emissiveColor, ao);
     return output;
 }
