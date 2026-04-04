@@ -2,6 +2,7 @@
 #include "../Resources/ResourceManager.h"
 #include "./PipelineStateCache.h"
 #include "./RootSignatureCache.h"
+#include "../Input/Camera.h"
 
 namespace DX12Engine
 {
@@ -22,6 +23,9 @@ namespace DX12Engine
 		m_RenderWindow->CreateSwapChain(m_QueueManager->GetGraphicsQueue().GetCommandQueue().Get());
 		m_RenderWindow->CreateRTVHeap(m_Device.Get());
 		m_RenderWindow->CreateDepthStencilBuffer();
+
+		m_ScreenDataCB = ResourceManager::GetInstance().CreateConstantBuffer(sizeof(ScreenData));
+		m_ScreenData.ScreenSize = DirectX::XMFLOAT2(m_WindowSize.x, m_WindowSize.y);
 	}
 
 	RenderContext::~RenderContext()
@@ -46,6 +50,19 @@ namespace DX12Engine
 		{
 			MessageBox(hwnd, "Failed to create DirectX 12 device.", "Error", MB_OK);
 			exit(-1);
+		}
+	}
+
+	void RenderContext::UpdateScreenData(Camera* camera)
+	{
+		if (camera != nullptr)
+		{
+			m_ScreenData.CameraPosition = DirectX::XMFLOAT4(camera->GetPosition().x, camera->GetPosition().y, camera->GetPosition().z, 1.0f);
+			m_ScreenData.ViewMatrix = camera->GetViewMatrix();
+			m_ScreenData.ProjectionMatrix = camera->GetProjectionMatrix();
+			m_ScreenData.InvViewMatrix = DirectX::XMMatrixInverse(nullptr, camera->GetViewMatrix());
+			m_ScreenData.InvProjectionMatrix = DirectX::XMMatrixInverse(nullptr, camera->GetProjectionMatrix());
+			m_ScreenDataCB->Update(&m_ScreenData, sizeof(ScreenData));
 		}
 	}
 }

@@ -37,7 +37,6 @@ namespace DX12Engine
 		~RenderPass() = default;
 		virtual void Init();
 		virtual void Execute();
-		virtual void OnResize(DirectX::XMINT2 newSize);
 		virtual std::shared_ptr<RenderTexture> GetRenderTarget(ResourceSlot type) = 0;
 		RenderPassType GetType() const { return m_Type; }
 
@@ -66,10 +65,6 @@ namespace DX12Engine
 		RenderContext& m_RenderContext;
 		CommandQueueManager& m_QueueManager;
 		ID3D12GraphicsCommandList& m_CommandList;
-
-		ScreenData m_ScreenData;
-		std::unique_ptr<ConstantBuffer> m_ScreenDataCB;
-		void UpdateCB();
 
 		RenderPassType m_Type;
 		std::vector<std::shared_ptr<GPUResource>> m_InputResources;

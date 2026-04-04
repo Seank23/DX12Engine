@@ -59,8 +59,8 @@ namespace DX12Engine
 	{
 		// Capture the previous frame's matrices BEFORE RenderPass::Execute() calls
 		// UpdateCB(), which overwrites m_ScreenData with the current camera state.
-		DirectX::XMMATRIX prevView = m_ScreenData.ViewMatrix;
-		DirectX::XMMATRIX prevProj = m_ScreenData.ProjectionMatrix;
+		DirectX::XMMATRIX prevView = m_PrevFrameScreenData.ViewMatrix;
+		DirectX::XMMATRIX prevProj = m_PrevFrameScreenData.ProjectionMatrix;
 
 		RenderPass::Execute(); // updates m_ScreenData to the current frame
 
@@ -133,7 +133,7 @@ namespace DX12Engine
 
 		auto bindPassInputTables = [this, historyBlock]()
 		{
-			m_CommandList.SetGraphicsRootConstantBufferView(0, m_ScreenDataCB->GetGPUAddress());
+			m_CommandList.SetGraphicsRootConstantBufferView(0, m_RenderContext.GetScreenDataBuffer().GetGPUAddress());
 			m_CommandList.SetGraphicsRootConstantBufferView(1, m_TemporalCB->GetGPUAddress());
 			m_CommandList.SetGraphicsRootDescriptorTable(2, m_InputResourceBlockHandles[InputResourceType::EnvironmentMap].GetGPUHandle());
 			m_CommandList.SetGraphicsRootDescriptorTable(3, m_InputResourceBlockHandles[InputResourceType::RenderTargets_Geometry].GetGPUHandle());
@@ -165,6 +165,7 @@ namespace DX12Engine
 		// Swap ping-pong index and advance frame counter
 		m_WriteIndex = 1 - m_WriteIndex;
 		m_FrameIndex++;
+		m_PrevFrameScreenData = m_RenderContext.GetScreenData();
 	}
 
 	std::shared_ptr<RenderTexture> SSRRenderPass::GetRenderTarget(ResourceSlot type)

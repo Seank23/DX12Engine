@@ -5,11 +5,14 @@
 #include "../Resources/Shader.h"
 #include "../Rendering/GPUUploader.h"
 #include "../Application.h"
+#include "RenderPass/RenderPassData.h"
 
 namespace DX12Engine
 {
 	class PipelineStateCache;
 	class RootSignatureCache;
+	class Camera;
+	class ConstantBuffer;
 
 	class RenderContext
 	{
@@ -31,6 +34,10 @@ namespace DX12Engine
 		bool						ProcessWindowMessages() const { return m_RenderWindow->ProcessWindowMessages(); }
 		void						PresentFrame() const { m_RenderWindow->PresentFrame(); }
 
+		void UpdateScreenData(Camera* camera);
+		ConstantBuffer& GetScreenDataBuffer() const { return *m_ScreenDataCB; }
+		ScreenData GetScreenData() const { return m_ScreenData; }
+
 	private:
 		void InitDevice(HWND hwnd);
 
@@ -41,6 +48,9 @@ namespace DX12Engine
 		std::unique_ptr<GPUUploader> m_Uploader;
 
 		DirectX::XMINT2 m_WindowSize;
+
+		ScreenData m_ScreenData;
+		std::unique_ptr<ConstantBuffer> m_ScreenDataCB;
 	};
 }
 

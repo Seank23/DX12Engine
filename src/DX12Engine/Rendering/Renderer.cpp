@@ -33,11 +33,15 @@ namespace DX12Engine
 			.SetRasterizerState(CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT))
 			.SetPrimitiveTopologyType(D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE)
 			.SetRenderTargets({ DXGI_FORMAT_R8G8B8A8_UNORM })
-			.SetSampleDesc(UINT_MAX, 1, 0).SetVertexShader(ResourceManager::GetInstance().GetShader("RenderTriangle_VS"))
+			.SetSampleDesc(UINT_MAX, 1, 0)
+			.SetVertexShader(ResourceManager::GetInstance().GetShader("RenderTriangle_VS"))
 			.SetPixelShader(ResourceManager::GetInstance().GetShader("FinalRender_PS"));
 
 		DescriptorTableConfig descriptorTable(1, D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 0);
-		rootSignatureBuilder = rootSignatureBuilder.AddDescriptorTables({ descriptorTable }).AddSampler(0, D3D12_FILTER_ANISOTROPIC);
+		rootSignatureBuilder = rootSignatureBuilder
+			.AddConstantBuffer(0, 0, D3D12_SHADER_VISIBILITY_PIXEL)
+			.AddDescriptorTables({descriptorTable})
+			.AddSampler(0, D3D12_FILTER_ANISOTROPIC);
 
 		m_RootSignature = ResourceManager::GetInstance().CreateRootSignature(rootSignatureBuilder.Build());
 		pipelineStateBuilder = pipelineStateBuilder.SetRootSignature(m_RootSignature.Get());
@@ -89,6 +93,7 @@ namespace DX12Engine
 	{
 		m_RenderContext->GetHeapManager().BeginFrame(m_FrameIndex++);
 		SetSceneData(pipeline);
+		m_RenderContext->UpdateScreenData(m_CurrentScene ? m_CurrentScene->GetCamera() : nullptr);
 		m_RenderContext->GetUploader().UploadAllPending();
 		for (RenderPass* pass : pipeline.RenderPasses)
 		{
@@ -397,7 +402,8 @@ namespace DX12Engine
 		auto srvHeap = m_RenderHeap.GetHeap();
 		m_CommandList->SetDescriptorHeaps(1, &srvHeap);
 
-		m_CommandList->SetGraphicsRootDescriptorTable(0, finalRenderTarget->GetTransientDescriptor()->GetGPUHandle());
+		m_CommandList->SetGraphicsRootConstantBufferView(0, m_RenderContext->GetScreenDataBuffer().GetGPUAddress());
+		m_CommandList->SetGraphicsRootDescriptorTable(1, finalRenderTarget->GetTransientDescriptor()->GetGPUHandle());
 
 		m_CommandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 		m_CommandList->DrawInstanced(3, 1, 0, 0);

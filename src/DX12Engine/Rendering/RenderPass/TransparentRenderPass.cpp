@@ -101,7 +101,7 @@ namespace DX12Engine
 
 		auto bindPassInputTables = [this]()
 		{
-			m_CommandList.SetGraphicsRootConstantBufferView(1, m_ScreenDataCB->GetGPUAddress());
+			m_CommandList.SetGraphicsRootConstantBufferView(1, m_RenderContext.GetScreenDataBuffer().GetGPUAddress());
 			m_CommandList.SetGraphicsRootDescriptorTable(4, m_InputResourceBlockHandles[InputResourceType::EnvironmentMap].GetGPUHandle());
 			m_CommandList.SetGraphicsRootDescriptorTable(5, m_InputResourceBlockHandles[InputResourceType::RenderTargets_Geometry].GetGPUHandle());
 			m_CommandList.SetGraphicsRootDescriptorTable(6, m_InputResourceBlockHandles[InputResourceType::RenderTargets_SSR].GetGPUHandle());

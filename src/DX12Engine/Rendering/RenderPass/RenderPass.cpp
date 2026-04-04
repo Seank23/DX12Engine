@@ -26,10 +26,6 @@ namespace DX12Engine
 			AddDescriptorTableConfig({ blockIt->second, D3D12_DESCRIPTOR_RANGE_TYPE_SRV, baseRegister });
 			baseRegister += blockIt->second;
 		}
-
-		DirectX::XMINT2 windowSize = m_RenderContext.GetWindowSize();
-		m_ScreenDataCB = ResourceManager::GetInstance().CreateConstantBuffer(sizeof(ScreenData));
-		m_ScreenData.ScreenSize = DirectX::XMFLOAT2(windowSize.x, windowSize.y);
 	}
 
 	void RenderPass::RebuildTransientDescriptors()
@@ -75,27 +71,6 @@ namespace DX12Engine
 	void RenderPass::Execute()
 	{
 		RebuildTransientDescriptors();
-		UpdateCB();
 		m_QueueManager.GetGraphicsQueue().ResetCommandAllocatorAndList();
-	}
-
-	void RenderPass::OnResize(DirectX::XMINT2 newSize)
-	{
-		m_ScreenData.ScreenSize = DirectX::XMFLOAT2((float)newSize.x, (float)newSize.y);
-		if (m_ScreenDataCB)
-			m_ScreenDataCB->Update(&m_ScreenData, sizeof(ScreenData));
-	}
-
-	void RenderPass::UpdateCB()
-	{
-		if (m_Camera != nullptr)
-		{
-			m_ScreenData.CameraPosition = DirectX::XMFLOAT4(m_Camera->GetPosition().x, m_Camera->GetPosition().y, m_Camera->GetPosition().z, 1.0f);
-			m_ScreenData.ViewMatrix = m_Camera->GetViewMatrix();
-			m_ScreenData.ProjectionMatrix = m_Camera->GetProjectionMatrix();
-			m_ScreenData.InvViewMatrix = DirectX::XMMatrixInverse(nullptr, m_Camera->GetViewMatrix());
-			m_ScreenData.InvProjectionMatrix = DirectX::XMMatrixInverse(nullptr, m_Camera->GetProjectionMatrix());
-			m_ScreenDataCB->Update(&m_ScreenData, sizeof(ScreenData));
-		}
 	}
 }

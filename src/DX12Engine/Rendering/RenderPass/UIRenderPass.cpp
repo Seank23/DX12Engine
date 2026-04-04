@@ -61,7 +61,7 @@ namespace DX12Engine
 		auto srvHeap = m_RenderContext.GetHeapManager().GetRenderPassHeap().GetHeap();
 		m_CommandList.SetDescriptorHeaps(1, &srvHeap);
 
-		m_CommandList.SetGraphicsRootConstantBufferView(0, m_ScreenDataCB->GetGPUAddress());
+		m_CommandList.SetGraphicsRootConstantBufferView(0, m_RenderContext.GetScreenDataBuffer().GetGPUAddress());
 		int startIndex = 1;
 		for (ConstantBuffer* cb : m_ExternalCBs)
 			m_CommandList.SetGraphicsRootConstantBufferView(startIndex++, cb->GetGPUAddress());

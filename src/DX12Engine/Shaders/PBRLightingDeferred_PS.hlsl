@@ -94,7 +94,7 @@ float ClearcoatSpecLobe(float NdotV, float NdotL, float NdotH, float HdotV, floa
     // glTF clearcoat uses fixed dielectric F0 ~= 0.04
     float F = FresnelSchlick(HdotV, float3(0.04, 0.04, 0.04)).r;
 
-    return (D * G * F) / max(0.001, 4.0 * NdotV * NdotL);
+    return (D * G * F) / max(0.01, 4.0 * NdotV * NdotL);
 }
 
 float3 PBRLighting(float3 albedo, float metallic, float roughness, float clearcoat, float clearcoatRoughness, float3 N, float3 V, float3 L, Light light)
@@ -121,11 +121,11 @@ float3 PBRLighting(float3 albedo, float metallic, float roughness, float clearco
     float FcV = FresnelSchlick(NdotV, float3(0.04, 0.04, 0.04)).r;
     float baseAtten = 1.0 - clearcoat * FcV;
     color *= baseAtten;
-    float clearcoatSpec = ClearcoatSpecLobe(NdotV, NdotL, NdotH, HdotV, clearcoatRoughness);
-    color += clearcoat * clearcoatSpec;
+    float clearcoatSpec = (NdotL > 0.0) ? ClearcoatSpecLobe(NdotV, NdotL, NdotH, HdotV, clearcoatRoughness) : 0.0;
+    color += clearcoat * clearcoatSpec * NdotL;
     float3 reflectionVector = reflect(-V, N);
     float3 clearcoatEnv = sRGBToLinear(environmentMap.SampleLevel(samp, reflectionVector, clearcoatRoughness * 12.0).rgb);
-    color += clearcoat * FcV * clearcoatEnv;
+    color += clearcoat * FcV * NdotV * clearcoatEnv;
     
     return color;
 }
