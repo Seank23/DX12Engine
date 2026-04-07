@@ -9,10 +9,13 @@
 #include "RenderPass/TransparentRenderPass.h"
 #include "RenderPass/SSRRenderPass.h"
 #include "RenderPass/UIRenderPass.h"
+#include "RenderPass/TAARenderPass.h"
 #include "RenderPipelineConfig.h"
 #include "../Entity/GameObject.h"
 #include "../Entity/RenderComponent.h"
 #include "DrawItem.h"
+
+
 #include <array>
 #include <algorithm>
 #include <unordered_set>
@@ -21,9 +24,36 @@
 
 namespace DX12Engine
 {
+	float Renderer::Halton(uint32_t index, uint32_t base)
+	{
+		float result = 0.0f;
+		float fraction = 1.0f;
+		while (index > 0)
+		{
+			fraction /= static_cast<float>(base);
+			result += fraction * static_cast<float>(index % base);
+			index /= base;
+		}
+		return result;
+	}
+
+	void Renderer::UpdateFrameJitter()
+	{
+		constexpr uint32_t kJitterCycle = 8;
+
+		m_PrevJitter = m_Jitter;
+		const uint32_t sampleIndex = static_cast<uint32_t>(m_JitterFrameIndex % kJitterCycle) + 1u;
+		m_Jitter.x = Halton(sampleIndex, 2u) - 0.5f;
+		m_Jitter.y = Halton(sampleIndex, 3u) - 0.5f;
+		++m_JitterFrameIndex;
+	}
+
 	Renderer::Renderer(std::shared_ptr<RenderContext> context)
 		: m_RenderContext(context), m_RenderHeap(context->GetHeapManager().GetRenderPassHeap()), m_QueueManager(context->GetQueueManager())
 	{
+		m_PostProcessingCB = ResourceManager::GetInstance().CreateConstantBuffer(sizeof(PostProcessingData));
+		UpdatePostProcessingCB();
+
 		m_CommandList = m_QueueManager.GetGraphicsQueue().GetCommandList();
 
 		PipelineStateBuilder pipelineStateBuilder;
@@ -40,6 +70,7 @@ namespace DX12Engine
 		DescriptorTableConfig descriptorTable(1, D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 0);
 		rootSignatureBuilder = rootSignatureBuilder
 			.AddConstantBuffer(0, 0, D3D12_SHADER_VISIBILITY_PIXEL)
+			.AddConstantBuffer(1, 0, D3D12_SHADER_VISIBILITY_PIXEL)
 			.AddDescriptorTables({descriptorTable})
 			.AddSampler(0, D3D12_FILTER_ANISOTROPIC);
 
@@ -77,6 +108,10 @@ namespace DX12Engine
 			return std::make_unique<TransparentRenderPass>(*m_RenderContext);
 		case RenderPassType::ScreenSpaceReflection:
 			return std::make_unique<SSRRenderPass>(*m_RenderContext);
+		case RenderPassType::TAA:
+			if (m_Options.AA_Mode == AntiAliasingMode::TAA)
+				return std::make_unique<TAARenderPass>(*m_RenderContext);
+			return nullptr;
 		case RenderPassType::UI:
 			return std::make_unique<UIRenderPass>(*m_RenderContext);
 		default:
@@ -91,6 +126,8 @@ namespace DX12Engine
 
 	void Renderer::ExecutePipeline(RenderPipeline pipeline)
 	{
+		if (m_Options.AA_Mode == AntiAliasingMode::TAA)
+			UpdateFrameJitter();
 		m_RenderContext->GetHeapManager().BeginFrame(m_FrameIndex++);
 		SetSceneData(pipeline);
 		m_RenderContext->UpdateScreenData(m_CurrentScene ? m_CurrentScene->GetCamera() : nullptr);
@@ -111,18 +148,29 @@ namespace DX12Engine
 	RenderPipeline Renderer::CreateRenderPipeline(RenderPipelineConfig config)
 	{
 		RenderPipeline pipeline;
-		std::unordered_map<RenderPassType, int> renderPassOrder;
-		int i = 0;
+		std::unordered_map<PipelineResource, RenderPass*> resourceProducers;
 		try
 		{
-			for (const RenderPassConfig& passConfig : config.Passes)
+			for (RenderPassConfig& passConfig : config.Passes)
 			{
 				RenderPass* renderPass = CreateRenderPass(passConfig.Type, passConfig.Count).release();
-				renderPassOrder[passConfig.Type] = i;
 				if (renderPass)
 				{
 					for (InputResourceType inputType : OrderedInputTypes)
 					{
+						auto bindingIt = std::find_if(passConfig.ResourceBindings.begin(), passConfig.ResourceBindings.end(),
+							[inputType](const ResourceBinding& binding) { return binding.InputType == inputType; });
+						if (bindingIt != passConfig.ResourceBindings.end())
+						{
+							auto producerIt = resourceProducers.find(bindingIt->Resource);
+							if (producerIt != resourceProducers.end() && producerIt->second != nullptr)
+							{
+								for (const ResourceSlot& slot : bindingIt->Slots)
+									renderPass->AddInputResources({ producerIt->second->GetRenderTarget(slot) });
+								renderPass->AddResourceBlock(bindingIt->InputType, static_cast<UINT>(bindingIt->Slots.size()));
+							}
+						}
+
 						auto inputIt = passConfig.InputResources.find(inputType);
 						if (inputIt == passConfig.InputResources.end())
 							continue;
@@ -130,54 +178,6 @@ namespace DX12Engine
 						void* inputResource = inputIt->second;
 						switch (inputType)
 						{
-						case InputResourceType::RenderTargets_ShadowMap:
-							for (auto& target : *static_cast<std::vector<ResourceSlot>*>(inputResource))
-								renderPass->AddInputResources({ pipeline.RenderPasses[renderPassOrder[RenderPassType::ShadowMap]]->GetRenderTarget(target) });
-							renderPass->AddResourceBlock(
-								InputResourceType::RenderTargets_ShadowMap,
-								static_cast<UINT>(static_cast<std::vector<ResourceSlot>*>(inputResource)->size())
-							);
-							break;
-						case InputResourceType::RenderTargets_CubeShadowMap:
-							for (auto& target : *static_cast<std::vector<ResourceSlot>*>(inputResource))
-								renderPass->AddInputResources({ pipeline.RenderPasses[renderPassOrder[RenderPassType::CubeShadowMap]]->GetRenderTarget(target) });
-							renderPass->AddResourceBlock(
-								InputResourceType::RenderTargets_CubeShadowMap,
-								static_cast<UINT>(static_cast<std::vector<ResourceSlot>*>(inputResource)->size())
-							);
-							break;
-						case InputResourceType::RenderTargets_Geometry:
-							for (auto& target : *static_cast<std::vector<ResourceSlot>*>(inputResource))
-								renderPass->AddInputResources({ pipeline.RenderPasses[renderPassOrder[RenderPassType::Geometry]]->GetRenderTarget(target) });
-							renderPass->AddResourceBlock(
-								InputResourceType::RenderTargets_Geometry,
-								static_cast<UINT>(static_cast<std::vector<ResourceSlot>*>(inputResource)->size())
-							);
-							break;
-						case InputResourceType::RenderTargets_Lighting:
-							for (auto& target : *static_cast<std::vector<ResourceSlot>*>(inputResource))
-								renderPass->AddInputResources({ pipeline.RenderPasses[renderPassOrder[RenderPassType::Lighting]]->GetRenderTarget(target) });
-							renderPass->AddResourceBlock(
-								InputResourceType::RenderTargets_Lighting,
-								static_cast<UINT>(static_cast<std::vector<ResourceSlot>*>(inputResource)->size())
-							);
-							break;
-						case InputResourceType::RenderTargets_Transparent:
-							for (auto& target : *static_cast<std::vector<ResourceSlot>*>(inputResource))
-								renderPass->AddInputResources({ pipeline.RenderPasses[renderPassOrder[RenderPassType::Transparent]]->GetRenderTarget(target) });
-							renderPass->AddResourceBlock(
-								InputResourceType::RenderTargets_Transparent,
-								static_cast<UINT>(static_cast<std::vector<ResourceSlot>*>(inputResource)->size())
-							);
-							break;
-						case InputResourceType::RenderTargets_SSR:
-							for (auto& target : *static_cast<std::vector<ResourceSlot>*>(inputResource))
-								renderPass->AddInputResources({ pipeline.RenderPasses[renderPassOrder[RenderPassType::ScreenSpaceReflection]]->GetRenderTarget(target) });
-							renderPass->AddResourceBlock(
-								InputResourceType::RenderTargets_SSR,
-								static_cast<UINT>(static_cast<std::vector<ResourceSlot>*>(inputResource)->size())
-							);
-							break;
 						case InputResourceType::EnvironmentMap:
 							for (auto& texture : *static_cast<std::vector<Texture*>*>(inputResource))
 								renderPass->AddInputResources({ std::shared_ptr<Texture>(texture, [](Texture*) {}) });
@@ -215,9 +215,13 @@ namespace DX12Engine
 					}
 
 					renderPass->Init();
+					for (ResourceWrite& write : passConfig.Writes)
+					{
+						resourceProducers[write.Resource] = renderPass;
+						write.SourcePass = passConfig.Type;
+					}
 					pipeline.RenderPasses.push_back(renderPass);
 				}
-				i++;
 			}
 		}
 		catch (const std::exception& e)
@@ -403,7 +407,8 @@ namespace DX12Engine
 		m_CommandList->SetDescriptorHeaps(1, &srvHeap);
 
 		m_CommandList->SetGraphicsRootConstantBufferView(0, m_RenderContext->GetScreenDataBuffer().GetGPUAddress());
-		m_CommandList->SetGraphicsRootDescriptorTable(1, finalRenderTarget->GetTransientDescriptor()->GetGPUHandle());
+		m_CommandList->SetGraphicsRootConstantBufferView(1, m_PostProcessingCB->GetGPUAddress());
+		m_CommandList->SetGraphicsRootDescriptorTable(2, finalRenderTarget->GetTransientDescriptor()->GetGPUHandle());
 
 		m_CommandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 		m_CommandList->DrawInstanced(3, 1, 0, 0);
@@ -436,5 +441,19 @@ namespace DX12Engine
 				OutputDebugStringA("[Renderer] WARNING: Persistent SRV heap above 80% capacity.\n");
 		}
 #endif
+	}
+
+	void Renderer::SetOptions(RendererOptions options)
+	{
+		m_Options = options;
+		UpdatePostProcessingCB();
+	}
+
+	void Renderer::UpdatePostProcessingCB()
+	{
+		PostProcessingData data{};
+		data.EnableGammaCorrection = m_Options.EnableGammaCorrection ? 1 : 0;
+		data.EnableFXAA = m_Options.AA_Mode == AntiAliasingMode::FXAA ? 1 : 0;
+		m_PostProcessingCB->Update(&data, sizeof(PostProcessingData));
 	}
 }

@@ -8,19 +8,6 @@
 
 namespace DX12Engine
 {
-	enum class ResourceSlot
-	{
-		Albedo,
-		WorldNormal,
-		ObjectNormal,
-		Material,
-		Position,
-		Depth,
-		Composite,
-		Emissive,
-		EnvironmentMap
-	};
-
 	class RenderComponent;
 	class GPUResource;
 	class RenderTexture;

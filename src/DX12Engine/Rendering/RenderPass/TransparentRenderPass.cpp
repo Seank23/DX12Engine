@@ -51,7 +51,7 @@ namespace DX12Engine
 		RenderPass::Execute();
 
 		RenderTexture* renderTarget = m_RenderTargets[0].get();
-		RenderTexture* sceneSource = dynamic_cast<RenderTexture*>(m_InputResources[m_InputResources.size() - 1].get());
+		RenderTexture* sceneSource = dynamic_cast<RenderTexture*>(m_InputResources[m_InputResources.size() - 2].get());
 
 		RenderUtils::UpdateMaterialBindings(m_DrawItems);
 
@@ -103,8 +103,8 @@ namespace DX12Engine
 		{
 			m_CommandList.SetGraphicsRootConstantBufferView(1, m_RenderContext.GetScreenDataBuffer().GetGPUAddress());
 			m_CommandList.SetGraphicsRootDescriptorTable(4, m_InputResourceBlockHandles[InputResourceType::EnvironmentMap].GetGPUHandle());
-			m_CommandList.SetGraphicsRootDescriptorTable(5, m_InputResourceBlockHandles[InputResourceType::RenderTargets_Geometry].GetGPUHandle());
-			m_CommandList.SetGraphicsRootDescriptorTable(6, m_InputResourceBlockHandles[InputResourceType::RenderTargets_SSR].GetGPUHandle());
+			m_CommandList.SetGraphicsRootDescriptorTable(5, m_InputResourceBlockHandles[InputResourceType::SceneColor].GetGPUHandle());
+			m_CommandList.SetGraphicsRootDescriptorTable(6, m_InputResourceBlockHandles[InputResourceType::Depth].GetGPUHandle());
 		};
 		bindPassInputTables();
 

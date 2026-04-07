@@ -44,8 +44,8 @@ Texture2D roughnessMap : register(t3);
 Texture2D aoMap : register(t4);
 Texture2D emissiveMap : register(t5);
 TextureCube envMap : register(t6);
-Texture2D depthMap : register(t7);
-Texture2D opaqueScene : register(t8);
+Texture2D opaqueScene : register(t7);
+Texture2D depthMap : register(t8);
 
 SamplerState sampWrap : register(s0);
 SamplerState sampClamp : register(s1);

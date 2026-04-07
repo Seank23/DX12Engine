@@ -6,6 +6,8 @@
 #include "../Entity/Scene.h"
 #include "RenderPipelineConfig.h"
 #include "RenderPass/RenderPass.h"
+#include "RendererOptions.h"
+#include <cstdint>
 
 namespace DX12Engine
 {
@@ -45,10 +47,16 @@ namespace DX12Engine
 		D3D12_VIEWPORT GetDefaultViewport();
 		D3D12_RECT GetDefaultScissorRect();
 
+		void SetOptions(RendererOptions options);
+		RendererOptions& GetOptions() { return m_Options; }
+
 	private:
 		void SetSceneData(RenderPipeline pipeline);
 		void PresentFrame(RenderTexture* finalRenderTarget);
 		std::unique_ptr<RenderPass> CreateRenderPass(RenderPassType type, int count);
+		void UpdateFrameJitter();
+		static float Halton(uint32_t index, uint32_t base);
+		void UpdatePostProcessingCB();
 
 		std::shared_ptr<RenderContext> m_RenderContext;
 		CommandQueueManager& m_QueueManager;
@@ -57,9 +65,15 @@ namespace DX12Engine
 
 		Scene* m_CurrentScene;
 		UINT m_FrameIndex = 0;
+		uint64_t m_JitterFrameIndex = 0;
+		DirectX::XMFLOAT2 m_Jitter = { 0.0f, 0.0f };
+		DirectX::XMFLOAT2 m_PrevJitter = { 0.0f, 0.0f };
 
 		Microsoft::WRL::ComPtr<ID3D12RootSignature> m_RootSignature;
 		Microsoft::WRL::ComPtr<ID3D12PipelineState> m_PipelineState;
+
+		RendererOptions m_Options;
+		std::unique_ptr<ConstantBuffer> m_PostProcessingCB;
 	};
 }
 

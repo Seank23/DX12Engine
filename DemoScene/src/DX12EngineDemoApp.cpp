@@ -5,6 +5,7 @@
 #include "DemoScene.h"
 #include "ComplexDemoScene.h"
 #include "DX12Engine/Rendering/RenderPipelineConfig.h"
+#include "DX12Engine/Rendering/PipelineBuilder.h"
 
 namespace DX12EngineDemo
 {
@@ -17,6 +18,9 @@ namespace DX12EngineDemo
 	{
 		m_RenderContext = renderContext;
 		m_Renderer = std::make_unique<DX12Engine::Renderer>(m_RenderContext);
+		DX12Engine::RendererOptions options;
+		options.AA_Mode = DX12Engine::AntiAliasingMode::None;
+		m_Renderer->SetOptions(options);
 
 		m_PhysicsEngine = std::make_shared<DX12Engine::PhysicsEngine>();
 
@@ -30,12 +34,11 @@ namespace DX12EngineDemo
 		auto shadowCastingLights = m_Scene->GetLightBuffer()->GetLightsByType({ DX12Engine::LightType::Directional, DX12Engine::LightType::Spot });
 		auto cubeShadowCastingLights = m_Scene->GetLightBuffer()->GetLightsByType({ DX12Engine::LightType::Point });
 
-		DX12Engine::RenderPipelineConfig pipelineConfig;
-
 		DX12Engine::RenderPassConfig shadowMapConfig;
 		shadowMapConfig.Type = DX12Engine::RenderPassType::ShadowMap;
 		shadowMapConfig.Count = static_cast<int>(shadowCastingLights.size());
 		shadowMapConfig.InputResources[DX12Engine::InputResourceType::LightData] = &shadowCastingLights;
+		shadowMapConfig.Writes.push_back({ DX12Engine::PipelineResource::ShadowMap });
 		std::vector<DX12Engine::ResourceSlot> shadowBufferTypes{
 			DX12Engine::ResourceSlot::Depth
 		};
@@ -44,12 +47,15 @@ namespace DX12EngineDemo
 		cubeShadowMapConfig.Type = DX12Engine::RenderPassType::CubeShadowMap;
 		cubeShadowMapConfig.Count = static_cast<int>(cubeShadowCastingLights.size());
 		cubeShadowMapConfig.InputResources[DX12Engine::InputResourceType::LightData] = &cubeShadowCastingLights;
+		cubeShadowMapConfig.Writes.push_back({ DX12Engine::PipelineResource::CubeShadowMap });
 		std::vector<DX12Engine::ResourceSlot> cubeShadowBufferTypes{
 			DX12Engine::ResourceSlot::Depth
 		};
 
 		DX12Engine::RenderPassConfig geometryConfig;
 		geometryConfig.Type = DX12Engine::RenderPassType::Geometry;
+		geometryConfig.Writes.push_back({ DX12Engine::PipelineResource::GBuffer });
+		geometryConfig.Writes.push_back({ DX12Engine::PipelineResource::Depth });
 		std::vector<DX12Engine::ResourceSlot> gBufferTypes{
 			DX12Engine::ResourceSlot::Albedo,
 			DX12Engine::ResourceSlot::WorldNormal,
@@ -65,9 +71,10 @@ namespace DX12EngineDemo
 		DX12Engine::RenderPassConfig lightingConfig;
 		lightingConfig.Type = DX12Engine::RenderPassType::Lighting;
 		lightingConfig.InputResources[DX12Engine::InputResourceType::EnvironmentMap] = &enviroAndIrradiance;
-		lightingConfig.InputResources[DX12Engine::InputResourceType::RenderTargets_ShadowMap] = &shadowBufferTypes;
-		lightingConfig.InputResources[DX12Engine::InputResourceType::RenderTargets_CubeShadowMap] = &cubeShadowBufferTypes;
-		lightingConfig.InputResources[DX12Engine::InputResourceType::RenderTargets_Geometry] = &gBufferTypes;
+		lightingConfig.ResourceBindings.push_back({ DX12Engine::InputResourceType::ShadowMap, DX12Engine::PipelineResource::ShadowMap, shadowBufferTypes });
+		lightingConfig.ResourceBindings.push_back({ DX12Engine::InputResourceType::CubeShadowMap, DX12Engine::PipelineResource::CubeShadowMap, cubeShadowBufferTypes });
+		lightingConfig.ResourceBindings.push_back({ DX12Engine::InputResourceType::GBuffer, DX12Engine::PipelineResource::GBuffer, gBufferTypes });
+		lightingConfig.Writes.push_back({ DX12Engine::PipelineResource::SceneColor });
 
 		std::vector<DX12Engine::ResourceSlot> compositeType{ DX12Engine::ResourceSlot::Composite };
 		std::vector<DX12Engine::ResourceSlot> ssrGBufferTypes{
@@ -80,23 +87,33 @@ namespace DX12EngineDemo
 		DX12Engine::RenderPassConfig ssrConfig;
 		ssrConfig.Type = DX12Engine::RenderPassType::ScreenSpaceReflection;
 		ssrConfig.InputResources[DX12Engine::InputResourceType::EnvironmentMap] = &enviro;
-		ssrConfig.InputResources[DX12Engine::InputResourceType::RenderTargets_Geometry] = &ssrGBufferTypes;
-		ssrConfig.InputResources[DX12Engine::InputResourceType::RenderTargets_Lighting] = &compositeType;
+		ssrConfig.ResourceBindings.push_back({ DX12Engine::InputResourceType::GBuffer, DX12Engine::PipelineResource::GBuffer, ssrGBufferTypes });
+		ssrConfig.ResourceBindings.push_back({ DX12Engine::InputResourceType::SceneColor, DX12Engine::PipelineResource::SceneColor, compositeType });
+		ssrConfig.Writes.push_back({ DX12Engine::PipelineResource::SceneColor });
+
+		DX12Engine::RenderPassConfig taaConfig;
+		taaConfig.Type = DX12Engine::RenderPassType::TAA;
+		taaConfig.ResourceBindings.push_back({ DX12Engine::InputResourceType::SceneColor, DX12Engine::PipelineResource::SceneColor, compositeType });
+		taaConfig.Writes.push_back({ DX12Engine::PipelineResource::SceneColor });
 
 		std::vector<DX12Engine::ResourceSlot> transparentDepthTypes{ DX12Engine::ResourceSlot::Depth };
 		DX12Engine::RenderPassConfig transparentConfig;
 		transparentConfig.Type = DX12Engine::RenderPassType::Transparent;
 		transparentConfig.InputResources[DX12Engine::InputResourceType::EnvironmentMap] = &enviro;
-		transparentConfig.InputResources[DX12Engine::InputResourceType::RenderTargets_Geometry] = &transparentDepthTypes;
-		transparentConfig.InputResources[DX12Engine::InputResourceType::RenderTargets_SSR] = &compositeType;
+		transparentConfig.ResourceBindings.push_back({ DX12Engine::InputResourceType::Depth, DX12Engine::PipelineResource::Depth, transparentDepthTypes });
+		transparentConfig.ResourceBindings.push_back({ DX12Engine::InputResourceType::SceneColor, DX12Engine::PipelineResource::SceneColor, compositeType });
+		transparentConfig.Writes.push_back({ DX12Engine::PipelineResource::SceneColor });
 
-		pipelineConfig.Passes.push_back(shadowMapConfig);
-		pipelineConfig.Passes.push_back(cubeShadowMapConfig);
-		pipelineConfig.Passes.push_back(geometryConfig);
-		pipelineConfig.Passes.push_back(lightingConfig);
-		pipelineConfig.Passes.push_back(ssrConfig);
-		pipelineConfig.Passes.push_back(transparentConfig);
-		m_RenderPipeline = m_Renderer->CreateRenderPipeline(pipelineConfig);
+		DX12Engine::PipelineBuilder builder;
+		builder.AddPass(shadowMapConfig)
+			.AddPass(cubeShadowMapConfig)
+			.AddPass(geometryConfig)
+			.AddPass(lightingConfig)
+			.AddPass(ssrConfig)
+			.AddPassIf(options.AA_Mode == DX12Engine::AntiAliasingMode::TAA, taaConfig)
+			.AddPass(transparentConfig);
+
+		m_RenderPipeline = m_Renderer->CreateRenderPipeline(builder.Build());
 	}
 
 	void DX12EngineDemoApp::Update(float ts, float elapsed)

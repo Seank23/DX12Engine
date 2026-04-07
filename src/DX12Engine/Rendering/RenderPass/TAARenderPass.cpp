@@ -1,4 +1,4 @@
-﻿#include "SSRRenderPass.h"
+﻿#include "TAARenderPass.h"
 #include "../../Resources/ResourceManager.h"
 #include "../RenderContext.h"
 #include "../PipelineStateBuilder.h"
@@ -9,30 +9,22 @@
 
 namespace DX12Engine
 {
-	SSRRenderPass::SSRRenderPass(RenderContext& context)
+	TAARenderPass::TAARenderPass(RenderContext& context)
 		: RenderPass(context)
 	{
-		m_Type = RenderPassType::ScreenSpaceReflection;
+		m_Type = RenderPassType::TAA;
 	}
 
-	SSRRenderPass::~SSRRenderPass()
+	TAARenderPass::~TAARenderPass()
 	{
 	}
 
-	void SSRRenderPass::Init()
+	void TAARenderPass::Init()
 	{
-		const bool hasEnvMap = m_ResourceBlocks.find(InputResourceType::EnvironmentMap) != m_ResourceBlocks.end();
-		if (!hasEnvMap)
-		{
-			m_FallbackEnvMap = ResourceManager::GetInstance().CreateDefaultCubeMap();
-			m_InputResources.insert(m_InputResources.begin(), std::shared_ptr<GPUResource>(m_FallbackEnvMap.get(), [](GPUResource*) {}));
-			AddResourceBlock(InputResourceType::EnvironmentMap, 1);
-		}
-
 		RenderPass::Init();
 
 		m_VertexShaderName = m_VertexShaderName.empty() ? "RenderTriangle_VS" : m_VertexShaderName;
-		m_PixelShaderName = m_PixelShaderName.empty() ? "SSRPass_PS" : m_PixelShaderName;
+		m_PixelShaderName = m_PixelShaderName.empty() ? "TAAPass_PS" : m_PixelShaderName;
 
 		DirectX::XMINT2 windowSize = m_RenderContext.GetWindowSize();
 
@@ -44,7 +36,7 @@ namespace DX12Engine
 		m_HistoryBuffers[1] = ResourceManager::GetInstance().CreateRenderTargetTexture(windowSize, DXGI_FORMAT_R16G16B16A16_FLOAT);
 
 		// Temporal constant buffer
-		m_TemporalCB = ResourceManager::GetInstance().CreateConstantBuffer(sizeof(SSRTemporalData));
+		m_TemporalCB = ResourceManager::GetInstance().CreateConstantBuffer(sizeof(TAATemporalData));
 		m_TemporalData.FrameIndex = 0;
 		m_TemporalData.PrevViewMatrix = DirectX::XMMatrixIdentity();
 		m_TemporalData.PrevProjectionMatrix = DirectX::XMMatrixIdentity();
@@ -52,10 +44,10 @@ namespace DX12Engine
 		m_Viewport = { 0.0f, 0.0f, (float)windowSize.x, (float)windowSize.y, 0.0f, 1.0f };
 		m_ScissorRect = { 0, 0, (LONG)windowSize.x, (LONG)windowSize.y };
 
-		CreateSSRPassPSO();
+		CreateTAAPassPSO();
 	}
 
-	void SSRRenderPass::Execute()
+	void TAARenderPass::Execute()
 	{
 		// Capture the previous frame's matrices BEFORE RenderPass::Execute() calls
 		// UpdateCB(), which overwrites m_ScreenData with the current camera state.
@@ -67,7 +59,7 @@ namespace DX12Engine
 		m_TemporalData.PrevViewMatrix = prevView;
 		m_TemporalData.PrevProjectionMatrix = prevProj;
 		m_TemporalData.FrameIndex = m_FrameIndex;
-		m_TemporalCB->Update(&m_TemporalData, sizeof(SSRTemporalData));
+		m_TemporalCB->Update(&m_TemporalData, sizeof(TAATemporalData));
 
 		RenderTexture* renderTarget = m_RenderTargets[0].get();
 
@@ -135,10 +127,8 @@ namespace DX12Engine
 		{
 			m_CommandList.SetGraphicsRootConstantBufferView(0, m_RenderContext.GetScreenDataBuffer().GetGPUAddress());
 			m_CommandList.SetGraphicsRootConstantBufferView(1, m_TemporalCB->GetGPUAddress());
-			m_CommandList.SetGraphicsRootDescriptorTable(2, m_InputResourceBlockHandles[InputResourceType::EnvironmentMap].GetGPUHandle());
-			m_CommandList.SetGraphicsRootDescriptorTable(3, m_InputResourceBlockHandles[InputResourceType::GBuffer].GetGPUHandle());
-			m_CommandList.SetGraphicsRootDescriptorTable(4, m_InputResourceBlockHandles[InputResourceType::SceneColor].GetGPUHandle());
-			m_CommandList.SetGraphicsRootDescriptorTable(5, historyBlock.GetGPUHandle());
+			m_CommandList.SetGraphicsRootDescriptorTable(2, m_InputResourceBlockHandles[InputResourceType::SceneColor].GetGPUHandle());
+			m_CommandList.SetGraphicsRootDescriptorTable(3, historyBlock.GetGPUHandle());
 		};
 		bindPassInputTables();
 
@@ -168,7 +158,7 @@ namespace DX12Engine
 		m_PrevFrameScreenData = m_RenderContext.GetScreenData();
 	}
 
-	std::shared_ptr<RenderTexture> SSRRenderPass::GetRenderTarget(ResourceSlot type)
+	std::shared_ptr<RenderTexture> TAARenderPass::GetRenderTarget(ResourceSlot type)
 	{
 		switch (type)
 		{
@@ -179,7 +169,7 @@ namespace DX12Engine
 		}
 	}
 
-	void SSRRenderPass::TransitionHistoryBuffer(D3D12_RESOURCE_STATES from, D3D12_RESOURCE_STATES to)
+	void TAARenderPass::TransitionHistoryBuffer(D3D12_RESOURCE_STATES from, D3D12_RESOURCE_STATES to)
 	{
 		for (int i = 0; i < 2; i++)
 		{
@@ -190,7 +180,7 @@ namespace DX12Engine
 		}
 	}
 
-	void SSRRenderPass::CreateSSRPassPSO()
+	void TAARenderPass::CreateTAAPassPSO()
 	{
 		PipelineStateBuilder pipelineStateBuilder;
 		RootSignatureBuilder rootSignatureBuilder;
@@ -204,7 +194,7 @@ namespace DX12Engine
 			.SetVertexShader(ResourceManager::GetInstance().GetShader(m_VertexShaderName))
 			.SetPixelShader(ResourceManager::GetInstance().GetShader(m_PixelShaderName));
 
-		// b0 = ScreenData, b1 = SSRTemporalData
+		// b0 = ScreenData, b1 = TAATemporalData
 		// then descriptor tables for G-buffer resources, then one extra table for history read
 		// Build all descriptor table configs in a single call to avoid vector reallocation invalidating pointers
 		std::vector<DescriptorTableConfig> allTableConfigs = m_DescriptorTableConfigs;

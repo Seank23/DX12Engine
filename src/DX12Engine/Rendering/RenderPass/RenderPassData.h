@@ -19,3 +19,11 @@ struct SSRTemporalData
 	DirectX::XMFLOAT3 Padding;
 };
 
+struct TAATemporalData
+{
+	DirectX::XMMATRIX PrevViewMatrix;
+	DirectX::XMMATRIX PrevProjectionMatrix;
+	uint32_t FrameIndex;
+	DirectX::XMFLOAT3 Padding;
+};
+

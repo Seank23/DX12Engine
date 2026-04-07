@@ -8,6 +8,12 @@ cbuffer ScreenData : register(b0)
     float2 ScreenSize;
 };
 
+cbuffer PostProcessingData : register(b1)
+{
+    bool EnableGammaCorrection;
+    bool EnableFXAA;
+};
+
 struct PSInput
 {
     float4 position : SV_POSITION;
@@ -146,7 +152,9 @@ float4 main(PSInput input) : SV_TARGET
     float3 colorCenter = finalRenderMap.Sample(samp, input.texCoord).rgb;
     
     float3 finalColor = colorCenter;
-    finalColor = applyFXAA(colorCenter, input.texCoord);
-    finalColor = pow(finalColor, 1.0 / 2.2); // Gamma correction
+    if (EnableFXAA)
+        finalColor = applyFXAA(colorCenter, input.texCoord);
+    if (EnableGammaCorrection)
+        finalColor = pow(finalColor, 1.0 / 2.2); // Gamma correction
     return float4(finalColor, 1.0);
 }
