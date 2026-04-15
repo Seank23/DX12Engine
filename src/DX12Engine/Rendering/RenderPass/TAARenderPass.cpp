@@ -28,18 +28,21 @@ namespace DX12Engine
 
 		DirectX::XMINT2 windowSize = m_RenderContext.GetWindowSize();
 
-		// Current-frame composite output
 		m_RenderTargets.emplace_back(ResourceManager::GetInstance().CreateRenderTargetTexture(windowSize, DXGI_FORMAT_R16G16B16A16_FLOAT));
 
-		// Ping-pong history buffers (R16G16B16A16 to preserve HDR history)
 		m_HistoryBuffers[0] = ResourceManager::GetInstance().CreateRenderTargetTexture(windowSize, DXGI_FORMAT_R16G16B16A16_FLOAT);
 		m_HistoryBuffers[1] = ResourceManager::GetInstance().CreateRenderTargetTexture(windowSize, DXGI_FORMAT_R16G16B16A16_FLOAT);
 
-		// Temporal constant buffer
 		m_TemporalCB = ResourceManager::GetInstance().CreateConstantBuffer(sizeof(TAATemporalData));
 		m_TemporalData.FrameIndex = 0;
 		m_TemporalData.PrevViewMatrix = DirectX::XMMatrixIdentity();
 		m_TemporalData.PrevProjectionMatrix = DirectX::XMMatrixIdentity();
+		m_TemporalData.Jitter = { 0.0f, 0.0f };
+		m_TemporalData.PrevJitter = { 0.0f, 0.0f };
+		m_TemporalData.BlendFactor = 0.1f;
+		m_TemporalData.Sharpness = 0.5f;
+
+		m_PrevFrameScreenData = m_RenderContext.GetScreenData();
 
 		m_Viewport = { 0.0f, 0.0f, (float)windowSize.x, (float)windowSize.y, 0.0f, 1.0f };
 		m_ScissorRect = { 0, 0, (LONG)windowSize.x, (LONG)windowSize.y };
@@ -49,21 +52,20 @@ namespace DX12Engine
 
 	void TAARenderPass::Execute()
 	{
-		// Capture the previous frame's matrices BEFORE RenderPass::Execute() calls
-		// UpdateCB(), which overwrites m_ScreenData with the current camera state.
 		DirectX::XMMATRIX prevView = m_PrevFrameScreenData.ViewMatrix;
 		DirectX::XMMATRIX prevProj = m_PrevFrameScreenData.ProjectionMatrix;
 
-		RenderPass::Execute(); // updates m_ScreenData to the current frame
+		RenderPass::Execute();
 
 		m_TemporalData.PrevViewMatrix = prevView;
 		m_TemporalData.PrevProjectionMatrix = prevProj;
 		m_TemporalData.FrameIndex = m_FrameIndex;
+		m_TemporalData.Jitter = m_Jitter;
+		m_TemporalData.PrevJitter = m_PrevJitter;
 		m_TemporalCB->Update(&m_TemporalData, sizeof(TAATemporalData));
 
 		RenderTexture* renderTarget = m_RenderTargets[0].get();
 
-		// Read buffer = previously written frame, write buffer = current frame output
 		int readIndex = 1 - m_WriteIndex;
 		RenderTexture* historyRead = m_HistoryBuffers[readIndex].get();
 		RenderTexture* historyWrite = m_HistoryBuffers[m_WriteIndex].get();
@@ -74,10 +76,6 @@ namespace DX12Engine
 		m_CommandList.RSSetViewports(1, &m_Viewport);
 		m_CommandList.RSSetScissorRects(1, &m_ScissorRect);
 
-		// Transition resources, skipping any barrier where before == after state
-		// (the history read buffer starts life as PIXEL_SHADER_RESOURCE and may
-		// still be in that state on the first frame, making the barrier a no-op
-		// that the D3D12 debug layer rejects).
 		std::vector<D3D12_RESOURCE_BARRIER> barriers;
 		if (renderTarget->GetUsageState() != D3D12_RESOURCE_STATE_RENDER_TARGET)
 		{
@@ -106,7 +104,6 @@ namespace DX12Engine
 		if (!barriers.empty())
 			m_CommandList.ResourceBarrier(static_cast<UINT>(barriers.size()), barriers.data());
 
-		// Render to both the composite output and the history write buffer simultaneously
 		D3D12_CPU_DESCRIPTOR_HANDLE rtvHandles[2] = {
 			renderTarget->GetTextureDescriptor().GetCPUHandle(),
 			historyWrite->GetTextureDescriptor().GetCPUHandle()
@@ -128,14 +125,15 @@ namespace DX12Engine
 			m_CommandList.SetGraphicsRootConstantBufferView(0, m_RenderContext.GetScreenDataBuffer().GetGPUAddress());
 			m_CommandList.SetGraphicsRootConstantBufferView(1, m_TemporalCB->GetGPUAddress());
 			m_CommandList.SetGraphicsRootDescriptorTable(2, m_InputResourceBlockHandles[InputResourceType::SceneColor].GetGPUHandle());
-			m_CommandList.SetGraphicsRootDescriptorTable(3, historyBlock.GetGPUHandle());
+			m_CommandList.SetGraphicsRootDescriptorTable(3, m_InputResourceBlockHandles[InputResourceType::Depth].GetGPUHandle());
+			m_CommandList.SetGraphicsRootDescriptorTable(4, m_InputResourceBlockHandles[InputResourceType::GBuffer].GetGPUHandle());
+			m_CommandList.SetGraphicsRootDescriptorTable(5, historyBlock.GetGPUHandle());
 		};
 		bindPassInputTables();
 
 		m_CommandList.IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 		m_CommandList.DrawInstanced(3, 1, 0, 0);
 
-		// Transition composite output and history write → SRV
 		std::vector<D3D12_RESOURCE_BARRIER> postBarriers;
 		postBarriers.push_back(CD3DX12_RESOURCE_BARRIER::Transition(
 			renderTarget->GetResource(),
@@ -152,7 +150,6 @@ namespace DX12Engine
 		UINT fenceVal = m_QueueManager.GetGraphicsQueue().ExecuteCommandList();
 		m_QueueManager.GetGraphicsQueue().WaitForFenceCPUBlocking(fenceVal);
 
-		// Swap ping-pong index and advance frame counter
 		m_WriteIndex = 1 - m_WriteIndex;
 		m_FrameIndex++;
 		m_PrevFrameScreenData = m_RenderContext.GetScreenData();
@@ -185,7 +182,6 @@ namespace DX12Engine
 		PipelineStateBuilder pipelineStateBuilder;
 		RootSignatureBuilder rootSignatureBuilder;
 
-		// Two render targets: composite output (SV_TARGET0) and history write buffer (SV_TARGET1)
 		pipelineStateBuilder = pipelineStateBuilder.SetBlendState(CD3DX12_BLEND_DESC(D3D12_DEFAULT))
 			.SetRasterizerState(CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT))
 			.SetPrimitiveTopologyType(D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE)

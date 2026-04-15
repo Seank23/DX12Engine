@@ -49,6 +49,8 @@ namespace DX12Engine
 		m_TemporalData.PrevViewMatrix = DirectX::XMMatrixIdentity();
 		m_TemporalData.PrevProjectionMatrix = DirectX::XMMatrixIdentity();
 
+		m_PrevFrameScreenData = m_RenderContext.GetScreenData();
+
 		m_Viewport = { 0.0f, 0.0f, (float)windowSize.x, (float)windowSize.y, 0.0f, 1.0f };
 		m_ScissorRect = { 0, 0, (LONG)windowSize.x, (LONG)windowSize.y };
 

@@ -54,7 +54,7 @@ namespace DX12Engine
 		void SetSceneData(RenderPipeline pipeline);
 		void PresentFrame(RenderTexture* finalRenderTarget);
 		std::unique_ptr<RenderPass> CreateRenderPass(RenderPassType type, int count);
-		void UpdateFrameJitter();
+		DirectX::XMMATRIX UpdateFrameJitter(DirectX::XMMATRIX projectionMatrix, DirectX::XMINT2 screenSize);
 		static float Halton(uint32_t index, uint32_t base);
 		void UpdatePostProcessingCB();
 
@@ -74,6 +74,8 @@ namespace DX12Engine
 
 		RendererOptions m_Options;
 		std::unique_ptr<ConstantBuffer> m_PostProcessingCB;
+
+		DirectX::XMMATRIX m_JitteredProjection;
 	};
 }
 

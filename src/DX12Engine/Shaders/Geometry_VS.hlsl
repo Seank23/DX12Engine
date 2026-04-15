@@ -5,9 +5,9 @@ cbuffer ObjectData : register(b0)
     float4x4 ViewMatrix;
     float4x4 ProjectionMatrix;
     float4x4 MVPMatrix;
-    float4x4 InvViewMatrix;
-    float4x4 InvProjectionMatrix;
     float3 CameraPosition;
+    float Padding;
+    float4x4 PrevMVPMatrix;
 };
 
 struct VSInput
@@ -20,19 +20,24 @@ struct VSInput
 
 struct VSOutput
 {
-    float4 position   : SV_POSITION;
-    float3 worldPos   : TEXCOORD0;
-    float3 normal     : TEXCOORD1;
-    float2 uv         : TEXCOORD2;
-    float3 tangent    : TANGENT;
-    float3 bitangent  : BITANGENT;
+    float4 currentPosition : SV_POSITION;
+    float4 currentClip : TEXCOORD0;
+    float4 prevClip : TEXCOORD1;
+    float3 worldPos : TEXCOORD2;
+    float3 normal : TEXCOORD3;
+    float2 uv : TEXCOORD4;
+    float3 tangent : TANGENT;
+    float3 bitangent : BITANGENT;
 };
 
 VSOutput main(VSInput input)
 {
     VSOutput output;
     float4 worldPosition = mul(ModelMatrix, float4(input.position, 1.0f));
-    output.position = mul(MVPMatrix, float4(input.position, 1.0f));
+    float4 currentClip = mul(MVPMatrix, float4(input.position, 1.0f));
+    output.currentPosition = currentClip;
+    output.currentClip = currentClip;
+    output.prevClip = mul(PrevMVPMatrix, float4(input.position, 1.0f));
     output.worldPos = worldPosition.xyz;
     output.normal   = normalize(mul(NormalMatrix, float4(input.normal, 0.0f)).xyz);
     output.uv       = input.texCoord;

@@ -37,10 +37,12 @@ cbuffer MaterialData : register(b1)
 
 struct PSInput
 {
-    float4 position : SV_POSITION;
-    float3 worldPos : TEXCOORD0;
-    float3 normal : TEXCOORD1;
-    float2 uv : TEXCOORD2;
+    float4 currentPosition : SV_POSITION;
+    float4 currentClip : TEXCOORD0;
+    float4 prevClip : TEXCOORD1;
+    float3 worldPos : TEXCOORD2;
+    float3 normal : TEXCOORD3;
+    float2 uv : TEXCOORD4;
     float3 tangent : TANGENT;
     float3 bitangent : BITANGENT;
 };
@@ -53,6 +55,7 @@ struct PSOutput
     float4 material : SV_Target3; // roughness, metallic, ao
     float4 position : SV_Target4;
     float4 emissive : SV_Target5;
+    float2 velocity : SV_Target6;
 };
 
 float3 sRGBToLinear(float3 color)
@@ -97,6 +100,13 @@ PSOutput main(PSInput input)
     }
     
     ao = lerp(1.0, ao, OcclusionStrength);
+    
+    float currentW = max(abs(input.currentClip.w), 1e-6);
+    float prevW = max(abs(input.prevClip.w), 1e-6);
+    float2 currentNDC = input.currentClip.xy / currentW;
+    float2 prevNDC = input.prevClip.xy / prevW;
+    float2 velocity = (currentNDC - prevNDC) * 0.5;
+    velocity.y = -velocity.y;
 
     output.albedo       = outputAlbedo;
     output.worldNormal  = float4(worldNormal, 1.0);
@@ -104,5 +114,6 @@ PSOutput main(PSInput input)
     output.material     = float4(roughness, metallic, Clearcoat, ClearcoatRoughness);
     output.position     = float4(input.worldPos, 1.0);
     output.emissive     = float4(emissiveColor, ao);
+    output.velocity     = velocity;
     return output;
 }

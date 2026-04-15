@@ -37,7 +37,7 @@ namespace DX12Engine
 		return result;
 	}
 
-	void Renderer::UpdateFrameJitter()
+	DirectX::XMMATRIX Renderer::UpdateFrameJitter(DirectX::XMMATRIX projectionMatrix, DirectX::XMINT2 screenSize)
 	{
 		constexpr uint32_t kJitterCycle = 8;
 
@@ -46,10 +46,17 @@ namespace DX12Engine
 		m_Jitter.x = Halton(sampleIndex, 2u) - 0.5f;
 		m_Jitter.y = Halton(sampleIndex, 3u) - 0.5f;
 		++m_JitterFrameIndex;
+
+		const float jxNdc = m_Jitter.x * 2.0f / screenSize.x;
+		const float jyNdc = m_Jitter.y * 2.0f / screenSize.y;
+
+		projectionMatrix.r[2].m128_f32[0] += jxNdc;
+		projectionMatrix.r[2].m128_f32[1] -= jyNdc;
+		return projectionMatrix;
 	}
 
 	Renderer::Renderer(std::shared_ptr<RenderContext> context)
-		: m_RenderContext(context), m_RenderHeap(context->GetHeapManager().GetRenderPassHeap()), m_QueueManager(context->GetQueueManager())
+		: m_RenderContext(context), m_RenderHeap(context->GetHeapManager().GetRenderPassHeap()), m_QueueManager(context->GetQueueManager()), m_JitteredProjection(DirectX::XMMatrixIdentity())
 	{
 		m_PostProcessingCB = ResourceManager::GetInstance().CreateConstantBuffer(sizeof(PostProcessingData));
 		UpdatePostProcessingCB();
@@ -126,11 +133,10 @@ namespace DX12Engine
 
 	void Renderer::ExecutePipeline(RenderPipeline pipeline)
 	{
-		if (m_Options.AA_Mode == AntiAliasingMode::TAA)
-			UpdateFrameJitter();
 		m_RenderContext->GetHeapManager().BeginFrame(m_FrameIndex++);
 		SetSceneData(pipeline);
-		m_RenderContext->UpdateScreenData(m_CurrentScene ? m_CurrentScene->GetCamera() : nullptr);
+		auto projectionOverride = m_Options.AA_Mode == AntiAliasingMode::TAA ? &m_JitteredProjection : nullptr;
+		m_RenderContext->UpdateScreenData(m_CurrentScene ? m_CurrentScene->GetCamera() : nullptr, m_Jitter, m_PrevJitter, projectionOverride);
 		m_RenderContext->GetUploader().UploadAllPending();
 		for (RenderPass* pass : pipeline.RenderPasses)
 		{
@@ -271,6 +277,9 @@ namespace DX12Engine
 		Camera* sceneCamera = m_CurrentScene->GetCamera();
 		LightBuffer* lightBuffer = m_CurrentScene->GetLightBuffer();
 
+		if (m_Options.AA_Mode == AntiAliasingMode::TAA)
+			m_JitteredProjection = UpdateFrameJitter(sceneCamera ? sceneCamera->GetProjectionMatrix() : DirectX::XMMatrixIdentity(), m_RenderContext->GetWindowSize());
+
 		std::vector<DrawItem> geometryPassDrawItems;
 		std::vector<DrawItem> transparentPassDrawItems;
 		for (auto& comp : renderComponents)
@@ -287,8 +296,8 @@ namespace DX12Engine
 
 				DirectX::XMMATRIX nodeWorldTransform = DirectX::XMLoadFloat4x4(&binding.NodeWorldTransform);
 				DirectX::XMMATRIX modelMatrix = nodeWorldTransform * comp->GetModelMatrix();
-				comp->UpdateConstantBufferData(*binding.PrimitiveConstantBuffer, modelMatrix,
-					sceneCamera->GetViewMatrix(), sceneCamera->GetProjectionMatrix(), sceneCamera->GetPosition());
+				DirectX::XMMATRIX projectionMatrix = (m_Options.AA_Mode == AntiAliasingMode::TAA) ? m_JitteredProjection : sceneCamera->GetProjectionMatrix();
+				comp->UpdateConstantBufferData(*binding.PrimitiveConstantBuffer, modelMatrix, sceneCamera->GetViewMatrix(), projectionMatrix, sceneCamera->GetPosition());
 
 				if (tmpl && !tmpl->HasResolvedPSO())
 					tmpl->ResolvePSO();
@@ -371,6 +380,9 @@ namespace DX12Engine
 				break;
 			case RenderPassType::Transparent:
 				static_cast<TransparentRenderPass*>(renderPass)->SetDrawItems(transparentPassDrawItems);
+				break;
+			case RenderPassType::TAA:
+				static_cast<TAARenderPass*>(renderPass)->SetJitterStates(m_Jitter, m_PrevJitter);
 				break;
 			default:
 				break;

@@ -19,7 +19,7 @@ namespace DX12EngineDemo
 		m_RenderContext = renderContext;
 		m_Renderer = std::make_unique<DX12Engine::Renderer>(m_RenderContext);
 		DX12Engine::RendererOptions options;
-		options.AA_Mode = DX12Engine::AntiAliasingMode::None;
+		options.AA_Mode = DX12Engine::AntiAliasingMode::TAA;
 		m_Renderer->SetOptions(options);
 
 		m_PhysicsEngine = std::make_shared<DX12Engine::PhysicsEngine>();
@@ -91,16 +91,19 @@ namespace DX12EngineDemo
 		ssrConfig.ResourceBindings.push_back({ DX12Engine::InputResourceType::SceneColor, DX12Engine::PipelineResource::SceneColor, compositeType });
 		ssrConfig.Writes.push_back({ DX12Engine::PipelineResource::SceneColor });
 
+		std::vector<DX12Engine::ResourceSlot> taaGBufferTypes{ DX12Engine::ResourceSlot::Velocity };
+		std::vector<DX12Engine::ResourceSlot> depthType{ DX12Engine::ResourceSlot::Depth };
 		DX12Engine::RenderPassConfig taaConfig;
 		taaConfig.Type = DX12Engine::RenderPassType::TAA;
 		taaConfig.ResourceBindings.push_back({ DX12Engine::InputResourceType::SceneColor, DX12Engine::PipelineResource::SceneColor, compositeType });
+		taaConfig.ResourceBindings.push_back({ DX12Engine::InputResourceType::Depth, DX12Engine::PipelineResource::Depth, depthType });
+		taaConfig.ResourceBindings.push_back({ DX12Engine::InputResourceType::GBuffer, DX12Engine::PipelineResource::GBuffer, taaGBufferTypes });
 		taaConfig.Writes.push_back({ DX12Engine::PipelineResource::SceneColor });
 
-		std::vector<DX12Engine::ResourceSlot> transparentDepthTypes{ DX12Engine::ResourceSlot::Depth };
 		DX12Engine::RenderPassConfig transparentConfig;
 		transparentConfig.Type = DX12Engine::RenderPassType::Transparent;
 		transparentConfig.InputResources[DX12Engine::InputResourceType::EnvironmentMap] = &enviro;
-		transparentConfig.ResourceBindings.push_back({ DX12Engine::InputResourceType::Depth, DX12Engine::PipelineResource::Depth, transparentDepthTypes });
+		transparentConfig.ResourceBindings.push_back({ DX12Engine::InputResourceType::Depth, DX12Engine::PipelineResource::Depth, depthType });
 		transparentConfig.ResourceBindings.push_back({ DX12Engine::InputResourceType::SceneColor, DX12Engine::PipelineResource::SceneColor, compositeType });
 		transparentConfig.Writes.push_back({ DX12Engine::PipelineResource::SceneColor });
 

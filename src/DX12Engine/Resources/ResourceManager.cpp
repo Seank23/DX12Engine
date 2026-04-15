@@ -24,6 +24,7 @@ namespace DX12Engine
 		m_Shaders.insert({ "FinalRender_PS", std::make_unique<Shader>(GetShaderPath("FinalRender_PS.hlsl"), ShaderType::Pixel) });
 		m_Shaders.insert({ "SSRPass_PS", std::make_unique<Shader>(GetShaderPath("SSRPass_PS.hlsl"), ShaderType::Pixel) });
 		m_Shaders.insert({ "PBRTransparent_PS", std::make_unique<Shader>(GetShaderPath("PBRTransparent_PS.hlsl"), ShaderType::Pixel) });
+		m_Shaders.insert({ "TAAPass_PS", std::make_unique<Shader>(GetShaderPath("TAAPass_PS.hlsl"), ShaderType::Pixel) });
 	}
 
 	ResourceManager::~ResourceManager()

@@ -42,6 +42,7 @@ namespace DX12Engine
 	void RenderComponent::SetAsset(std::shared_ptr<ModelInstance> asset)
 	{
 		m_Asset = std::move(asset);
+		m_HasValidPrevMVP = false;
 		RebuildResolvedPrimitiveBindings();
 	}
 
@@ -148,14 +149,16 @@ namespace DX12Engine
 
 	void RenderComponent::UpdateConstantBufferData(ConstantBuffer& target, DirectX::XMMATRIX modelMatrix, DirectX::XMMATRIX viewMatrix, DirectX::XMMATRIX projectionMatrix, DirectX::XMFLOAT3 cameraPosition)
 	{
+		const DirectX::XMMATRIX currentMVP = modelMatrix * viewMatrix * projectionMatrix;
+		m_RenderObjectData.PrevMVPMatrix = m_HasValidPrevMVP ? m_RenderObjectData.MVPMatrix : currentMVP;
+
 		m_RenderObjectData.ModelMatrix = modelMatrix;
 		m_RenderObjectData.NormalMatrix = DirectX::XMMatrixTranspose(DirectX::XMMatrixInverse(nullptr, modelMatrix));
 		m_RenderObjectData.ViewMatrix = viewMatrix;
 		m_RenderObjectData.ProjectionMatrix = projectionMatrix;
-		m_RenderObjectData.MVPMatrix = modelMatrix * viewMatrix * projectionMatrix;
-		m_RenderObjectData.InvViewMatrix = DirectX::XMMatrixInverse(nullptr, viewMatrix);
-		m_RenderObjectData.InvProjectionMatrix = DirectX::XMMatrixInverse(nullptr, projectionMatrix);
+		m_RenderObjectData.MVPMatrix = currentMVP;
 		m_RenderObjectData.CameraPosition = cameraPosition;
+		m_HasValidPrevMVP = true;
 		target.Update(&m_RenderObjectData, sizeof(RenderComponentData));
 	}
 }

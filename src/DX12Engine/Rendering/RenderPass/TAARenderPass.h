@@ -15,6 +15,8 @@ namespace DX12Engine
 		void Execute() override;
 		std::shared_ptr<RenderTexture> GetRenderTarget(ResourceSlot type) override;
 
+		void SetJitterStates(const DirectX::XMFLOAT2& jitter, const DirectX::XMFLOAT2& prevJitter) { m_Jitter = jitter; m_PrevJitter = prevJitter; }
+
 	private:
 		void CreateTAAPassPSO();
 		void TransitionHistoryBuffer(D3D12_RESOURCE_STATES from, D3D12_RESOURCE_STATES to);
@@ -33,6 +35,9 @@ namespace DX12Engine
 		std::unique_ptr<ConstantBuffer> m_TemporalCB;
 		uint32_t m_FrameIndex = 0;
 		ScreenData m_PrevFrameScreenData;
+
+		DirectX::XMFLOAT2 m_Jitter = { 0.0f, 0.0f };
+		DirectX::XMFLOAT2 m_PrevJitter = { 0.0f, 0.0f };
 	};
 }
 

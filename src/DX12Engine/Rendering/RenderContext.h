@@ -34,7 +34,7 @@ namespace DX12Engine
 		bool						ProcessWindowMessages() const { return m_RenderWindow->ProcessWindowMessages(); }
 		void						PresentFrame() const { m_RenderWindow->PresentFrame(); }
 
-		void UpdateScreenData(Camera* camera);
+		void UpdateScreenData(Camera* camera, const DirectX::XMFLOAT2& jitter, const DirectX::XMFLOAT2& prevJitter, const DirectX::XMMATRIX* projectionOverride = nullptr);
 		ConstantBuffer& GetScreenDataBuffer() const { return *m_ScreenDataCB; }
 		ScreenData GetScreenData() const { return m_ScreenData; }
 

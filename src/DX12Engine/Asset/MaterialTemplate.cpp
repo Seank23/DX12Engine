@@ -29,11 +29,11 @@ namespace DX12Engine
 		if (m_PassTarget == PassTarget::Transparent)
 		{
 			DescriptorTableConfig envMapTable(1, D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 6);
-			DescriptorTableConfig depthTable(1, D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 7);
-			DescriptorTableConfig opaqueSceneTable(1, D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 8);
+			DescriptorTableConfig opaqueSceneTable(1, D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 7);
+			DescriptorTableConfig depthTable(1, D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 8);
 			m_RootSignatureBuilder
 				.AddConstantBuffer(2)
-				.AddDescriptorTables({ materialTexTable, envMapTable, depthTable, opaqueSceneTable })
+				.AddDescriptorTables({ materialTexTable, envMapTable, opaqueSceneTable, depthTable })
 				.AddSampler(0, D3D12_FILTER_ANISOTROPIC)
 				.AddSampler(1, D3D12_FILTER_ANISOTROPIC);
 		}
@@ -108,7 +108,8 @@ namespace DX12Engine
 				DXGI_FORMAT_R16G16B16A16_FLOAT,
 				DXGI_FORMAT_R16G16B16A16_FLOAT,
 				DXGI_FORMAT_R16G16B16A16_FLOAT,
-				DXGI_FORMAT_R16G16B16A16_FLOAT })
+				DXGI_FORMAT_R16G16B16A16_FLOAT,
+				DXGI_FORMAT_R16G16_FLOAT })
 			.SetDepthStencilFormat(DXGI_FORMAT_D32_FLOAT);
 		}
 

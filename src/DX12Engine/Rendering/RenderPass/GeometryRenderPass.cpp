@@ -32,6 +32,7 @@ namespace DX12Engine
 		m_RenderTargets.emplace_back(ResourceManager::GetInstance().CreateRenderTargetTexture(windowSize, DXGI_FORMAT_R16G16B16A16_FLOAT)); // Metallic, Roughness, AO
 		m_RenderTargets.emplace_back(ResourceManager::GetInstance().CreateRenderTargetTexture(windowSize, DXGI_FORMAT_R16G16B16A16_FLOAT)); // Position
 		m_RenderTargets.emplace_back(ResourceManager::GetInstance().CreateRenderTargetTexture(windowSize, DXGI_FORMAT_R16G16B16A16_FLOAT)); // Emissive
+		m_RenderTargets.emplace_back(ResourceManager::GetInstance().CreateRenderTargetTexture(windowSize, DXGI_FORMAT_R16G16_FLOAT)); // Velocity
 		m_RenderTargets.emplace_back(ResourceManager::GetInstance().CreateDepthMap(DirectX::XMINT3(windowSize.x, windowSize.y, 1), DXGI_FORMAT_D32_FLOAT, DXGI_FORMAT_R32_FLOAT, false)); // Depth
 
         m_Viewport = { 0.0f, 0.0f, (float)windowSize.x, (float)windowSize.y, 0.0f, 1.0f };
@@ -49,9 +50,9 @@ namespace DX12Engine
         m_CommandList.RSSetViewports(1, &m_Viewport);
         m_CommandList.RSSetScissorRects(1, &m_ScissorRect);
 
-		CD3DX12_RESOURCE_BARRIER rtBarriers[7];
-        D3D12_CPU_DESCRIPTOR_HANDLE rtvHandles[6];
-        for (int i = 0; i < 6; i++)
+		CD3DX12_RESOURCE_BARRIER rtBarriers[8];
+        D3D12_CPU_DESCRIPTOR_HANDLE rtvHandles[7];
+        for (int i = 0; i < 7; i++)
         {
 			rtBarriers[i] = CD3DX12_RESOURCE_BARRIER::Transition(
 				m_RenderTargets[i]->GetResource(),
@@ -61,17 +62,17 @@ namespace DX12Engine
 			m_RenderTargets[i]->SetUsageState(D3D12_RESOURCE_STATE_RENDER_TARGET);
             rtvHandles[i] = m_RenderTargets[i]->GetTextureDescriptor().GetCPUHandle();
         }
-		rtBarriers[6] = CD3DX12_RESOURCE_BARRIER::Transition(
-			m_RenderTargets[6]->GetResource(),
-			m_RenderTargets[6]->GetUsageState(),
+		rtBarriers[7] = CD3DX12_RESOURCE_BARRIER::Transition(
+			m_RenderTargets[7]->GetResource(),
+			m_RenderTargets[7]->GetUsageState(),
 			D3D12_RESOURCE_STATE_DEPTH_WRITE
 		);
-        m_RenderTargets[6]->SetUsageState(D3D12_RESOURCE_STATE_DEPTH_WRITE);
+        m_RenderTargets[7]->SetUsageState(D3D12_RESOURCE_STATE_DEPTH_WRITE);
         m_CommandList.ResourceBarrier(m_RenderTargets.size(), rtBarriers);
 
-		auto dsvHandle = m_RenderTargets[6]->GetTextureDescriptor().GetCPUHandle();
-		m_CommandList.OMSetRenderTargets(6, rtvHandles, false, &dsvHandle);
-        for (int i = 0; i < 6; i++)
+		auto dsvHandle = m_RenderTargets[7]->GetTextureDescriptor().GetCPUHandle();
+		m_CommandList.OMSetRenderTargets(7, rtvHandles, false, &dsvHandle);
+        for (int i = 0; i < 7; i++)
         {
 			DirectX::XMFLOAT4 rtClearColor = m_RenderTargets[i]->GetClearColor();
             const float clearColor[] = { rtClearColor.x, rtClearColor.y, rtClearColor.z, rtClearColor.w };
@@ -173,8 +174,10 @@ namespace DX12Engine
 			return m_RenderTargets[4];
         case ResourceSlot::Emissive:
             return m_RenderTargets[5];
-        case ResourceSlot::Depth:
+        case ResourceSlot::Velocity:
             return m_RenderTargets[6];
+        case ResourceSlot::Depth:
+            return m_RenderTargets[7];
         default:
             return nullptr;
         }
@@ -193,7 +196,8 @@ namespace DX12Engine
                 DXGI_FORMAT_R16G16B16A16_FLOAT,
                 DXGI_FORMAT_R16G16B16A16_FLOAT,
                 DXGI_FORMAT_R16G16B16A16_FLOAT,
-                DXGI_FORMAT_R16G16B16A16_FLOAT })
+                DXGI_FORMAT_R16G16B16A16_FLOAT,
+                DXGI_FORMAT_R16G16_FLOAT })
             .SetDepthStencilFormat(DXGI_FORMAT_D32_FLOAT);
 
         DescriptorTableConfig config(6, D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 0);

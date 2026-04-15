@@ -9,6 +9,8 @@ struct ScreenData
 	DirectX::XMMATRIX InvViewMatrix;
 	DirectX::XMMATRIX InvProjectionMatrix;
 	DirectX::XMFLOAT2 ScreenSize;
+	DirectX::XMFLOAT2 Jitter;
+	DirectX::XMFLOAT2 PrevJitter;
 };
 
 struct SSRTemporalData
@@ -24,6 +26,9 @@ struct TAATemporalData
 	DirectX::XMMATRIX PrevViewMatrix;
 	DirectX::XMMATRIX PrevProjectionMatrix;
 	uint32_t FrameIndex;
-	DirectX::XMFLOAT3 Padding;
+	DirectX::XMFLOAT2 Jitter;
+	DirectX::XMFLOAT2 PrevJitter;
+	float BlendFactor;
+	float Sharpness;
 };
 

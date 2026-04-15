@@ -20,10 +20,9 @@ namespace DX12Engine
 		DirectX::XMMATRIX ViewMatrix;
 		DirectX::XMMATRIX ProjectionMatrix;
 		DirectX::XMMATRIX MVPMatrix;
-		DirectX::XMMATRIX InvViewMatrix;
-		DirectX::XMMATRIX InvProjectionMatrix;
 		DirectX::XMFLOAT3 CameraPosition;
 		float Padding;
+		DirectX::XMMATRIX PrevMVPMatrix;
 	};
 
 	class GameObject;
@@ -69,6 +68,7 @@ namespace DX12Engine
 
 		std::shared_ptr<ModelInstance> m_Asset;
 		RenderComponentData m_RenderObjectData;
+		bool m_HasValidPrevMVP = false;
 		std::vector<ResolvedPrimitiveBinding> m_ResolvedPrimitiveBindings;
 	};
 }

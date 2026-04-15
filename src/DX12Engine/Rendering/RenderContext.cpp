@@ -53,15 +53,17 @@ namespace DX12Engine
 		}
 	}
 
-	void RenderContext::UpdateScreenData(Camera* camera)
+	void RenderContext::UpdateScreenData(Camera* camera, const DirectX::XMFLOAT2& jitter, const DirectX::XMFLOAT2& prevJitter, const DirectX::XMMATRIX* projectionOverride)
 	{
 		if (camera != nullptr)
 		{
 			m_ScreenData.CameraPosition = DirectX::XMFLOAT4(camera->GetPosition().x, camera->GetPosition().y, camera->GetPosition().z, 1.0f);
 			m_ScreenData.ViewMatrix = camera->GetViewMatrix();
-			m_ScreenData.ProjectionMatrix = camera->GetProjectionMatrix();
+			m_ScreenData.ProjectionMatrix = projectionOverride ? *projectionOverride : camera->GetProjectionMatrix();
 			m_ScreenData.InvViewMatrix = DirectX::XMMatrixInverse(nullptr, camera->GetViewMatrix());
-			m_ScreenData.InvProjectionMatrix = DirectX::XMMatrixInverse(nullptr, camera->GetProjectionMatrix());
+			m_ScreenData.InvProjectionMatrix = DirectX::XMMatrixInverse(nullptr, m_ScreenData.ProjectionMatrix);
+			m_ScreenData.Jitter = jitter;
+			m_ScreenData.PrevJitter = prevJitter;
 			m_ScreenDataCB->Update(&m_ScreenData, sizeof(ScreenData));
 		}
 	}

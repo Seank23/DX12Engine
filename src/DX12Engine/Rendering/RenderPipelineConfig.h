@@ -15,7 +15,8 @@ namespace DX12Engine
 		Depth,
 		Composite,
 		Emissive,
-		EnvironmentMap
+		EnvironmentMap,
+		Velocity,
 	};
 
 	enum class RenderPassType
