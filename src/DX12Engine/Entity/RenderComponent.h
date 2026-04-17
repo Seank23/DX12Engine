@@ -23,6 +23,7 @@ namespace DX12Engine
 		DirectX::XMFLOAT3 CameraPosition;
 		float Padding;
 		DirectX::XMMATRIX PrevMVPMatrix;
+		DirectX::XMMATRIX UnjitteredMVPMatrix;
 	};
 
 	class GameObject;
@@ -38,6 +39,8 @@ namespace DX12Engine
 		}();
 		std::unique_ptr<ConstantBuffer> PrimitiveConstantBuffer;
 		D3D12_GPU_VIRTUAL_ADDRESS CBVAddress = 0;
+		DirectX::XMMATRIX PrevUnjitteredMVPMatrix = DirectX::XMMatrixIdentity();
+		bool HasValidPrevUnjitteredMVP = false;
 	};
 
 	class RenderComponent : public Component
@@ -63,12 +66,17 @@ namespace DX12Engine
 		DirectX::XMMATRIX GetModelMatrix();
 
 	private:
-		void UpdateConstantBufferData(ConstantBuffer& target, DirectX::XMMATRIX modelMatrix, DirectX::XMMATRIX viewMatrix, DirectX::XMMATRIX projectionMatrix, DirectX::XMFLOAT3 cameraPosition);
+		void UpdateConstantBufferData(
+			ResolvedPrimitiveBinding& binding,
+			DirectX::XMMATRIX modelMatrix,
+			DirectX::XMMATRIX viewMatrix,
+			DirectX::XMMATRIX projectionMatrix,
+			DirectX::XMMATRIX unjitteredProjectionMatrix,
+			DirectX::XMFLOAT3 cameraPosition);
 		void RebuildResolvedPrimitiveBindings();
 
 		std::shared_ptr<ModelInstance> m_Asset;
 		RenderComponentData m_RenderObjectData;
-		bool m_HasValidPrevMVP = false;
 		std::vector<ResolvedPrimitiveBinding> m_ResolvedPrimitiveBindings;
 	};
 }

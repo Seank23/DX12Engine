@@ -125,7 +125,7 @@ namespace DX12EngineDemo
 		m_PhysicsEngine->Update(ts, elapsed);
 		m_Scene->Update(ts, elapsed);
 		m_Scene->GetLightBuffer()->Update();
-		m_Renderer->ExecutePipeline(m_RenderPipeline);
+		m_Renderer->ExecutePipeline(m_RenderPipeline, ts);
 	}
 
 	void DX12EngineDemoApp::HandleWindowEvent(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)

@@ -39,7 +39,7 @@ namespace DX12Engine
 
 	DirectX::XMMATRIX Renderer::UpdateFrameJitter(DirectX::XMMATRIX projectionMatrix, DirectX::XMINT2 screenSize)
 	{
-		constexpr uint32_t kJitterCycle = 8;
+		constexpr uint32_t kJitterCycle = 4;
 
 		m_PrevJitter = m_Jitter;
 		const uint32_t sampleIndex = static_cast<uint32_t>(m_JitterFrameIndex % kJitterCycle) + 1u;
@@ -131,10 +131,10 @@ namespace DX12Engine
 		return m_RenderContext->ProcessWindowMessages();
 	}
 
-	void Renderer::ExecutePipeline(RenderPipeline pipeline)
+	void Renderer::ExecutePipeline(RenderPipeline pipeline, float frameTime)
 	{
 		m_RenderContext->GetHeapManager().BeginFrame(m_FrameIndex++);
-		SetSceneData(pipeline);
+		SetSceneData(pipeline, frameTime);
 		auto projectionOverride = m_Options.AA_Mode == AntiAliasingMode::TAA ? &m_JitteredProjection : nullptr;
 		m_RenderContext->UpdateScreenData(m_CurrentScene ? m_CurrentScene->GetCamera() : nullptr, m_Jitter, m_PrevJitter, projectionOverride);
 		m_RenderContext->GetUploader().UploadAllPending();
@@ -266,7 +266,7 @@ namespace DX12Engine
 		return scissorRect;
 	}
 
-	void Renderer::SetSceneData(RenderPipeline pipeline)
+	void Renderer::SetSceneData(RenderPipeline pipeline, float frameTime)
 	{
 		std::vector<Texture*> texturesToUpload;
 		std::unordered_set<Texture*> queuedTextures;
@@ -278,7 +278,12 @@ namespace DX12Engine
 		LightBuffer* lightBuffer = m_CurrentScene->GetLightBuffer();
 
 		if (m_Options.AA_Mode == AntiAliasingMode::TAA)
+		{
 			m_JitteredProjection = UpdateFrameJitter(sceneCamera ? sceneCamera->GetProjectionMatrix() : DirectX::XMMatrixIdentity(), m_RenderContext->GetWindowSize());
+			float jitterScale = (1.0f / frameTime) / 120.0f; // scale jitter based on frame time to maintain stability across varying frame rates
+			m_Jitter.x *= jitterScale;
+			m_Jitter.y *= jitterScale;
+		}
 
 		std::vector<DrawItem> geometryPassDrawItems;
 		std::vector<DrawItem> transparentPassDrawItems;
@@ -296,8 +301,9 @@ namespace DX12Engine
 
 				DirectX::XMMATRIX nodeWorldTransform = DirectX::XMLoadFloat4x4(&binding.NodeWorldTransform);
 				DirectX::XMMATRIX modelMatrix = nodeWorldTransform * comp->GetModelMatrix();
-				DirectX::XMMATRIX projectionMatrix = (m_Options.AA_Mode == AntiAliasingMode::TAA) ? m_JitteredProjection : sceneCamera->GetProjectionMatrix();
-				comp->UpdateConstantBufferData(*binding.PrimitiveConstantBuffer, modelMatrix, sceneCamera->GetViewMatrix(), projectionMatrix, sceneCamera->GetPosition());
+				DirectX::XMMATRIX unjitteredProjectionMatrix = sceneCamera->GetProjectionMatrix();
+				DirectX::XMMATRIX projectionMatrix = (m_Options.AA_Mode == AntiAliasingMode::TAA) ? m_JitteredProjection : unjitteredProjectionMatrix;
+				comp->UpdateConstantBufferData(binding, modelMatrix, sceneCamera->GetViewMatrix(), projectionMatrix, unjitteredProjectionMatrix, sceneCamera->GetPosition());
 
 				if (tmpl && !tmpl->HasResolvedPSO())
 					tmpl->ResolvePSO();
@@ -382,8 +388,16 @@ namespace DX12Engine
 				static_cast<TransparentRenderPass*>(renderPass)->SetDrawItems(transparentPassDrawItems);
 				break;
 			case RenderPassType::TAA:
-				static_cast<TAARenderPass*>(renderPass)->SetJitterStates(m_Jitter, m_PrevJitter);
+			{
+				TAARenderPass* taaPass = static_cast<TAARenderPass*>(renderPass);
+				taaPass->SetJitterStates(m_Jitter, m_PrevJitter);
+				taaPass->SetTAASettings(m_Options.TAA);
+				if (m_RequestTAAHistoryReset)
+				{
+					taaPass->InvalidateHistory();
+				}
 				break;
+			}
 			default:
 				break;
 			}
@@ -457,7 +471,22 @@ namespace DX12Engine
 
 	void Renderer::SetOptions(RendererOptions options)
 	{
+		const bool aaModeChanged = m_Options.AA_Mode != options.AA_Mode;
+		const bool taaSettingsChanged =
+			m_Options.TAA.BaseBlend != options.TAA.BaseBlend ||
+			m_Options.TAA.MinBlend != options.TAA.MinBlend ||
+			m_Options.TAA.MaxBlend != options.TAA.MaxBlend ||
+			m_Options.TAA.VelocityRejection != options.TAA.VelocityRejection ||
+			m_Options.TAA.DepthRejection != options.TAA.DepthRejection ||
+			m_Options.TAA.ClampGamma != options.TAA.ClampGamma ||
+			m_Options.TAA.Sharpness != options.TAA.Sharpness ||
+			m_Options.TAA.DisocclusionDepthThreshold != options.TAA.DisocclusionDepthThreshold;
+
 		m_Options = options;
+		if (aaModeChanged || taaSettingsChanged)
+		{
+			m_RequestTAAHistoryReset = true;
+		}
 		UpdatePostProcessingCB();
 	}
 

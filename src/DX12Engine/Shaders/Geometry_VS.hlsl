@@ -8,6 +8,7 @@ cbuffer ObjectData : register(b0)
     float3 CameraPosition;
     float Padding;
     float4x4 PrevMVPMatrix;
+    float4x4 UnjitteredMVPMatrix;
 };
 
 struct VSInput
@@ -34,8 +35,9 @@ VSOutput main(VSInput input)
 {
     VSOutput output;
     float4 worldPosition = mul(ModelMatrix, float4(input.position, 1.0f));
-    float4 currentClip = mul(MVPMatrix, float4(input.position, 1.0f));
-    output.currentPosition = currentClip;
+    float4 rasterClip = mul(MVPMatrix, float4(input.position, 1.0f));
+    float4 currentClip = mul(UnjitteredMVPMatrix, float4(input.position, 1.0f));
+    output.currentPosition = rasterClip;
     output.currentClip = currentClip;
     output.prevClip = mul(PrevMVPMatrix, float4(input.position, 1.0f));
     output.worldPos = worldPosition.xyz;

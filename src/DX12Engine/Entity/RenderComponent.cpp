@@ -28,6 +28,8 @@ namespace DX12Engine
 		{
 			binding.PrimitiveConstantBuffer = ResourceManager::GetInstance().CreateConstantBuffer(sizeof(RenderComponentData));
 			binding.CBVAddress = binding.PrimitiveConstantBuffer->GetGPUAddress();
+			binding.PrevUnjitteredMVPMatrix = DirectX::XMMatrixIdentity();
+			binding.HasValidPrevUnjitteredMVP = false;
 		}
 	}
 
@@ -42,7 +44,6 @@ namespace DX12Engine
 	void RenderComponent::SetAsset(std::shared_ptr<ModelInstance> asset)
 	{
 		m_Asset = std::move(asset);
-		m_HasValidPrevMVP = false;
 		RebuildResolvedPrimitiveBindings();
 	}
 
@@ -147,18 +148,31 @@ namespace DX12Engine
 		}
 	}
 
-	void RenderComponent::UpdateConstantBufferData(ConstantBuffer& target, DirectX::XMMATRIX modelMatrix, DirectX::XMMATRIX viewMatrix, DirectX::XMMATRIX projectionMatrix, DirectX::XMFLOAT3 cameraPosition)
+	void RenderComponent::UpdateConstantBufferData(
+		ResolvedPrimitiveBinding& binding,
+		DirectX::XMMATRIX modelMatrix,
+		DirectX::XMMATRIX viewMatrix,
+		DirectX::XMMATRIX projectionMatrix,
+		DirectX::XMMATRIX unjitteredProjectionMatrix,
+		DirectX::XMFLOAT3 cameraPosition)
 	{
+		if (!binding.PrimitiveConstantBuffer)
+			return;
+
 		const DirectX::XMMATRIX currentMVP = modelMatrix * viewMatrix * projectionMatrix;
-		m_RenderObjectData.PrevMVPMatrix = m_HasValidPrevMVP ? m_RenderObjectData.MVPMatrix : currentMVP;
+		const DirectX::XMMATRIX currentUnjitteredMVP = modelMatrix * viewMatrix * unjitteredProjectionMatrix;
+		m_RenderObjectData.PrevMVPMatrix = binding.HasValidPrevUnjitteredMVP ? binding.PrevUnjitteredMVPMatrix : currentUnjitteredMVP;
 
 		m_RenderObjectData.ModelMatrix = modelMatrix;
 		m_RenderObjectData.NormalMatrix = DirectX::XMMatrixTranspose(DirectX::XMMatrixInverse(nullptr, modelMatrix));
 		m_RenderObjectData.ViewMatrix = viewMatrix;
 		m_RenderObjectData.ProjectionMatrix = projectionMatrix;
 		m_RenderObjectData.MVPMatrix = currentMVP;
+		m_RenderObjectData.UnjitteredMVPMatrix = currentUnjitteredMVP;
 		m_RenderObjectData.CameraPosition = cameraPosition;
-		m_HasValidPrevMVP = true;
-		target.Update(&m_RenderObjectData, sizeof(RenderComponentData));
+		binding.PrimitiveConstantBuffer->Update(&m_RenderObjectData, sizeof(RenderComponentData));
+
+		binding.PrevUnjitteredMVPMatrix = currentUnjitteredMVP;
+		binding.HasValidPrevUnjitteredMVP = true;
 	}
 }

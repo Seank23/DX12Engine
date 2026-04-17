@@ -1,4 +1,5 @@
-﻿#include "TAARenderPass.h"
+﻿#define NOMINMAX
+#include "TAARenderPass.h"
 #include "../../Resources/ResourceManager.h"
 #include "../RenderContext.h"
 #include "../PipelineStateBuilder.h"
@@ -7,8 +8,28 @@
 #include "../../Input/Camera.h"
 #include "../../Utils/EngineUtils.h"
 
+#include <algorithm>
+#include <cmath>
+
 namespace DX12Engine
 {
+	float TAARenderPass::MatrixMaxAbsDelta(const DirectX::XMMATRIX& a, const DirectX::XMMATRIX& b)
+	{
+		DirectX::XMFLOAT4X4 af{};
+		DirectX::XMFLOAT4X4 bf{};
+		DirectX::XMStoreFloat4x4(&af, a);
+		DirectX::XMStoreFloat4x4(&bf, b);
+
+		const float* pa = &af._11;
+		const float* pb = &bf._11;
+		float maxDelta = 0.0f;
+		for (int i = 0; i < 16; ++i)
+		{
+			maxDelta = std::max(maxDelta, std::fabs(pa[i] - pb[i]));
+		}
+		return maxDelta;
+	}
+
 	TAARenderPass::TAARenderPass(RenderContext& context)
 		: RenderPass(context)
 	{
@@ -35,12 +56,15 @@ namespace DX12Engine
 
 		m_TemporalCB = ResourceManager::GetInstance().CreateConstantBuffer(sizeof(TAATemporalData));
 		m_TemporalData.FrameIndex = 0;
-		m_TemporalData.PrevViewMatrix = DirectX::XMMatrixIdentity();
-		m_TemporalData.PrevProjectionMatrix = DirectX::XMMatrixIdentity();
-		m_TemporalData.Jitter = { 0.0f, 0.0f };
-		m_TemporalData.PrevJitter = { 0.0f, 0.0f };
-		m_TemporalData.BlendFactor = 0.1f;
-		m_TemporalData.Sharpness = 0.5f;
+		m_TemporalData.EnableHistoryReset = 1;
+		m_TemporalData.BaseBlend = m_Settings.BaseBlend;
+		m_TemporalData.MinBlend = m_Settings.MinBlend;
+		m_TemporalData.MaxBlend = m_Settings.MaxBlend;
+		m_TemporalData.VelocityRejection = m_Settings.VelocityRejection;
+		m_TemporalData.DepthRejection = m_Settings.DepthRejection;
+		m_TemporalData.ClampGamma = m_Settings.ClampGamma;
+		m_TemporalData.Sharpness = m_Settings.Sharpness;
+		m_TemporalData.DisocclusionDepthThreshold = m_Settings.DisocclusionDepthThreshold;
 
 		m_PrevFrameScreenData = m_RenderContext.GetScreenData();
 
@@ -52,16 +76,32 @@ namespace DX12Engine
 
 	void TAARenderPass::Execute()
 	{
+		const ScreenData currentScreenData = m_RenderContext.GetScreenData();
 		DirectX::XMMATRIX prevView = m_PrevFrameScreenData.ViewMatrix;
 		DirectX::XMMATRIX prevProj = m_PrevFrameScreenData.ProjectionMatrix;
+		const float viewDelta = MatrixMaxAbsDelta(currentScreenData.ViewMatrix, m_PrevFrameScreenData.ViewMatrix);
+		const float projDelta = MatrixMaxAbsDelta(currentScreenData.ProjectionMatrix, m_PrevFrameScreenData.ProjectionMatrix);
+		const float cameraPosDelta = std::fabs(currentScreenData.CameraPosition.x - m_PrevFrameScreenData.CameraPosition.x)
+			+ std::fabs(currentScreenData.CameraPosition.y - m_PrevFrameScreenData.CameraPosition.y)
+			+ std::fabs(currentScreenData.CameraPosition.z - m_PrevFrameScreenData.CameraPosition.z);
+		const bool screenSizeChanged =
+			std::fabs(currentScreenData.ScreenSize.x - m_PrevFrameScreenData.ScreenSize.x) > 0.5f ||
+			std::fabs(currentScreenData.ScreenSize.y - m_PrevFrameScreenData.ScreenSize.y) > 0.5f;
+		const bool cameraCut = (viewDelta > 0.35f) || (projDelta > 0.35f) || (cameraPosDelta > 3.0f);
+		const bool historyReset = m_ForceHistoryReset || !m_HistoryValid || cameraCut || screenSizeChanged;
 
 		RenderPass::Execute();
 
-		m_TemporalData.PrevViewMatrix = prevView;
-		m_TemporalData.PrevProjectionMatrix = prevProj;
 		m_TemporalData.FrameIndex = m_FrameIndex;
-		m_TemporalData.Jitter = m_Jitter;
-		m_TemporalData.PrevJitter = m_PrevJitter;
+		m_TemporalData.EnableHistoryReset = historyReset ? 1u : 0u;
+		m_TemporalData.BaseBlend = m_Settings.BaseBlend;
+		m_TemporalData.MinBlend = m_Settings.MinBlend;
+		m_TemporalData.MaxBlend = m_Settings.MaxBlend;
+		m_TemporalData.VelocityRejection = m_Settings.VelocityRejection;
+		m_TemporalData.DepthRejection = m_Settings.DepthRejection;
+		m_TemporalData.ClampGamma = m_Settings.ClampGamma;
+		m_TemporalData.Sharpness = m_Settings.Sharpness;
+		m_TemporalData.DisocclusionDepthThreshold = m_Settings.DisocclusionDepthThreshold;
 		m_TemporalCB->Update(&m_TemporalData, sizeof(TAATemporalData));
 
 		RenderTexture* renderTarget = m_RenderTargets[0].get();
@@ -152,6 +192,8 @@ namespace DX12Engine
 
 		m_WriteIndex = 1 - m_WriteIndex;
 		m_FrameIndex++;
+		m_HistoryValid = true;
+		m_ForceHistoryReset = false;
 		m_PrevFrameScreenData = m_RenderContext.GetScreenData();
 	}
 

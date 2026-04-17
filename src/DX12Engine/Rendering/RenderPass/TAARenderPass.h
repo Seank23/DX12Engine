@@ -1,6 +1,7 @@
 #pragma once
 #include "RenderPass.h"
 #include "RenderPassData.h"
+#include "../RendererOptions.h"
 
 namespace DX12Engine
 {
@@ -16,10 +17,13 @@ namespace DX12Engine
 		std::shared_ptr<RenderTexture> GetRenderTarget(ResourceSlot type) override;
 
 		void SetJitterStates(const DirectX::XMFLOAT2& jitter, const DirectX::XMFLOAT2& prevJitter) { m_Jitter = jitter; m_PrevJitter = prevJitter; }
+		void SetTAASettings(const TAASettings& settings) { m_Settings = settings; }
+		void InvalidateHistory() { m_ForceHistoryReset = true; }
 
 	private:
 		void CreateTAAPassPSO();
 		void TransitionHistoryBuffer(D3D12_RESOURCE_STATES from, D3D12_RESOURCE_STATES to);
+		static float MatrixMaxAbsDelta(const DirectX::XMMATRIX& a, const DirectX::XMMATRIX& b);
 
 		Microsoft::WRL::ComPtr<ID3D12RootSignature> m_RootSignature;
 		Microsoft::WRL::ComPtr<ID3D12PipelineState> m_PipelineState;
@@ -38,6 +42,9 @@ namespace DX12Engine
 
 		DirectX::XMFLOAT2 m_Jitter = { 0.0f, 0.0f };
 		DirectX::XMFLOAT2 m_PrevJitter = { 0.0f, 0.0f };
+		TAASettings m_Settings;
+		bool m_ForceHistoryReset = true;
+		bool m_HistoryValid = false;
 	};
 }
 

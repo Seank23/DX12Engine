@@ -12,10 +12,16 @@ cbuffer ScreenBuffer : register(b0)
 
 cbuffer TemporalBuffer : register(b1)
 {
-    float4x4 PrevViewMatrix;
-    float4x4 PrevProjectionMatrix;
     uint FrameIndex;
-    float3 TemporalPadding;
+    uint EnableHistoryReset;
+    float BaseBlend;
+    float MinBlend;
+    float MaxBlend;
+    float VelocityRejection;
+    float DepthRejection;
+    float ClampGamma;
+    float Sharpness;
+    float DisocclusionDepthThreshold;
 };
 
 struct PSInput
@@ -26,14 +32,14 @@ struct PSInput
 
 struct PSOutput
 {
-    float4 color   : SV_TARGET0;
+    float4 color : SV_TARGET0;
     float4 history : SV_TARGET1;
 };
 
 Texture2D sceneColorMap : register(t0);
-Texture2D depthMap      : register(t1);
-Texture2D velocityMap   : register(t2);
-Texture2D historyMap    : register(t3);
+Texture2D depthMap : register(t1);
+Texture2D velocityMap : register(t2);
+Texture2D historyMap : register(t3);
 
 SamplerState samp : register(s0);
 
@@ -47,25 +53,11 @@ float3 SampleCurrent(float2 uv)
     return sceneColorMap.Sample(samp, uv).rgb;
 }
 
-float2 GetJitterDelta(float2 uv)
-{
-    // Jitter values are in pixel units in [-0.5, 0.5].
-    float2 jitterDeltaPixels = PrevJitter - Jitter;
-    float2 jitterDeltaUV = jitterDeltaPixels / ScreenSize;
-    return jitterDeltaUV;
-}
-
-float2 ReprojectFromVelocity(float2 uv)
-{
-    float2 velocity = velocityMap.Sample(samp, uv).xy;
-    return uv - velocity;
-}
-
-void NeighborhoodMinMax(float2 uv, out float3 cMin, out float3 cMax)
+float3 PrefilterCurrent(float2 uv)
 {
     float2 texel = 1.0 / ScreenSize;
-    cMin = float3(1e9, 1e9, 1e9);
-    cMax = float3(-1e9, -1e9, -1e9);
+    float3 sum = 0.0;
+    float weightSum = 0.0;
 
     [unroll]
     for (int y = -1; y <= 1; ++y)
@@ -73,12 +65,116 @@ void NeighborhoodMinMax(float2 uv, out float3 cMin, out float3 cMax)
         [unroll]
         for (int x = -1; x <= 1; ++x)
         {
-            float2 p = uv + float2((float)x, (float)y) * texel;
-            float3 c = SampleCurrent(p);
-            cMin = min(cMin, c);
-            cMax = max(cMax, c);
+            float2 o = float2((float) x, (float) y);
+            float w = (x == 0 && y == 0) ? 4.0 : ((x == 0 || y == 0) ? 2.0 : 1.0);
+            sum += sceneColorMap.SampleLevel(samp, uv + o * texel, 0).rgb * w;
+            weightSum += w;
         }
     }
+
+    return sum / weightSum;
+}
+
+float CatmullRom(float x)
+{
+    x = abs(x);
+    if (x <= 1.0)
+        return 1.5 * x * x * x - 2.5 * x * x + 1.0;
+    if (x < 2.0)
+        return -0.5 * x * x * x + 2.5 * x * x - 4.0 * x + 2.0;
+    return 0.0;
+}
+
+float3 SampleHistoryCatmullRom(float2 uv)
+{
+    float2 texel = 1.0 / ScreenSize;
+    float2 samplePos = uv * ScreenSize - 0.5;
+    float2 base = floor(samplePos);
+    float2 f = samplePos - base;
+
+    float3 accum = 0.0;
+    float totalWeight = 0.0;
+
+    [unroll]
+    for (int y = -1; y <= 2; ++y)
+    {
+        [unroll]
+        for (int x = -1; x <= 2; ++x)
+        {
+            float2 offset = float2((float) x, (float) y);
+            float2 tapUV = (base + offset + 0.5) * texel;
+            float w = CatmullRom(offset.x - f.x) * CatmullRom(offset.y - f.y);
+            accum += historyMap.SampleLevel(samp, tapUV, 0).rgb * w;
+            totalWeight += w;
+        }
+    }
+
+    return (totalWeight > 0.0) ? (accum / totalWeight) : historyMap.SampleLevel(samp, uv, 0).rgb;
+}
+
+float2 JitterDeltaUV()
+{
+    // Jitter is stored in pixel units in [-0.5, 0.5].
+    // Reprojection must account for frame-to-frame jitter phase shift.
+    float2 jitterDeltaPixels = PrevJitter - Jitter;
+    return jitterDeltaPixels / ScreenSize;
+}
+
+// Dilate velocity by picking the motion vector from the closest-depth
+// neighbor in a 3x3 region.  This prevents thin geometry and edges from
+// getting an incorrect (background) motion vector, which is a major
+// source of edge shimmer.
+float2 DilatedVelocity(float2 uv)
+{
+    float2 texel = 1.0 / ScreenSize;
+    float bestDepth = 1.0;
+    float2 bestUV = uv;
+
+    [unroll]
+    for (int y = -1; y <= 1; ++y)
+    {
+        [unroll]
+        for (int x = -1; x <= 1; ++x)
+        {
+            float2 tapUV = uv + float2((float) x, (float) y) * texel;
+            float d = depthMap.SampleLevel(samp, tapUV, 0).r;
+            if (d < bestDepth)
+            {
+                bestDepth = d;
+                bestUV = tapUV;
+            }
+        }
+    }
+
+    return velocityMap.SampleLevel(samp, bestUV, 0).xy;
+}
+
+// Gather neighborhood mean and standard deviation for variance-based
+// history clamping.  Variance clipping (mean +/- gamma*sigma) is far
+// more stable than raw min/max on high-frequency textures because it
+// ignores single-pixel outliers that would otherwise widen the box and
+// let ghosting through, or tighten it asymmetrically and cause flicker.
+void NeighborhoodStats(float2 uv, out float3 mean, out float3 sigma)
+{
+    float2 texel = 1.0 / ScreenSize;
+    float3 m1 = 0.0;
+    float3 m2 = 0.0;
+
+    [unroll]
+    for (int y = -1; y <= 1; ++y)
+    {
+        [unroll]
+        for (int x = -1; x <= 1; ++x)
+        {
+            float3 c = SampleCurrent(uv + float2((float) x, (float) y) * texel);
+            m1 += c;
+            m2 += c * c;
+        }
+    }
+
+    mean = m1 / 9.0;
+    float3 variance = max(m2 / 9.0 - mean * mean, 1e-6);
+    sigma = sqrt(variance);
 }
 
 float EdgeFactor(float2 uv)
@@ -93,7 +189,7 @@ float EdgeFactor(float2 uv)
     return saturate(dz * 64.0);
 }
 
-float3 Sharpen(float2 uv, float3 color)
+float3 Sharpen(float2 uv, float3 color, float strength)
 {
     float2 texel = 1.0 / ScreenSize;
     float3 n = SampleCurrent(uv + float2(0.0, texel.y));
@@ -101,7 +197,7 @@ float3 Sharpen(float2 uv, float3 color)
     float3 e = SampleCurrent(uv + float2(texel.x, 0.0));
     float3 w = SampleCurrent(uv - float2(texel.x, 0.0));
     float3 blur = (n + s + e + w) * 0.25;
-    return max(color + (color - blur) * 0.05, 0.0);
+    return max(color + (color - blur) * strength, 0.0);
 }
 
 PSOutput main(PSInput input)
@@ -110,59 +206,65 @@ PSOutput main(PSInput input)
     float2 uv = input.texCoord;
 
     float3 current = SampleCurrent(uv);
-    float2 prevUV = ReprojectFromVelocity(uv);
+    float3 filteredCurrent = PrefilterCurrent(uv);
 
-    // First frame (or invalid reprojection) starts fresh.
+    // Use dilated velocity so thin edges pick up the correct motion vector.
+    float2 velocity = DilatedVelocity(uv);
+    float2 prevUV = uv - velocity + JitterDeltaUV();
+
+    // First frame or out-of-bounds reprojection starts fresh.
     bool outOfBounds = any(prevUV < 0.0) || any(prevUV > 1.0);
     if (FrameIndex == 0 || outOfBounds)
     {
-        float3 start = Sharpen(uv, current);
+        float3 start = Sharpen(uv, current, Sharpness);
         output.color = float4(start, 1.0);
         output.history = float4(start, 1.0);
         return output;
     }
 
-    float2 velocity = velocityMap.Sample(samp, uv).xy;
     float velocityPixels = length(velocity * ScreenSize);
-    float velocityFactor = saturate(velocityPixels * 0.2);
+    float velocityFactor = saturate(velocityPixels * VelocityRejection);
 
-    float3 history = historyMap.Sample(samp, prevUV).rgb;
+    float3 history = SampleHistoryCatmullRom(prevUV);
 
-    // Clamp history into a local box around the current frame neighborhood.
-    float3 cMin, cMax;
-    NeighborhoodMinMax(uv, cMin, cMax);
-    float3 center = current;
-    float3 halfExtent = (cMax - cMin) * 0.5;
-    // Tighten the clamp under motion to avoid chroma smearing/ghost tails.
-    halfExtent *= lerp(1.0, 0.35, velocityFactor);
-    history = clamp(history, center - halfExtent, center + halfExtent);
+    // Variance-based history clamping: mean +/- gamma*sigma.
+    // Gamma of 1.25 keeps the box tight enough to reject ghosts while
+    // being wide enough not to flicker on detailed surfaces.
+    float3 mean, sigma;
+    NeighborhoodStats(uv, mean, sigma);
+    float gamma = lerp(ClampGamma, 0.75, velocityFactor);
+    float3 clipMin = mean - sigma * gamma;
+    float3 clipMax = mean + sigma * gamma;
+    history = clamp(history, clipMin, clipMax);
 
-    // Reduce history trust near geometric edges and when history diverges heavily.
+    // Adaptive blend weight.
     float edge = EdgeFactor(uv);
     float lumaCurrent = Luma(current);
     float lumaHistory = Luma(history);
     float contrast = saturate(abs(lumaCurrent - lumaHistory) * 4.0);
-    float colorDelta = saturate(length(current - history) * 1.5);
-    float depthCurrent = depthMap.Sample(samp, uv).r;
-    float depthAtPrevUV = depthMap.Sample(samp, prevUV).r;
-    float disocclusion = saturate(abs(depthCurrent - depthAtPrevUV) * 250.0);
+    float depthCurrent = depthMap.SampleLevel(samp, uv, 0).r;
+    float depthPrev = depthMap.SampleLevel(samp, prevUV, 0).r;
+    float depthDelta = abs(depthCurrent - depthPrev);
+    float depthFactor = saturate(depthDelta * DepthRejection);
+    float disoccluded = depthDelta > DisocclusionDepthThreshold ? 1.0 : 0.0;
 
-    // Base history weight is intentionally conservative to reduce visible ghosting.
-    float historyWeight = 0.78;
-    historyWeight *= lerp(1.0, 0.45, edge);
-    historyWeight *= lerp(1.0, 0.25, velocityFactor);
-    historyWeight *= lerp(1.0, 0.08, disocclusion);
-    historyWeight *= (1.0 - 0.65 * contrast);
-    historyWeight *= (1.0 - 0.55 * colorDelta);
-    historyWeight = saturate(historyWeight);
-    historyWeight = clamp(historyWeight, 0.03, 0.82);
+    float historyWeight = BaseBlend;
+    historyWeight *= (1.0 - edge);
+    historyWeight *= (1.0 - velocityFactor);
+    historyWeight *= (1.0 - depthFactor);
+    historyWeight *= (1.0 - contrast * 0.5);
+    historyWeight *= (1.0 - disoccluded);
+    historyWeight = clamp(historyWeight, MinBlend, MaxBlend);
 
     float3 resolved = lerp(current, history, historyWeight);
-    // Avoid adding sharpness in strongly disoccluded regions where it amplifies halos.
-    float sharpenAmount = 1.0 - saturate(disocclusion * 1.25);
-    resolved = lerp(resolved, Sharpen(uv, resolved), sharpenAmount);
+
+    // Gate sharpening by motion and disocclusion.
+    float sharpenGate = 1.0 - saturate(velocityFactor + depthFactor + disoccluded);
+    float sharpenStrength = Sharpness * sharpenGate;
+    resolved = Sharpen(uv, resolved, sharpenStrength);
 
     output.color = float4(resolved, 1.0);
     output.history = float4(resolved, 1.0);
     return output;
 }
+

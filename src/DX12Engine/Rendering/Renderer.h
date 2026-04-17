@@ -37,7 +37,7 @@ namespace DX12Engine
 		~Renderer();
 
 		bool PollWindow();
-		void ExecutePipeline(RenderPipeline pipeline);
+		void ExecutePipeline(RenderPipeline pipeline, float frameTime);
 
 		std::unique_ptr<std::vector<ResourceSlot>> GetTargets(std::vector<ResourceSlot> targets);
 		RenderPipeline CreateRenderPipeline(RenderPipelineConfig config);
@@ -51,7 +51,7 @@ namespace DX12Engine
 		RendererOptions& GetOptions() { return m_Options; }
 
 	private:
-		void SetSceneData(RenderPipeline pipeline);
+		void SetSceneData(RenderPipeline pipeline, float frameTime);
 		void PresentFrame(RenderTexture* finalRenderTarget);
 		std::unique_ptr<RenderPass> CreateRenderPass(RenderPassType type, int count);
 		DirectX::XMMATRIX UpdateFrameJitter(DirectX::XMMATRIX projectionMatrix, DirectX::XMINT2 screenSize);
@@ -76,6 +76,7 @@ namespace DX12Engine
 		std::unique_ptr<ConstantBuffer> m_PostProcessingCB;
 
 		DirectX::XMMATRIX m_JitteredProjection;
+		bool m_RequestTAAHistoryReset = true;
 	};
 }
 

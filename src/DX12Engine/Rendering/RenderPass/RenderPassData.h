@@ -23,12 +23,15 @@ struct SSRTemporalData
 
 struct TAATemporalData
 {
-	DirectX::XMMATRIX PrevViewMatrix;
-	DirectX::XMMATRIX PrevProjectionMatrix;
 	uint32_t FrameIndex;
-	DirectX::XMFLOAT2 Jitter;
-	DirectX::XMFLOAT2 PrevJitter;
-	float BlendFactor;
+	uint32_t EnableHistoryReset;
+	float BaseBlend;
+	float MinBlend;
+	float MaxBlend;
+	float VelocityRejection;
+	float DepthRejection;
+	float ClampGamma;
 	float Sharpness;
+	float DisocclusionDepthThreshold;
 };
 
