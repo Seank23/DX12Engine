@@ -34,14 +34,15 @@ namespace DX12Engine
 		m_VertexShaderName = m_VertexShaderName.empty() ? "RenderTriangle_VS" : m_VertexShaderName;
 		m_PixelShaderName = m_PixelShaderName.empty() ? "SSRPass_PS" : m_PixelShaderName;
 
-		DirectX::XMINT2 windowSize = m_RenderContext.GetWindowSize();
+		DirectX::XMINT2 renderSize = m_RenderContext.GetRenderSize();
 
 		// Current-frame composite output
-		m_RenderTargets.emplace_back(ResourceManager::GetInstance().CreateRenderTargetTexture(windowSize, DXGI_FORMAT_R16G16B16A16_FLOAT));
+		m_RenderTargets.emplace_back(ResourceManager::GetInstance().CreateRenderTargetTexture(renderSize, DXGI_FORMAT_R16G16B16A16_FLOAT));
+		m_RenderTargets.emplace_back(ResourceManager::GetInstance().CreateRenderTargetTexture(renderSize, DXGI_FORMAT_R8_UNORM, 1, { 0.0f, 0.0f, 0.0f, 0.0f }));
 
 		// Ping-pong history buffers (R16G16B16A16 to preserve HDR history)
-		m_HistoryBuffers[0] = ResourceManager::GetInstance().CreateRenderTargetTexture(windowSize, DXGI_FORMAT_R16G16B16A16_FLOAT);
-		m_HistoryBuffers[1] = ResourceManager::GetInstance().CreateRenderTargetTexture(windowSize, DXGI_FORMAT_R16G16B16A16_FLOAT);
+		m_HistoryBuffers[0] = ResourceManager::GetInstance().CreateRenderTargetTexture(renderSize, DXGI_FORMAT_R16G16B16A16_FLOAT);
+		m_HistoryBuffers[1] = ResourceManager::GetInstance().CreateRenderTargetTexture(renderSize, DXGI_FORMAT_R16G16B16A16_FLOAT);
 
 		// Temporal constant buffer
 		m_TemporalCB = ResourceManager::GetInstance().CreateConstantBuffer(sizeof(SSRTemporalData));
@@ -51,8 +52,8 @@ namespace DX12Engine
 
 		m_PrevFrameScreenData = m_RenderContext.GetScreenData();
 
-		m_Viewport = { 0.0f, 0.0f, (float)windowSize.x, (float)windowSize.y, 0.0f, 1.0f };
-		m_ScissorRect = { 0, 0, (LONG)windowSize.x, (LONG)windowSize.y };
+		m_Viewport = { 0.0f, 0.0f, (float)renderSize.x, (float)renderSize.y, 0.0f, 1.0f };
+		m_ScissorRect = { 0, 0, (LONG)renderSize.x, (LONG)renderSize.y };
 
 		CreateSSRPassPSO();
 	}
@@ -72,6 +73,7 @@ namespace DX12Engine
 		m_TemporalCB->Update(&m_TemporalData, sizeof(SSRTemporalData));
 
 		RenderTexture* renderTarget = m_RenderTargets[0].get();
+		RenderTexture* reactiveMaskTarget = m_RenderTargets[1].get();
 
 		// Read buffer = previously written frame, write buffer = current frame output
 		int readIndex = 1 - m_WriteIndex;
@@ -97,6 +99,14 @@ namespace DX12Engine
 				D3D12_RESOURCE_STATE_RENDER_TARGET));
 			renderTarget->SetUsageState(D3D12_RESOURCE_STATE_RENDER_TARGET);
 		}
+		if (reactiveMaskTarget->GetUsageState() != D3D12_RESOURCE_STATE_RENDER_TARGET)
+		{
+			barriers.push_back(CD3DX12_RESOURCE_BARRIER::Transition(
+				reactiveMaskTarget->GetResource(),
+				reactiveMaskTarget->GetUsageState(),
+				D3D12_RESOURCE_STATE_RENDER_TARGET));
+			reactiveMaskTarget->SetUsageState(D3D12_RESOURCE_STATE_RENDER_TARGET);
+		}
 		if (historyWrite->GetUsageState() != D3D12_RESOURCE_STATE_RENDER_TARGET)
 		{
 			barriers.push_back(CD3DX12_RESOURCE_BARRIER::Transition(
@@ -116,16 +126,19 @@ namespace DX12Engine
 		if (!barriers.empty())
 			m_CommandList.ResourceBarrier(static_cast<UINT>(barriers.size()), barriers.data());
 
-		// Render to both the composite output and the history write buffer simultaneously
-		D3D12_CPU_DESCRIPTOR_HANDLE rtvHandles[2] = {
+		// Render to the composite output, the history write buffer and the reactive mask simultaneously.
+		D3D12_CPU_DESCRIPTOR_HANDLE rtvHandles[3] = {
 			renderTarget->GetTextureDescriptor().GetCPUHandle(),
-			historyWrite->GetTextureDescriptor().GetCPUHandle()
+			historyWrite->GetTextureDescriptor().GetCPUHandle(),
+			reactiveMaskTarget->GetTextureDescriptor().GetCPUHandle()
 		};
-		m_CommandList.OMSetRenderTargets(2, rtvHandles, FALSE, nullptr);
+		m_CommandList.OMSetRenderTargets(3, rtvHandles, FALSE, nullptr);
 
 		const float clearColor[] = { 0.0f, 0.0f, 0.0f, 1.0f };
+		const float reactiveClear[] = { 0.0f, 0.0f, 0.0f, 0.0f };
 		m_CommandList.ClearRenderTargetView(rtvHandles[0], clearColor, 0, nullptr);
 		m_CommandList.ClearRenderTargetView(rtvHandles[1], clearColor, 0, nullptr);
+		m_CommandList.ClearRenderTargetView(rtvHandles[2], reactiveClear, 0, nullptr);
 
 		auto srvHeap = m_RenderContext.GetHeapManager().GetRenderPassHeap().GetHeap();
 		m_CommandList.SetDescriptorHeaps(1, &srvHeap);
@@ -134,14 +147,14 @@ namespace DX12Engine
 		DescriptorHeapHandle historyBlock = ResourceManager::GetInstance().UpdateSRVDescriptors(historyVec);
 
 		auto bindPassInputTables = [this, historyBlock]()
-		{
-			m_CommandList.SetGraphicsRootConstantBufferView(0, m_RenderContext.GetScreenDataBuffer().GetGPUAddress());
-			m_CommandList.SetGraphicsRootConstantBufferView(1, m_TemporalCB->GetGPUAddress());
-			m_CommandList.SetGraphicsRootDescriptorTable(2, m_InputResourceBlockHandles[InputResourceType::EnvironmentMap].GetGPUHandle());
-			m_CommandList.SetGraphicsRootDescriptorTable(3, m_InputResourceBlockHandles[InputResourceType::GBuffer].GetGPUHandle());
-			m_CommandList.SetGraphicsRootDescriptorTable(4, m_InputResourceBlockHandles[InputResourceType::SceneColor].GetGPUHandle());
-			m_CommandList.SetGraphicsRootDescriptorTable(5, historyBlock.GetGPUHandle());
-		};
+			{
+				m_CommandList.SetGraphicsRootConstantBufferView(0, m_RenderContext.GetScreenDataBuffer().GetGPUAddress());
+				m_CommandList.SetGraphicsRootConstantBufferView(1, m_TemporalCB->GetGPUAddress());
+				m_CommandList.SetGraphicsRootDescriptorTable(2, m_InputResourceBlockHandles[InputResourceType::EnvironmentMap].GetGPUHandle());
+				m_CommandList.SetGraphicsRootDescriptorTable(3, m_InputResourceBlockHandles[InputResourceType::GBuffer].GetGPUHandle());
+				m_CommandList.SetGraphicsRootDescriptorTable(4, m_InputResourceBlockHandles[InputResourceType::SceneColor].GetGPUHandle());
+				m_CommandList.SetGraphicsRootDescriptorTable(5, historyBlock.GetGPUHandle());
+			};
 		bindPassInputTables();
 
 		m_CommandList.IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
@@ -157,9 +170,14 @@ namespace DX12Engine
 			historyWrite->GetResource(),
 			D3D12_RESOURCE_STATE_RENDER_TARGET,
 			D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE));
+		postBarriers.push_back(CD3DX12_RESOURCE_BARRIER::Transition(
+			reactiveMaskTarget->GetResource(),
+			D3D12_RESOURCE_STATE_RENDER_TARGET,
+			D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE));
 		m_CommandList.ResourceBarrier(static_cast<UINT>(postBarriers.size()), postBarriers.data());
 		renderTarget->SetUsageState(D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
 		historyWrite->SetUsageState(D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+		reactiveMaskTarget->SetUsageState(D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
 
 		UINT fenceVal = m_QueueManager.GetGraphicsQueue().ExecuteCommandList();
 		m_QueueManager.GetGraphicsQueue().WaitForFenceCPUBlocking(fenceVal);
@@ -176,6 +194,8 @@ namespace DX12Engine
 		{
 		case ResourceSlot::Composite:
 			return m_RenderTargets[0];
+		case ResourceSlot::ReactiveMask:
+			return m_RenderTargets[1];
 		default:
 			return nullptr;
 		}
@@ -197,11 +217,12 @@ namespace DX12Engine
 		PipelineStateBuilder pipelineStateBuilder;
 		RootSignatureBuilder rootSignatureBuilder;
 
-		// Two render targets: composite output (SV_TARGET0) and history write buffer (SV_TARGET1)
+		// Three render targets: composite output (SV_TARGET0), history write buffer (SV_TARGET1)
+		// and the single-channel reactive mask (SV_TARGET2).
 		pipelineStateBuilder = pipelineStateBuilder.SetBlendState(CD3DX12_BLEND_DESC(D3D12_DEFAULT))
 			.SetRasterizerState(CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT))
 			.SetPrimitiveTopologyType(D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE)
-			.SetRenderTargets({ DXGI_FORMAT_R16G16B16A16_FLOAT, DXGI_FORMAT_R16G16B16A16_FLOAT })
+			.SetRenderTargets({ DXGI_FORMAT_R16G16B16A16_FLOAT, DXGI_FORMAT_R16G16B16A16_FLOAT, DXGI_FORMAT_R8_UNORM })
 			.SetSampleDesc(UINT_MAX, 1, 0)
 			.SetVertexShader(ResourceManager::GetInstance().GetShader(m_VertexShaderName))
 			.SetPixelShader(ResourceManager::GetInstance().GetShader(m_PixelShaderName));

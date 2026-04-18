@@ -39,7 +39,8 @@ struct PSOutput
 Texture2D sceneColorMap : register(t0);
 Texture2D depthMap : register(t1);
 Texture2D velocityMap : register(t2);
-Texture2D historyMap : register(t3);
+Texture2D reactiveMaskMap : register(t3);
+Texture2D historyMap : register(t4);
 
 SamplerState samp : register(s0);
 
@@ -48,9 +49,19 @@ float Luma(float3 c)
     return dot(c, float3(0.2126, 0.7152, 0.0722));
 }
 
+float Max3(float3 c)
+{
+    return max(c.x, max(c.y, c.z));
+}
+
 float3 SampleCurrent(float2 uv)
 {
     return sceneColorMap.Sample(samp, uv).rgb;
+}
+
+float SampleReactive(float2 uv)
+{
+    return reactiveMaskMap.SampleLevel(samp, uv, 0).r;
 }
 
 float3 PrefilterCurrent(float2 uv)
@@ -66,7 +77,7 @@ float3 PrefilterCurrent(float2 uv)
         for (int x = -1; x <= 1; ++x)
         {
             float2 o = float2((float) x, (float) y);
-            float w = (x == 0 && y == 0) ? 4.0 : ((x == 0 || y == 0) ? 2.0 : 1.0);
+            float w = (x == 0 && y == 0) ? 8.0 : ((x == 0 || y == 0) ? 2.0 : 1.0);
             sum += sceneColorMap.SampleLevel(samp, uv + o * texel, 0).rgb * w;
             weightSum += w;
         }
@@ -180,13 +191,30 @@ void NeighborhoodStats(float2 uv, out float3 mean, out float3 sigma)
 float EdgeFactor(float2 uv)
 {
     float2 texel = 1.0 / ScreenSize;
+    float3 current = SampleCurrent(uv);
 
     float zc = depthMap.Sample(samp, uv).r;
     float zx = depthMap.Sample(samp, uv + float2(texel.x, 0.0)).r;
     float zy = depthMap.Sample(samp, uv + float2(0.0, texel.y)).r;
 
+    float lumaCenter = Luma(current);
+    float lumaX = abs(Luma(SampleCurrent(uv + float2(texel.x, 0.0))) - lumaCenter);
+    float lumaY = abs(Luma(SampleCurrent(uv + float2(0.0, texel.y))) - lumaCenter);
+
     float dz = abs(zx - zc) + abs(zy - zc);
-    return saturate(dz * 64.0);
+    float depthEdge = saturate(dz * 24.0);
+    float shadingEdge = saturate((lumaX + lumaY) * 2.0);
+    return saturate(max(depthEdge, shadingEdge * 0.35));
+}
+
+float EstimateReactiveHeuristic(float3 current, float edge, float velocityFactor, float contrast)
+{
+    float peak = Max3(current);
+    float highlight = saturate((peak - 1.0) * 0.35);
+    float litEdge = edge * saturate((peak - 0.75) * 0.45);
+    float contrastHighlight = contrast * saturate((peak - 0.6) * 0.35);
+    float motionHighlight = velocityFactor * saturate((peak - 1.25) * 0.2);
+    return saturate(max(max(highlight, litEdge), max(contrastHighlight, motionHighlight)));
 }
 
 float3 Sharpen(float2 uv, float3 color, float strength)
@@ -207,6 +235,8 @@ PSOutput main(PSInput input)
 
     float3 current = SampleCurrent(uv);
     float3 filteredCurrent = PrefilterCurrent(uv);
+    float edge = EdgeFactor(uv);
+    float sampledReactive = SampleReactive(uv);
 
     // Use dilated velocity so thin edges pick up the correct motion vector.
     float2 velocity = DilatedVelocity(uv);
@@ -216,7 +246,10 @@ PSOutput main(PSInput input)
     bool outOfBounds = any(prevUV < 0.0) || any(prevUV > 1.0);
     if (FrameIndex == 0 || outOfBounds)
     {
-        float3 start = Sharpen(uv, current, Sharpness);
+        float earlyReactive = saturate(max(sampledReactive, EstimateReactiveHeuristic(current, edge, 0.0, 0.0)));
+        float earlyFilterWeight = saturate(max(earlyReactive, edge * 0.6));
+        float3 startCurrent = lerp(current, filteredCurrent, earlyFilterWeight);
+        float3 start = Sharpen(uv, startCurrent, Sharpness * (1.0 - earlyReactive * 0.75));
         output.color = float4(start, 1.0);
         output.history = float4(start, 1.0);
         return output;
@@ -232,39 +265,44 @@ PSOutput main(PSInput input)
     // being wide enough not to flicker on detailed surfaces.
     float3 mean, sigma;
     NeighborhoodStats(uv, mean, sigma);
-    float gamma = lerp(ClampGamma, 0.75, velocityFactor);
-    float3 clipMin = mean - sigma * gamma;
-    float3 clipMax = mean + sigma * gamma;
-    history = clamp(history, clipMin, clipMax);
-
-    // Adaptive blend weight.
-    float edge = EdgeFactor(uv);
     float lumaCurrent = Luma(current);
     float lumaHistory = Luma(history);
     float contrast = saturate(abs(lumaCurrent - lumaHistory) * 4.0);
+    float reactive = saturate(max(sampledReactive, EstimateReactiveHeuristic(current, edge, velocityFactor, contrast)));
+    float gamma = lerp(ClampGamma, 0.65, saturate(max(velocityFactor, reactive)));
+    float3 clipMin = mean - sigma * gamma;
+    float3 clipMax = mean + sigma * gamma;
+    history = clamp(history, clipMin, clipMax);
+    
+    float currentFilterWeight = saturate(max(reactive, edge * 0.65));
+    float3 combinedCurrent = lerp(current, filteredCurrent, currentFilterWeight);
+
+    // Adaptive blend weight.
     float depthCurrent = depthMap.SampleLevel(samp, uv, 0).r;
     float depthPrev = depthMap.SampleLevel(samp, prevUV, 0).r;
     float depthDelta = abs(depthCurrent - depthPrev);
     float depthFactor = saturate(depthDelta * DepthRejection);
     float disoccluded = depthDelta > DisocclusionDepthThreshold ? 1.0 : 0.0;
+    float edgePenalty = smoothstep(0.2, 1.0, edge);
+    float edgeAwareMinBlend = lerp(MinBlend, min(MaxBlend, 0.32), edgePenalty);
 
     float historyWeight = BaseBlend;
-    historyWeight *= (1.0 - edge);
+    historyWeight *= lerp(1.0, 0.55, edgePenalty);
     historyWeight *= (1.0 - velocityFactor);
     historyWeight *= (1.0 - depthFactor);
-    historyWeight *= (1.0 - contrast * 0.5);
+    historyWeight *= (1.0 - contrast * lerp(0.5, 0.85, reactive));
     historyWeight *= (1.0 - disoccluded);
-    historyWeight = clamp(historyWeight, MinBlend, MaxBlend);
+    historyWeight *= (1.0 - reactive * 0.85);
+    historyWeight = clamp(historyWeight, edgeAwareMinBlend, MaxBlend);
 
-    float3 resolved = lerp(current, history, historyWeight);
+    float3 resolved = lerp(combinedCurrent, history, historyWeight);
 
     // Gate sharpening by motion and disocclusion.
-    float sharpenGate = 1.0 - saturate(velocityFactor + depthFactor + disoccluded);
+    float sharpenGate = 1.0 - saturate(velocityFactor + depthFactor + disoccluded + reactive * 0.75);
     float sharpenStrength = Sharpness * sharpenGate;
-    resolved = Sharpen(uv, resolved, sharpenStrength);
+    resolved = lerp(resolved, Sharpen(uv, resolved, sharpenStrength), sharpenGate);
 
     output.color = float4(resolved, 1.0);
     output.history = float4(resolved, 1.0);
     return output;
 }
-

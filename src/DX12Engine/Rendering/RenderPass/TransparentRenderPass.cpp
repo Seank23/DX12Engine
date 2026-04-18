@@ -37,11 +37,11 @@ namespace DX12Engine
 		m_VertexShaderName = m_VertexShaderName.empty() ? "PBRTransparent_VS" : m_VertexShaderName;
 		m_PixelShaderName = m_PixelShaderName.empty() ? "PBRTransparent_PS" : m_PixelShaderName;
 
-		DirectX::XMINT2 windowSize = m_RenderContext.GetWindowSize();
-		m_RenderTargets.emplace_back(ResourceManager::GetInstance().CreateRenderTargetTexture(windowSize, DXGI_FORMAT_R16G16B16A16_FLOAT));
+		DirectX::XMINT2 renderSize = m_RenderContext.GetRenderSize();
+		m_RenderTargets.emplace_back(ResourceManager::GetInstance().CreateRenderTargetTexture(renderSize, DXGI_FORMAT_R16G16B16A16_FLOAT));
 
-		m_Viewport = { 0.0f, 0.0f, (float)windowSize.x, (float)windowSize.y, 0.0f, 1.0f };
-		m_ScissorRect = { 0, 0, (LONG)windowSize.x, (LONG)windowSize.y };
+		m_Viewport = { 0.0f, 0.0f, (float)renderSize.x, (float)renderSize.y, 0.0f, 1.0f };
+		m_ScissorRect = { 0, 0, (LONG)renderSize.x, (LONG)renderSize.y };
 
 		CreateTransparentPassPSO();
 	}

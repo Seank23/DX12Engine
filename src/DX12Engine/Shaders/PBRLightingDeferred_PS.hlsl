@@ -123,9 +123,6 @@ float3 PBRLighting(float3 albedo, float metallic, float roughness, float clearco
     color *= baseAtten;
     float clearcoatSpec = (NdotL > 0.0) ? ClearcoatSpecLobe(NdotV, NdotL, NdotH, HdotV, clearcoatRoughness) : 0.0;
     color += clearcoat * clearcoatSpec * NdotL;
-    float3 reflectionVector = reflect(-V, N);
-    float3 clearcoatEnv = sRGBToLinear(environmentMap.SampleLevel(samp, reflectionVector, clearcoatRoughness * 12.0).rgb);
-    color += clearcoat * FcV * NdotV * clearcoatEnv;
     
     return color;
 }
@@ -242,11 +239,18 @@ float4 main(PSInput input) : SV_TARGET
     float3 diffuseIBL = albedo * sRGBToLinear(irradianceMap.Sample(samp, worldNormal).rgb);
     float3 reflectionVector = reflect(-V, worldNormal);
     float perceptualRoughness = roughness;
+    float baseGloss = 1.0 - roughness;
+    float clearcoatGloss = clearcoat * (1.0 - clearcoatRoughness);
     float3 prefilteredEnv = sRGBToLinear(environmentMap.SampleLevel(samp, reflectionVector, perceptualRoughness * 12.0).rgb);
-    float specularWeight = (1.0 - roughness) * (1.0 - roughness);
+    float specularWeight = baseGloss * baseGloss;
     float specOcc = SpecularOcclusion(NdotV, ao, roughness);
+    float clearcoatF = FresnelSchlick(NdotV, float3(0.04, 0.04, 0.04)).r;
+    float baseAmbientAtten = 1.0 - clearcoat * clearcoatF;
     float3 diffuseAmbient = (kD * diffuseIBL) * ao;
-    float3 specularAmbient = prefilteredEnv * kS * specularWeight * specOcc;
+    float3 specularAmbient = prefilteredEnv * kS * specularWeight * specOcc * baseAmbientAtten;
+    float clearcoatOcc = SpecularOcclusion(NdotV, ao, clearcoatRoughness);
+    float3 clearcoatEnv = sRGBToLinear(environmentMap.SampleLevel(samp, reflectionVector, clearcoatRoughness * 12.0).rgb);
+    float3 clearcoatAmbient = clearcoatEnv * (clearcoat * clearcoatF * clearcoatOcc);
     
     for (int i = 0; i < LightCount; i++)
     {
@@ -288,9 +292,10 @@ float4 main(PSInput input) : SV_TARGET
     // full 0..1 PCF range maps smoothly to the min/max ambient levels.
     float smoothShadow = smoothstep(0.0, 1.0, ambientShadow);
     float remappedDiffuseShadow = lerp(0.2, 1.0, smoothShadow);
-    float remappedSpecularShadow = lerp(0.05, 1.0, smoothShadow);
+    float glossyShadowFloor = lerp(0.06, 0.30, saturate(max(baseGloss * 0.75, clearcoatGloss)));
+    float remappedSpecularShadow = lerp(glossyShadowFloor, 1.0, smoothShadow);
     finalColor += diffuseAmbient * remappedDiffuseShadow;
-    finalColor += specularAmbient * remappedSpecularShadow;
+    finalColor += (specularAmbient + clearcoatAmbient) * remappedSpecularShadow;
     finalColor += emissive;
     return float4(finalColor, 1.0f);
 }

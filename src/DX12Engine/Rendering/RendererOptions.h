@@ -12,11 +12,11 @@ namespace DX12Engine
 	struct TAASettings
 	{
 		// Baseline history contribution before adaptive rejection terms are applied.
-		float BaseBlend = 0.82f;
+		float BaseBlend = 0.86f;
 		// Lower clamp for history weight; higher values reduce flicker but can increase ghosting.
-		float MinBlend = 0.08f;
+		float MinBlend = 0.16f;
 		// Upper clamp for history weight; lower values bias toward current frame and reduce trails.
-		float MaxBlend = 0.88f;
+		float MaxBlend = 0.92f;
 		// Scales how strongly motion vectors suppress history reuse.
 		float VelocityRejection = 0.14f;
 		// Scales how strongly depth disagreement suppresses history reuse.
@@ -24,7 +24,7 @@ namespace DX12Engine
 		// Variance-clip radius in YCoCg space; smaller values clamp history more aggressively.
 		float ClampGamma = 1.25f;
 		// Post-resolve sharpening amount (gated by motion/disocclusion in shader).
-		float Sharpness = 0.05f;
+		float Sharpness = 0.025f;
 		// Absolute depth delta that triggers hard disocclusion history rejection.
 		float DisocclusionDepthThreshold = 0.004f;
 	};
@@ -33,6 +33,7 @@ namespace DX12Engine
 	{
 		AntiAliasingMode AA_Mode = AntiAliasingMode::None;
 		TAASettings TAA;
+		float RenderScale = 1.0f;
 		bool EnableGammaCorrection = true;
 	};
 

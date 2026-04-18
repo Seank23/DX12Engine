@@ -4,10 +4,13 @@
 #include "./RootSignatureCache.h"
 #include "../Input/Camera.h"
 
+#include <algorithm>
+#include <cmath>
+
 namespace DX12Engine
 {
 	RenderContext::RenderContext(Application* app, int width, int height, std::string name)
-		: m_WindowSize(DirectX::XMINT2(width, height)), m_Device(nullptr)
+		: m_WindowSize(DirectX::XMINT2(width, height)), m_RenderSize(DirectX::XMINT2(width, height)), m_Device(nullptr)
 	{
 		m_RenderWindow = std::make_unique<RenderWindow>();
 		HWND windowHandle = m_RenderWindow->Init(app, m_WindowSize, name);
@@ -25,7 +28,7 @@ namespace DX12Engine
 		m_RenderWindow->CreateDepthStencilBuffer();
 
 		m_ScreenDataCB = ResourceManager::GetInstance().CreateConstantBuffer(sizeof(ScreenData));
-		m_ScreenData.ScreenSize = DirectX::XMFLOAT2(m_WindowSize.x, m_WindowSize.y);
+		m_ScreenData.ScreenSize = DirectX::XMFLOAT2(static_cast<float>(m_RenderSize.x), static_cast<float>(m_RenderSize.y));
 	}
 
 	RenderContext::~RenderContext()
@@ -53,10 +56,30 @@ namespace DX12Engine
 		}
 	}
 
+	void RenderContext::SetWindowSize(DirectX::XMINT2 windowSize)
+	{
+		m_WindowSize = windowSize;
+		UpdateRenderSize();
+	}
+
+	void RenderContext::SetRenderScale(float renderScale)
+	{
+		m_RenderScale = (std::max)(0.5f, renderScale);
+		UpdateRenderSize();
+	}
+
+	void RenderContext::UpdateRenderSize()
+	{
+		m_RenderSize.x = (std::max)(1, static_cast<int>(std::lround(static_cast<double>(m_WindowSize.x) * m_RenderScale)));
+		m_RenderSize.y = (std::max)(1, static_cast<int>(std::lround(static_cast<double>(m_WindowSize.y) * m_RenderScale)));
+		m_ScreenData.ScreenSize = DirectX::XMFLOAT2(static_cast<float>(m_RenderSize.x), static_cast<float>(m_RenderSize.y));
+	}
+
 	void RenderContext::UpdateScreenData(Camera* camera, const DirectX::XMFLOAT2& jitter, const DirectX::XMFLOAT2& prevJitter, const DirectX::XMMATRIX* projectionOverride)
 	{
 		if (camera != nullptr)
 		{
+			m_ScreenData.ScreenSize = DirectX::XMFLOAT2(static_cast<float>(m_RenderSize.x), static_cast<float>(m_RenderSize.y));
 			m_ScreenData.CameraPosition = DirectX::XMFLOAT4(camera->GetPosition().x, camera->GetPosition().y, camera->GetPosition().z, 1.0f);
 			m_ScreenData.ViewMatrix = camera->GetViewMatrix();
 			m_ScreenData.ProjectionMatrix = projectionOverride ? *projectionOverride : camera->GetProjectionMatrix();

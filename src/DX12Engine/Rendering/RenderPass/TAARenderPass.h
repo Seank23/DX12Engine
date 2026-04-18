@@ -45,6 +45,8 @@ namespace DX12Engine
 		TAASettings m_Settings;
 		bool m_ForceHistoryReset = true;
 		bool m_HistoryValid = false;
+		std::unique_ptr<RenderTexture> m_FallbackReactiveMask;
+		bool m_UsingFallbackReactiveMask = false;
 	};
 }
 

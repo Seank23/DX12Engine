@@ -23,12 +23,12 @@ namespace DX12Engine
 
 		m_VertexShaderName = m_VertexShaderName.empty() ? "RenderTriangle_VS" : m_VertexShaderName;
 
-		DirectX::XMINT2 windowSize = m_RenderContext.GetWindowSize();
-		m_RenderTargets.emplace_back(ResourceManager::GetInstance().CreateRenderTargetTexture(windowSize, DXGI_FORMAT_R8G8B8A8_UNORM));
+		DirectX::XMINT2 renderSize = m_RenderContext.GetRenderSize();
+		m_RenderTargets.emplace_back(ResourceManager::GetInstance().CreateRenderTargetTexture(renderSize, DXGI_FORMAT_R8G8B8A8_UNORM));
 		ResourceManager::GetInstance().UpdateSRVDescriptors(reinterpret_cast<std::vector<GPUResource*> const&>(m_RenderTargets));
 
-		m_Viewport = { 0.0f, 0.0f, (float)windowSize.x, (float)windowSize.y, -1.0f, 1.0f };
-		m_ScissorRect = { 0, 0, (LONG)windowSize.x, (LONG)windowSize.y };
+		m_Viewport = { 0.0f, 0.0f, (float)renderSize.x, (float)renderSize.y, -1.0f, 1.0f };
+		m_ScissorRect = { 0, 0, (LONG)renderSize.x, (LONG)renderSize.y };
 
 		CreateUIPassPSO();
 	}

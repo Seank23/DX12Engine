@@ -15,7 +15,6 @@
 #include "../Entity/RenderComponent.h"
 #include "DrawItem.h"
 
-
 #include <array>
 #include <algorithm>
 #include <unordered_set>
@@ -279,7 +278,7 @@ namespace DX12Engine
 
 		if (m_Options.AA_Mode == AntiAliasingMode::TAA)
 		{
-			m_JitteredProjection = UpdateFrameJitter(sceneCamera ? sceneCamera->GetProjectionMatrix() : DirectX::XMMatrixIdentity(), m_RenderContext->GetWindowSize());
+			m_JitteredProjection = UpdateFrameJitter(sceneCamera ? sceneCamera->GetProjectionMatrix() : DirectX::XMMatrixIdentity(), m_RenderContext->GetRenderSize());
 			float jitterScale = (1.0f / frameTime) / 120.0f; // scale jitter based on frame time to maintain stability across varying frame rates
 			m_Jitter.x *= jitterScale;
 			m_Jitter.y *= jitterScale;
@@ -472,6 +471,7 @@ namespace DX12Engine
 	void Renderer::SetOptions(RendererOptions options)
 	{
 		const bool aaModeChanged = m_Options.AA_Mode != options.AA_Mode;
+		const bool renderScaleChanged = std::fabs(m_Options.RenderScale - options.RenderScale) > 0.001f;
 		const bool taaSettingsChanged =
 			m_Options.TAA.BaseBlend != options.TAA.BaseBlend ||
 			m_Options.TAA.MinBlend != options.TAA.MinBlend ||
@@ -483,7 +483,8 @@ namespace DX12Engine
 			m_Options.TAA.DisocclusionDepthThreshold != options.TAA.DisocclusionDepthThreshold;
 
 		m_Options = options;
-		if (aaModeChanged || taaSettingsChanged)
+		m_RenderContext->SetRenderScale(m_Options.RenderScale);
+		if (aaModeChanged || taaSettingsChanged || renderScaleChanged)
 		{
 			m_RequestTAAHistoryReset = true;
 		}

@@ -17,6 +17,7 @@ namespace DX12Engine
 		Emissive,
 		EnvironmentMap,
 		Velocity,
+		ReactiveMask,
 	};
 
 	enum class RenderPassType
@@ -36,6 +37,7 @@ namespace DX12Engine
 		SceneColor,
 		Depth,
 		GBuffer,
+		ReactiveMask,
 		ShadowMap,
 		CubeShadowMap,
 		EnvironmentMap
@@ -53,6 +55,7 @@ namespace DX12Engine
 		GBuffer,
 		SceneColor,
 		Depth,
+		ReactiveMask,
 		VertexShader,
 		PixelShader,
 	};
@@ -64,6 +67,7 @@ namespace DX12Engine
 			InputResourceType::CubeShadowMap,
 			InputResourceType::SceneColor,
 			InputResourceType::Depth,
+			InputResourceType::ReactiveMask,
 			InputResourceType::VertexShader,
 			InputResourceType::PixelShader,
 	};

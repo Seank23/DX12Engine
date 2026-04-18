@@ -20,6 +20,7 @@ namespace DX12EngineDemo
 		m_Renderer = std::make_unique<DX12Engine::Renderer>(m_RenderContext);
 		DX12Engine::RendererOptions options;
 		options.AA_Mode = DX12Engine::AntiAliasingMode::TAA;
+		//options.RenderScale = 1.5f;
 		m_Renderer->SetOptions(options);
 
 		m_PhysicsEngine = std::make_shared<DX12Engine::PhysicsEngine>();
@@ -77,11 +78,14 @@ namespace DX12EngineDemo
 		lightingConfig.Writes.push_back({ DX12Engine::PipelineResource::SceneColor });
 
 		std::vector<DX12Engine::ResourceSlot> compositeType{ DX12Engine::ResourceSlot::Composite };
+		std::vector<DX12Engine::ResourceSlot> reactiveMaskType{ DX12Engine::ResourceSlot::ReactiveMask };
 		std::vector<DX12Engine::ResourceSlot> ssrGBufferTypes{
 			DX12Engine::ResourceSlot::Albedo,
 			DX12Engine::ResourceSlot::WorldNormal,
+			DX12Engine::ResourceSlot::ObjectNormal,
 			DX12Engine::ResourceSlot::Material,
 			DX12Engine::ResourceSlot::Position,
+			DX12Engine::ResourceSlot::Emissive,
 			DX12Engine::ResourceSlot::Depth
 		};
 		DX12Engine::RenderPassConfig ssrConfig;
@@ -90,6 +94,7 @@ namespace DX12EngineDemo
 		ssrConfig.ResourceBindings.push_back({ DX12Engine::InputResourceType::GBuffer, DX12Engine::PipelineResource::GBuffer, ssrGBufferTypes });
 		ssrConfig.ResourceBindings.push_back({ DX12Engine::InputResourceType::SceneColor, DX12Engine::PipelineResource::SceneColor, compositeType });
 		ssrConfig.Writes.push_back({ DX12Engine::PipelineResource::SceneColor });
+		ssrConfig.Writes.push_back({ DX12Engine::PipelineResource::ReactiveMask });
 
 		std::vector<DX12Engine::ResourceSlot> taaGBufferTypes{ DX12Engine::ResourceSlot::Velocity };
 		std::vector<DX12Engine::ResourceSlot> depthType{ DX12Engine::ResourceSlot::Depth };
@@ -98,6 +103,7 @@ namespace DX12EngineDemo
 		taaConfig.ResourceBindings.push_back({ DX12Engine::InputResourceType::SceneColor, DX12Engine::PipelineResource::SceneColor, compositeType });
 		taaConfig.ResourceBindings.push_back({ DX12Engine::InputResourceType::Depth, DX12Engine::PipelineResource::Depth, depthType });
 		taaConfig.ResourceBindings.push_back({ DX12Engine::InputResourceType::GBuffer, DX12Engine::PipelineResource::GBuffer, taaGBufferTypes });
+		taaConfig.ResourceBindings.push_back({ DX12Engine::InputResourceType::ReactiveMask, DX12Engine::PipelineResource::ReactiveMask, reactiveMaskType });
 		taaConfig.Writes.push_back({ DX12Engine::PipelineResource::SceneColor });
 
 		DX12Engine::RenderPassConfig transparentConfig;

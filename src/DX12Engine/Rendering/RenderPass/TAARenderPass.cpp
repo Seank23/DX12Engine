@@ -42,17 +42,26 @@ namespace DX12Engine
 
 	void TAARenderPass::Init()
 	{
+		DirectX::XMINT2 renderSize = m_RenderContext.GetRenderSize();
+
+		const bool hasReactiveMask = m_ResourceBlocks.find(InputResourceType::ReactiveMask) != m_ResourceBlocks.end();
+		if (!hasReactiveMask)
+		{
+			m_FallbackReactiveMask = ResourceManager::GetInstance().CreateRenderTargetTexture(renderSize, DXGI_FORMAT_R8_UNORM, 1, { 0.0f, 0.0f, 0.0f, 0.0f });
+			AddInputResources({ std::shared_ptr<GPUResource>(m_FallbackReactiveMask.get(), [](GPUResource*) {}) });
+			AddResourceBlock(InputResourceType::ReactiveMask, 1);
+			m_UsingFallbackReactiveMask = true;
+		}
+
 		RenderPass::Init();
 
 		m_VertexShaderName = m_VertexShaderName.empty() ? "RenderTriangle_VS" : m_VertexShaderName;
 		m_PixelShaderName = m_PixelShaderName.empty() ? "TAAPass_PS" : m_PixelShaderName;
 
-		DirectX::XMINT2 windowSize = m_RenderContext.GetWindowSize();
+		m_RenderTargets.emplace_back(ResourceManager::GetInstance().CreateRenderTargetTexture(renderSize, DXGI_FORMAT_R16G16B16A16_FLOAT));
 
-		m_RenderTargets.emplace_back(ResourceManager::GetInstance().CreateRenderTargetTexture(windowSize, DXGI_FORMAT_R16G16B16A16_FLOAT));
-
-		m_HistoryBuffers[0] = ResourceManager::GetInstance().CreateRenderTargetTexture(windowSize, DXGI_FORMAT_R16G16B16A16_FLOAT);
-		m_HistoryBuffers[1] = ResourceManager::GetInstance().CreateRenderTargetTexture(windowSize, DXGI_FORMAT_R16G16B16A16_FLOAT);
+		m_HistoryBuffers[0] = ResourceManager::GetInstance().CreateRenderTargetTexture(renderSize, DXGI_FORMAT_R16G16B16A16_FLOAT);
+		m_HistoryBuffers[1] = ResourceManager::GetInstance().CreateRenderTargetTexture(renderSize, DXGI_FORMAT_R16G16B16A16_FLOAT);
 
 		m_TemporalCB = ResourceManager::GetInstance().CreateConstantBuffer(sizeof(TAATemporalData));
 		m_TemporalData.FrameIndex = 0;
@@ -68,8 +77,8 @@ namespace DX12Engine
 
 		m_PrevFrameScreenData = m_RenderContext.GetScreenData();
 
-		m_Viewport = { 0.0f, 0.0f, (float)windowSize.x, (float)windowSize.y, 0.0f, 1.0f };
-		m_ScissorRect = { 0, 0, (LONG)windowSize.x, (LONG)windowSize.y };
+		m_Viewport = { 0.0f, 0.0f, (float)renderSize.x, (float)renderSize.y, 0.0f, 1.0f };
+		m_ScissorRect = { 0, 0, (LONG)renderSize.x, (LONG)renderSize.y };
 
 		CreateTAAPassPSO();
 	}
@@ -77,8 +86,6 @@ namespace DX12Engine
 	void TAARenderPass::Execute()
 	{
 		const ScreenData currentScreenData = m_RenderContext.GetScreenData();
-		DirectX::XMMATRIX prevView = m_PrevFrameScreenData.ViewMatrix;
-		DirectX::XMMATRIX prevProj = m_PrevFrameScreenData.ProjectionMatrix;
 		const float viewDelta = MatrixMaxAbsDelta(currentScreenData.ViewMatrix, m_PrevFrameScreenData.ViewMatrix);
 		const float projDelta = MatrixMaxAbsDelta(currentScreenData.ProjectionMatrix, m_PrevFrameScreenData.ProjectionMatrix);
 		const float cameraPosDelta = std::fabs(currentScreenData.CameraPosition.x - m_PrevFrameScreenData.CameraPosition.x)
@@ -91,6 +98,30 @@ namespace DX12Engine
 		const bool historyReset = m_ForceHistoryReset || !m_HistoryValid || cameraCut || screenSizeChanged;
 
 		RenderPass::Execute();
+
+		if (m_UsingFallbackReactiveMask && m_FallbackReactiveMask)
+		{
+			RenderTexture* fallbackReactiveMask = m_FallbackReactiveMask.get();
+			if (fallbackReactiveMask->GetUsageState() != D3D12_RESOURCE_STATE_RENDER_TARGET)
+			{
+				auto toRenderTarget = CD3DX12_RESOURCE_BARRIER::Transition(
+					fallbackReactiveMask->GetResource(),
+					fallbackReactiveMask->GetUsageState(),
+					D3D12_RESOURCE_STATE_RENDER_TARGET);
+				m_CommandList.ResourceBarrier(1, &toRenderTarget);
+				fallbackReactiveMask->SetUsageState(D3D12_RESOURCE_STATE_RENDER_TARGET);
+			}
+
+			const float clearReactiveMask[] = { 0.0f, 0.0f, 0.0f, 0.0f };
+			m_CommandList.ClearRenderTargetView(fallbackReactiveMask->GetTextureDescriptor().GetCPUHandle(), clearReactiveMask, 0, nullptr);
+
+			auto toShaderResource = CD3DX12_RESOURCE_BARRIER::Transition(
+				fallbackReactiveMask->GetResource(),
+				fallbackReactiveMask->GetUsageState(),
+				D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+			m_CommandList.ResourceBarrier(1, &toShaderResource);
+			fallbackReactiveMask->SetUsageState(D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+		}
 
 		m_TemporalData.FrameIndex = m_FrameIndex;
 		m_TemporalData.EnableHistoryReset = historyReset ? 1u : 0u;
@@ -161,14 +192,15 @@ namespace DX12Engine
 		DescriptorHeapHandle historyBlock = ResourceManager::GetInstance().UpdateSRVDescriptors(historyVec);
 
 		auto bindPassInputTables = [this, historyBlock]()
-		{
-			m_CommandList.SetGraphicsRootConstantBufferView(0, m_RenderContext.GetScreenDataBuffer().GetGPUAddress());
-			m_CommandList.SetGraphicsRootConstantBufferView(1, m_TemporalCB->GetGPUAddress());
-			m_CommandList.SetGraphicsRootDescriptorTable(2, m_InputResourceBlockHandles[InputResourceType::SceneColor].GetGPUHandle());
-			m_CommandList.SetGraphicsRootDescriptorTable(3, m_InputResourceBlockHandles[InputResourceType::Depth].GetGPUHandle());
-			m_CommandList.SetGraphicsRootDescriptorTable(4, m_InputResourceBlockHandles[InputResourceType::GBuffer].GetGPUHandle());
-			m_CommandList.SetGraphicsRootDescriptorTable(5, historyBlock.GetGPUHandle());
-		};
+			{
+				m_CommandList.SetGraphicsRootConstantBufferView(0, m_RenderContext.GetScreenDataBuffer().GetGPUAddress());
+				m_CommandList.SetGraphicsRootConstantBufferView(1, m_TemporalCB->GetGPUAddress());
+				m_CommandList.SetGraphicsRootDescriptorTable(2, m_InputResourceBlockHandles[InputResourceType::SceneColor].GetGPUHandle());
+				m_CommandList.SetGraphicsRootDescriptorTable(3, m_InputResourceBlockHandles[InputResourceType::Depth].GetGPUHandle());
+				m_CommandList.SetGraphicsRootDescriptorTable(4, m_InputResourceBlockHandles[InputResourceType::GBuffer].GetGPUHandle());
+				m_CommandList.SetGraphicsRootDescriptorTable(5, m_InputResourceBlockHandles[InputResourceType::ReactiveMask].GetGPUHandle());
+				m_CommandList.SetGraphicsRootDescriptorTable(6, historyBlock.GetGPUHandle());
+			};
 		bindPassInputTables();
 
 		m_CommandList.IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
@@ -233,7 +265,7 @@ namespace DX12Engine
 			.SetPixelShader(ResourceManager::GetInstance().GetShader(m_PixelShaderName));
 
 		// b0 = ScreenData, b1 = TAATemporalData
-		// then descriptor tables for G-buffer resources, then one extra table for history read
+		// then descriptor tables for TAA inputs, then one extra table for history read
 		// Build all descriptor table configs in a single call to avoid vector reallocation invalidating pointers
 		std::vector<DescriptorTableConfig> allTableConfigs = m_DescriptorTableConfigs;
 		allTableConfigs.push_back({ 1, D3D12_DESCRIPTOR_RANGE_TYPE_SRV, (UINT)m_InputResources.size() });
