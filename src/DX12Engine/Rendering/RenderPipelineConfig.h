@@ -24,6 +24,7 @@ namespace DX12Engine
 	{
 		ShadowMap,
 		CubeShadowMap,
+		CascadedShadowMap,
 		Geometry,
 		Lighting,
 		Transparent,
@@ -40,6 +41,7 @@ namespace DX12Engine
 		ReactiveMask,
 		ShadowMap,
 		CubeShadowMap,
+		CascadedShadowMap,
 		EnvironmentMap
 	};
 
@@ -52,6 +54,7 @@ namespace DX12Engine
 		EnvironmentMap,
 		ShadowMap,
 		CubeShadowMap,
+		CascadedShadowMap,
 		GBuffer,
 		SceneColor,
 		Depth,
@@ -65,6 +68,7 @@ namespace DX12Engine
 			InputResourceType::GBuffer,
 			InputResourceType::ShadowMap,
 			InputResourceType::CubeShadowMap,
+			InputResourceType::CascadedShadowMap,
 			InputResourceType::SceneColor,
 			InputResourceType::Depth,
 			InputResourceType::ReactiveMask,

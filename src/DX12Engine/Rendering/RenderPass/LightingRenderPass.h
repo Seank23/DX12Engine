@@ -30,6 +30,7 @@ namespace DX12Engine
 
 		std::unique_ptr<Texture> m_FallbackEnvMap;
 		std::unique_ptr<Texture> m_FallbackIrradianceMap;
+		std::unique_ptr<ConstantBuffer> m_FallbackCascadedShadowCB;
 	};
 }
 

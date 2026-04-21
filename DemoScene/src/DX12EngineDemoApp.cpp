@@ -21,6 +21,7 @@ namespace DX12EngineDemo
 		DX12Engine::RendererOptions options;
 		options.AA_Mode = DX12Engine::AntiAliasingMode::TAA;
 		//options.RenderScale = 1.5f;
+		options.CSM.CascadeCount = 4;
 		m_Renderer->SetOptions(options);
 
 		m_PhysicsEngine = std::make_shared<DX12Engine::PhysicsEngine>();
@@ -32,8 +33,9 @@ namespace DX12EngineDemo
 		m_InputHandler = std::make_unique<DemoInputHandler>();
 		m_InputHandler->SetCamera(m_Scene->GetCamera());
 
-		auto shadowCastingLights = m_Scene->GetLightBuffer()->GetLightsByType({ DX12Engine::LightType::Directional, DX12Engine::LightType::Spot });
+		auto shadowCastingLights = m_Scene->GetLightBuffer()->GetLightsByType({ DX12Engine::LightType::Spot });
 		auto cubeShadowCastingLights = m_Scene->GetLightBuffer()->GetLightsByType({ DX12Engine::LightType::Point });
+		auto cascadedShadowCastingLights = m_Scene->GetLightBuffer()->GetLightsByType({ DX12Engine::LightType::Directional });
 
 		DX12Engine::RenderPassConfig shadowMapConfig;
 		shadowMapConfig.Type = DX12Engine::RenderPassType::ShadowMap;
@@ -50,6 +52,14 @@ namespace DX12EngineDemo
 		cubeShadowMapConfig.InputResources[DX12Engine::InputResourceType::LightData] = &cubeShadowCastingLights;
 		cubeShadowMapConfig.Writes.push_back({ DX12Engine::PipelineResource::CubeShadowMap });
 		std::vector<DX12Engine::ResourceSlot> cubeShadowBufferTypes{
+			DX12Engine::ResourceSlot::Depth
+		};
+
+		DX12Engine::RenderPassConfig cascadedShadowMapConfig;
+		cascadedShadowMapConfig.Type = DX12Engine::RenderPassType::CascadedShadowMap;
+		cascadedShadowMapConfig.InputResources[DX12Engine::InputResourceType::LightData] = &cascadedShadowCastingLights;
+		cascadedShadowMapConfig.Writes.push_back({ DX12Engine::PipelineResource::CascadedShadowMap });
+		std::vector<DX12Engine::ResourceSlot> cascadedShadowBufferTypes{
 			DX12Engine::ResourceSlot::Depth
 		};
 
@@ -75,6 +85,7 @@ namespace DX12EngineDemo
 		lightingConfig.ResourceBindings.push_back({ DX12Engine::InputResourceType::ShadowMap, DX12Engine::PipelineResource::ShadowMap, shadowBufferTypes });
 		lightingConfig.ResourceBindings.push_back({ DX12Engine::InputResourceType::CubeShadowMap, DX12Engine::PipelineResource::CubeShadowMap, cubeShadowBufferTypes });
 		lightingConfig.ResourceBindings.push_back({ DX12Engine::InputResourceType::GBuffer, DX12Engine::PipelineResource::GBuffer, gBufferTypes });
+		lightingConfig.ResourceBindings.push_back({ DX12Engine::InputResourceType::CascadedShadowMap, DX12Engine::PipelineResource::CascadedShadowMap, cascadedShadowBufferTypes });
 		lightingConfig.Writes.push_back({ DX12Engine::PipelineResource::SceneColor });
 
 		std::vector<DX12Engine::ResourceSlot> compositeType{ DX12Engine::ResourceSlot::Composite };
@@ -116,6 +127,7 @@ namespace DX12EngineDemo
 		DX12Engine::PipelineBuilder builder;
 		builder.AddPass(shadowMapConfig)
 			.AddPass(cubeShadowMapConfig)
+			.AddPass(cascadedShadowMapConfig)
 			.AddPass(geometryConfig)
 			.AddPass(lightingConfig)
 			.AddPass(ssrConfig)

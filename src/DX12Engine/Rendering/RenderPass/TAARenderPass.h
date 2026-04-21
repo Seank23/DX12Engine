@@ -17,7 +17,7 @@ namespace DX12Engine
 		std::shared_ptr<RenderTexture> GetRenderTarget(ResourceSlot type) override;
 
 		void SetJitterStates(const DirectX::XMFLOAT2& jitter, const DirectX::XMFLOAT2& prevJitter) { m_Jitter = jitter; m_PrevJitter = prevJitter; }
-		void SetTAASettings(const TAASettings& settings) { m_Settings = settings; }
+		void SetSettings(const TAASettings& settings) { m_Settings = settings; }
 		void InvalidateHistory() { m_ForceHistoryReset = true; }
 
 	private:

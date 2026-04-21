@@ -21,7 +21,7 @@ namespace DX12EngineDemo
 
 	void ComplexDemoScene::Init()
 	{
-		m_Camera = std::make_unique<DX12Engine::Camera>(m_WindowSize.x / m_WindowSize.y, 0.1f, 100.0f);
+		m_Camera = std::make_unique<DX12Engine::Camera>(m_WindowSize.x / m_WindowSize.y, 0.1f, 1000.0f);
 		m_Camera->SetPosition({ -10.0f, 5.0f, -20.0f });
 		m_Camera->SetRotation(-3.0f, 60.0f);
 		m_Camera->SetSpeed(5.0f);
@@ -101,6 +101,7 @@ namespace DX12EngineDemo
 	void ComplexDemoScene::Update(float ts, float elapsed)
 	{
 		m_Camera->Update(ts);
+		m_SceneObjects.Get("Mazda")->Rotate({ 0.0f, ts * 10.0f, 0.0f });
 		m_SceneObjects.Update(ts, elapsed);
 	}
 

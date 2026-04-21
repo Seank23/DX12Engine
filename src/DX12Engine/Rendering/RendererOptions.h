@@ -29,17 +29,29 @@ namespace DX12Engine
 		float DisocclusionDepthThreshold = 0.004f;
 	};
 
-	struct RendererOptions
+	struct CSMSettings
 	{
-		AntiAliasingMode AA_Mode = AntiAliasingMode::None;
-		TAASettings TAA;
-		float RenderScale = 1.0f;
-		bool EnableGammaCorrection = true;
+		int CascadeCount = 4;
+		float MaxDistance = 120.0f;
+		float SplitLambda = 0.85f;
+		float CascadeBlend = 0.1f;
+		float ConstantBias = 0.0008f;
+		float SlopeBias = 1.5f;
+		float NormalBias = 0.5f;
 	};
 
 	struct PostProcessingData
 	{
 		int EnableGammaCorrection = 1;
 		int EnableFXAA = 0;
+	};
+
+	struct RendererOptions
+	{
+		float RenderScale = 1.0f;
+		AntiAliasingMode AA_Mode = AntiAliasingMode::None;
+		TAASettings TAA;
+		CSMSettings CSM;
+		bool EnableGammaCorrection = true;
 	};
 }

@@ -42,6 +42,14 @@ namespace DX12Engine
 		m_Viewport = { 0.0f, 0.0f, (float)renderSize.x, (float)renderSize.y, -1.0f, 1.0f };
 		m_ScissorRect = { 0, 0, (LONG)renderSize.x, (LONG)renderSize.y };
 
+		if (!m_FallbackCascadedShadowCB)
+		{
+			m_FallbackCascadedShadowCB = ResourceManager::GetInstance().CreateConstantBuffer(sizeof(CascadedShadowData));
+			CascadedShadowData noCSMData{};
+			noCSMData.Params0 = DirectX::XMFLOAT4(0.0f, 0.0f, 0.0f, 0.0f);
+			m_FallbackCascadedShadowCB->Update(&noCSMData, sizeof(CascadedShadowData));
+		}
+
 		CreateLightingPassPSO();
 	}
 
@@ -75,12 +83,15 @@ namespace DX12Engine
 
 		auto bindPassInputTables = [this]()
 		{
+			ConstantBuffer* cascadedShadowCB = !m_ExternalCBs.empty() ? m_ExternalCBs[0] : m_FallbackCascadedShadowCB.get();
 			m_CommandList.SetGraphicsRootConstantBufferView(0, m_RenderContext.GetScreenDataBuffer().GetGPUAddress());
 			m_CommandList.SetGraphicsRootConstantBufferView(1, m_LightBuffer->GetCBVAddress());
-			m_CommandList.SetGraphicsRootDescriptorTable(2, m_InputResourceBlockHandles[InputResourceType::EnvironmentMap].GetGPUHandle());
-			m_CommandList.SetGraphicsRootDescriptorTable(3, m_InputResourceBlockHandles[InputResourceType::GBuffer].GetGPUHandle());
-			m_CommandList.SetGraphicsRootDescriptorTable(4, m_InputResourceBlockHandles[InputResourceType::ShadowMap].GetGPUHandle());
-			m_CommandList.SetGraphicsRootDescriptorTable(5, m_InputResourceBlockHandles[InputResourceType::CubeShadowMap].GetGPUHandle());
+			m_CommandList.SetGraphicsRootConstantBufferView(2, cascadedShadowCB->GetGPUAddress());
+			m_CommandList.SetGraphicsRootDescriptorTable(3, m_InputResourceBlockHandles[InputResourceType::EnvironmentMap].GetGPUHandle());
+			m_CommandList.SetGraphicsRootDescriptorTable(4, m_InputResourceBlockHandles[InputResourceType::GBuffer].GetGPUHandle());
+			m_CommandList.SetGraphicsRootDescriptorTable(5, m_InputResourceBlockHandles[InputResourceType::ShadowMap].GetGPUHandle());
+			m_CommandList.SetGraphicsRootDescriptorTable(6, m_InputResourceBlockHandles[InputResourceType::CubeShadowMap].GetGPUHandle());
+			m_CommandList.SetGraphicsRootDescriptorTable(7, m_InputResourceBlockHandles[InputResourceType::CascadedShadowMap].GetGPUHandle());
 		};
 		bindPassInputTables();
 
@@ -122,7 +133,7 @@ namespace DX12Engine
 			.SetSampleDesc(UINT_MAX, 1, 0).SetVertexShader(ResourceManager::GetInstance().GetShader(m_VertexShaderName))
 			.SetPixelShader(ResourceManager::GetInstance().GetShader(m_PixelShaderName));
 
-		rootSignatureBuilder = rootSignatureBuilder.AddConstantBuffer(0).AddConstantBuffer(1)
+		rootSignatureBuilder = rootSignatureBuilder.AddConstantBuffer(0).AddConstantBuffer(1).AddConstantBuffer(2)
 			.AddDescriptorTables(m_DescriptorTableConfigs)
 			.AddSampler(0, D3D12_FILTER_ANISOTROPIC)
 			.AddShadowMapSampler(1);

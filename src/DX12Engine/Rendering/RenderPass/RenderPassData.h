@@ -35,3 +35,12 @@ struct TAATemporalData
 	float DisocclusionDepthThreshold;
 };
 
+struct CascadedShadowData
+{
+	DirectX::XMMATRIX CascadeViewProj[4];
+	DirectX::XMFLOAT4 CascadeSplits;      // view-space split end distances
+	DirectX::XMFLOAT4 CascadeTexelSize;   // world units/texel per cascade
+	DirectX::XMFLOAT4 Params0;            // x=count, y=maxDist, z=blend, w=unused
+	DirectX::XMFLOAT4 BiasParams;         // x=const, y=slope, z=normal, w=unused
+};
+

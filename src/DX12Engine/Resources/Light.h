@@ -42,6 +42,8 @@ namespace DX12Engine
         DirectX::XMMATRIX GetViewProjMatrix() { return m_LightData.ViewProjMatrix; }
         float GetFarPlane();
 
+		DirectX::XMFLOAT3 GetDirection() { return m_LightData.Direction; }
+
     private:
         void UpdateViewProjMatrix();
 

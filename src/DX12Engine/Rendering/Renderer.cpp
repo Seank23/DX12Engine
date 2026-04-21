@@ -10,6 +10,7 @@
 #include "RenderPass/SSRRenderPass.h"
 #include "RenderPass/UIRenderPass.h"
 #include "RenderPass/TAARenderPass.h"
+#include "RenderPass/CascadedShadowMapRenderPass.h"
 #include "RenderPipelineConfig.h"
 #include "../Entity/GameObject.h"
 #include "../Entity/RenderComponent.h"
@@ -106,6 +107,8 @@ namespace DX12Engine
 			return std::make_unique<ShadowMapRenderPass>(*m_RenderContext, count, false);
 		case RenderPassType::CubeShadowMap:
 			return std::make_unique<ShadowMapRenderPass>(*m_RenderContext, count, true);
+		case RenderPassType::CascadedShadowMap:
+			return std::make_unique<CascadedShadowMapRenderPass>(*m_RenderContext);
 		case RenderPassType::Geometry:
 			return std::make_unique<GeometryRenderPass>(*m_RenderContext);
 		case RenderPassType::Lighting:
@@ -212,8 +215,26 @@ namespace DX12Engine
 							static_cast<ShadowMapRenderPass*>(renderPass)->SetLights(*static_cast<std::vector<Light*>*>(lightDataIt->second));
 						break;
 					}
+					case RenderPassType::CascadedShadowMap:
+					{
+						static_cast<CascadedShadowMapRenderPass*>(renderPass)->SetSettings(m_Options.CSM);
+						auto lightDataIt = passConfig.InputResources.find(InputResourceType::LightData);
+						if (lightDataIt != passConfig.InputResources.end())
+							static_cast<CascadedShadowMapRenderPass*>(renderPass)->SetDirectionalLight(*static_cast<std::vector<Light*>*>(lightDataIt->second));
+						break;
+					}
 					case RenderPassType::Geometry:
 					case RenderPassType::Lighting:
+					{
+						RenderPass* cascadedShadowPass = pipeline.GetRenderPass(RenderPassType::CascadedShadowMap);
+						if (cascadedShadowPass)
+						{
+							ConstantBuffer* cascadedShadowCB = static_cast<CascadedShadowMapRenderPass*>(cascadedShadowPass)->GetCascadedShadowCB();
+							if (cascadedShadowCB)
+								renderPass->AddConstantBuffer(cascadedShadowCB);
+						}
+						break;
+					}
 					case RenderPassType::ScreenSpaceReflection:
 					case RenderPassType::UI:
 						break;
@@ -380,6 +401,13 @@ namespace DX12Engine
 			case RenderPassType::CubeShadowMap:
 				static_cast<ShadowMapRenderPass*>(renderPass)->SetDrawItems(geometryPassDrawItems);
 				break;
+			case RenderPassType::CascadedShadowMap:
+			{
+				CascadedShadowMapRenderPass* csmPass = static_cast<CascadedShadowMapRenderPass*>(renderPass);
+				csmPass->SetDrawItems(geometryPassDrawItems);
+				csmPass->SetSettings(m_Options.CSM);
+				break;
+			}
 			case RenderPassType::Lighting:
 				static_cast<LightingRenderPass*>(renderPass)->SetLightBuffer(lightBuffer);
 				break;
@@ -390,7 +418,7 @@ namespace DX12Engine
 			{
 				TAARenderPass* taaPass = static_cast<TAARenderPass*>(renderPass);
 				taaPass->SetJitterStates(m_Jitter, m_PrevJitter);
-				taaPass->SetTAASettings(m_Options.TAA);
+				taaPass->SetSettings(m_Options.TAA);
 				if (m_RequestTAAHistoryReset)
 				{
 					taaPass->InvalidateHistory();

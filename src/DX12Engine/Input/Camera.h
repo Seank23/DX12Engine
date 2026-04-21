@@ -24,6 +24,10 @@ namespace DX12Engine
 		DirectX::XMMATRIX GetViewMatrix() const { return m_ViewMatrix; }
 		DirectX::XMMATRIX GetProjectionMatrix() const { return m_ProjectionMatrix; }
 		DirectX::XMFLOAT3 GetPosition() const { return m_Position; }
+		float GetNearPlane() const { return m_ZNear; }
+		float GetFarPlane() const { return m_ZFar; }
+		float GetFOV() const { return m_FOV; }
+		float GetAspectRatio() const { return m_AspectRatio; }
 
 		void SetPosition(DirectX::XMFLOAT3 position);
 		void SetRotation(float pitch, float yaw);

@@ -1,9 +1,6 @@
 cbuffer ShadowConstants : register(b0)
 {
     matrix LightMVPMatrix;
-    matrix ModelMatrix;
-    float3 LightPos;
-    float FarPlane;
 }
 
 struct VSInput
