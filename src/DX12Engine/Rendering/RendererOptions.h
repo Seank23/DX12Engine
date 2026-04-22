@@ -32,6 +32,7 @@ namespace DX12Engine
 	struct CSMSettings
 	{
 		int CascadeCount = 4;
+		int ShadowMapSize = 2048;
 		float MaxDistance = 120.0f;
 		float SplitLambda = 0.85f;
 		float CascadeBlend = 0.1f;

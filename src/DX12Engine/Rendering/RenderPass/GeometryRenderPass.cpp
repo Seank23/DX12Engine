@@ -38,7 +38,7 @@ namespace DX12Engine
         m_Viewport = { 0.0f, 0.0f, (float)renderSize.x, (float)renderSize.y, 0.0f, 1.0f };
         m_ScissorRect = { 0, 0, (LONG)renderSize.x, (LONG)renderSize.y };
 
-		CreateGeometryPassPSO();
+        CreatePSO();
     }
 
     void GeometryRenderPass::Execute()
@@ -154,8 +154,7 @@ namespace DX12Engine
         }
         m_CommandList.ResourceBarrier(static_cast<UINT>(m_RenderTargets.size()), rtBarriers);
 
-        UINT fenceVal = m_QueueManager.GetGraphicsQueue().ExecuteCommandList();
-        m_QueueManager.GetGraphicsQueue().WaitForFenceCPUBlocking(fenceVal);
+        m_QueueManager.GetGraphicsQueue().ExecuteCommandList();
     }
 
     std::shared_ptr<RenderTexture> GeometryRenderPass::GetRenderTarget(ResourceSlot type)
@@ -183,7 +182,7 @@ namespace DX12Engine
         }
     }
 
-    void GeometryRenderPass::CreateGeometryPassPSO()
+    void GeometryRenderPass::CreatePSO()
     {
         PipelineStateBuilder pipelineStateBuilder;
         RootSignatureBuilder rootSignatureBuilder;

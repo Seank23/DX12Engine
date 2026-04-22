@@ -49,6 +49,8 @@ namespace DX12Engine
 		void AddConstantBuffer(ConstantBuffer* cb) { m_ExternalCBs.push_back(cb); }
 
 	protected:
+		virtual void CreatePSO() = 0;
+
 		RenderContext& m_RenderContext;
 		CommandQueueManager& m_QueueManager;
 		ID3D12GraphicsCommandList& m_CommandList;
@@ -64,7 +66,15 @@ namespace DX12Engine
 		std::string m_PixelShaderName;
 		std::unordered_map<InputResourceType, UINT> m_ResourceBlocks;
 
+		Microsoft::WRL::ComPtr<ID3D12RootSignature> m_RootSignature;
+		Microsoft::WRL::ComPtr<ID3D12PipelineState> m_PipelineState;
+
+		D3D12_VIEWPORT m_Viewport;
+		D3D12_RECT m_ScissorRect;
+
 		Camera* m_Camera;
 		std::vector<ConstantBuffer*> m_ExternalCBs;
+
+		uint64_t m_LocalShaderGeneration = 0;
 	};
 }

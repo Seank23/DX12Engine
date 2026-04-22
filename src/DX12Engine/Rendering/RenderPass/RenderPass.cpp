@@ -70,6 +70,11 @@ namespace DX12Engine
 
 	void RenderPass::Execute()
 	{
+		if (m_LocalShaderGeneration != ResourceManager::GetInstance().GetShaderGeneration())
+		{
+			CreatePSO();
+			m_LocalShaderGeneration = ResourceManager::GetInstance().GetShaderGeneration();
+		}
 		RebuildTransientDescriptors();
 		m_QueueManager.GetGraphicsQueue().ResetCommandAllocatorAndList();
 	}

@@ -4,6 +4,7 @@
 #include "../Utils/EngineUtils.h"
 #include "../Utils/Constants.h"
 #include "UploadResourceWrapper.h"
+#include <filesystem>
 
 namespace DX12Engine
 {
@@ -11,20 +12,20 @@ namespace DX12Engine
 
 	ResourceManager::ResourceManager()
 	{
-		m_Shaders.insert({ "BasicLighting_VS", std::make_unique<Shader>(GetShaderPath("BasicLighting_VS.hlsl"), ShaderType::Vertex) });
-		m_Shaders.insert({ "BasicLighting_PS", std::make_unique<Shader>(GetShaderPath("BasicLighting_PS.hlsl"), ShaderType::Pixel) });
-		m_Shaders.insert({ "ShadowMap_VS", std::make_unique<Shader>(GetShaderPath("ShadowMap_VS.hlsl"), ShaderType::Vertex) });
-		m_Shaders.insert({ "ShadowCubeMap_VS", std::make_unique<Shader>(GetShaderPath("ShadowCubeMap_VS.hlsl"), ShaderType::Vertex) });
-		m_Shaders.insert({ "ShadowCubeMap_PS", std::make_unique<Shader>(GetShaderPath("ShadowCubeMap_PS.hlsl"), ShaderType::Pixel) });
-		m_Shaders.insert({ "Geometry_VS", std::make_unique<Shader>(GetShaderPath("Geometry_VS.hlsl"), ShaderType::Vertex) });
-		m_Shaders.insert({ "Geometry_PS", std::make_unique<Shader>(GetShaderPath("Geometry_PS.hlsl"), ShaderType::Pixel) });
-		m_Shaders.insert({ "RenderTriangle_VS", std::make_unique<Shader>(GetShaderPath("RenderTriangle_VS.hlsl"), ShaderType::Vertex) });
-		m_Shaders.insert({ "PBRTransparent_VS", std::make_unique<Shader>(GetShaderPath("PBRTransparent_VS.hlsl"), ShaderType::Vertex) });
-		m_Shaders.insert({ "PBRLightingDeferred_PS", std::make_unique<Shader>(GetShaderPath("PBRLightingDeferred_PS.hlsl"), ShaderType::Pixel) });
-		m_Shaders.insert({ "FinalRender_PS", std::make_unique<Shader>(GetShaderPath("FinalRender_PS.hlsl"), ShaderType::Pixel) });
-		m_Shaders.insert({ "SSRPass_PS", std::make_unique<Shader>(GetShaderPath("SSRPass_PS.hlsl"), ShaderType::Pixel) });
-		m_Shaders.insert({ "PBRTransparent_PS", std::make_unique<Shader>(GetShaderPath("PBRTransparent_PS.hlsl"), ShaderType::Pixel) });
-		m_Shaders.insert({ "TAAPass_PS", std::make_unique<Shader>(GetShaderPath("TAAPass_PS.hlsl"), ShaderType::Pixel) });
+		for (auto& file : std::filesystem::directory_iterator(GetShaderFolder()))
+		{
+			if (file.path().extension() == ".hlsl")
+			{
+				std::string filename = file.path().filename().string();
+				filename = filename.substr(0, filename.size() - 5); // Remove .hlsl extension
+				if (filename.find("_VS") != std::string::npos)
+					m_Shaders.insert({ filename, std::make_unique<Shader>(GetShaderPath(filename + ".hlsl"), ShaderType::Vertex) });
+				else if (filename.find("_PS") != std::string::npos)
+					m_Shaders.insert({ filename, std::make_unique<Shader>(GetShaderPath(filename + ".hlsl"), ShaderType::Pixel) });
+				else if (filename.find("_CS") != std::string::npos)
+					m_Shaders.insert({ filename, std::make_unique<Shader>(GetShaderPath(filename + ".hlsl"), ShaderType::Compute) });
+			}
+		}
 	}
 
 	ResourceManager::~ResourceManager()
@@ -563,5 +564,23 @@ namespace DX12Engine
 	Microsoft::WRL::ComPtr<ID3D12RootSignature> ResourceManager::CreateRootSignature(const D3D12_ROOT_SIGNATURE_DESC& desc)
 	{
 		return m_RootSignatureCache->GetOrCreateRootSignature(desc);
+	}
+
+	bool ResourceManager::ReloadChangedShaders()
+	{
+		#ifndef _DEBUG
+		return false;
+		#else
+		for (auto& [name, shader] : m_Shaders)
+		{
+			if (shader->ReloadIfChanged())
+			{
+				m_ShaderGeneration++;
+				m_PipelineStateCache->ClearCache();
+				return true;
+			}
+		}
+		return false;
+		#endif
 	}
 }

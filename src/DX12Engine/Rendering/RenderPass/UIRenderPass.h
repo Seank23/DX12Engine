@@ -16,13 +16,7 @@ namespace DX12Engine
 		std::shared_ptr<RenderTexture> GetRenderTarget(ResourceSlot type) override;
 
 	private:
-		void CreateUIPassPSO();
-
-		Microsoft::WRL::ComPtr<ID3D12RootSignature> m_RootSignature;
-		Microsoft::WRL::ComPtr<ID3D12PipelineState> m_PipelineState;
-
-		D3D12_VIEWPORT m_Viewport;
-		D3D12_RECT m_ScissorRect;
+		void CreatePSO() override;
 	};
 }
 

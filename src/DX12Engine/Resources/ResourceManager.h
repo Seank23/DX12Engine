@@ -66,6 +66,10 @@ namespace DX12Engine
 		static std::wstring GetMaterialPath(std::string path) { return L"res/Materials/" + std::wstring(path.begin(), path.end()); }
 		static std::string GetModelPath(std::string path) { return "res/Models/" + path; }
 		static std::string GetShaderPath(std::string path) { return "res/Shaders/" + path; }
+		static std::string GetShaderFolder() { return "res/Shaders/"; }
+
+		bool ReloadChangedShaders();
+		uint64_t GetShaderGeneration() const { return m_ShaderGeneration; }
 
 	private:
 		Microsoft::WRL::ComPtr<ID3D12Device> m_Device;
@@ -75,6 +79,8 @@ namespace DX12Engine
 		std::unique_ptr<RootSignatureCache> m_RootSignatureCache;
 		std::unordered_map<std::string, std::unique_ptr<Shader>> m_Shaders;
 		std::unique_ptr<PBRMaterial> m_DefaultMaterial;
+
+		uint64_t m_ShaderGeneration = 0; // Incremented each time a shader is reloaded so dependent PSOs can be invalidated
 	};
 }
 

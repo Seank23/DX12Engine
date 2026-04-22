@@ -28,8 +28,8 @@ namespace DX12Engine
 		std::shared_ptr<RenderTexture> GetShadowMapOutput() { return m_RenderTargets[0]; }
 
 	private:
+		virtual void CreatePSO() override;
 		void GenerateCascadeMatrices(int cascadeCount);
-		void CreateShadowMapPSO();
 
 		Light* m_DirectionalLight = nullptr;
 		std::vector<DrawItem> m_DrawItems;
@@ -38,9 +38,6 @@ namespace DX12Engine
 		CSMSettings m_Settings;
 
 		std::vector<DirectX::XMMATRIX> m_CascadeMatrices;
-
-		Microsoft::WRL::ComPtr<ID3D12RootSignature> m_RootSignature;
-		Microsoft::WRL::ComPtr<ID3D12PipelineState> m_PipelineState;
 	};
 }
 

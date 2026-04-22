@@ -30,7 +30,7 @@ namespace DX12Engine
 		m_Viewport = { 0.0f, 0.0f, (float)renderSize.x, (float)renderSize.y, -1.0f, 1.0f };
 		m_ScissorRect = { 0, 0, (LONG)renderSize.x, (LONG)renderSize.y };
 
-		CreateUIPassPSO();
+		CreatePSO();
 	}
 
 	void UIRenderPass::Execute()
@@ -81,8 +81,7 @@ namespace DX12Engine
 		m_CommandList.ResourceBarrier(1, &barrier);
 		renderTarget->SetUsageState(D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
 
-		UINT fenceVal = m_QueueManager.GetGraphicsQueue().ExecuteCommandList();
-		m_QueueManager.GetGraphicsQueue().WaitForFenceCPUBlocking(fenceVal);
+		m_QueueManager.GetGraphicsQueue().ExecuteCommandList();
 	}
 
 	std::shared_ptr<RenderTexture> UIRenderPass::GetRenderTarget(ResourceSlot type)
@@ -96,7 +95,7 @@ namespace DX12Engine
 		}
 	}
 
-	void UIRenderPass::CreateUIPassPSO()
+	void UIRenderPass::CreatePSO()
 	{
 		PipelineStateBuilder pipelineStateBuilder;
 		RootSignatureBuilder rootSignatureBuilder;

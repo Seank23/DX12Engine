@@ -55,7 +55,7 @@ namespace DX12Engine
 		m_Viewport = { 0.0f, 0.0f, (float)renderSize.x, (float)renderSize.y, 0.0f, 1.0f };
 		m_ScissorRect = { 0, 0, (LONG)renderSize.x, (LONG)renderSize.y };
 
-		CreateSSRPassPSO();
+		CreatePSO();
 	}
 
 	void SSRRenderPass::Execute()
@@ -179,8 +179,7 @@ namespace DX12Engine
 		historyWrite->SetUsageState(D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
 		reactiveMaskTarget->SetUsageState(D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
 
-		UINT fenceVal = m_QueueManager.GetGraphicsQueue().ExecuteCommandList();
-		m_QueueManager.GetGraphicsQueue().WaitForFenceCPUBlocking(fenceVal);
+		m_QueueManager.GetGraphicsQueue().ExecuteCommandList();
 
 		// Swap ping-pong index and advance frame counter
 		m_WriteIndex = 1 - m_WriteIndex;
@@ -212,7 +211,7 @@ namespace DX12Engine
 		}
 	}
 
-	void SSRRenderPass::CreateSSRPassPSO()
+	void SSRRenderPass::CreatePSO()
 	{
 		PipelineStateBuilder pipelineStateBuilder;
 		RootSignatureBuilder rootSignatureBuilder;

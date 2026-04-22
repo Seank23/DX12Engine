@@ -40,7 +40,7 @@ namespace DX12Engine
 			DXGI_FORMAT_R32_FLOAT,
 			m_IsCubeMap));
 
-		CreateShadowMapPSO();
+		CreatePSO();
 	}
 
 	void ShadowMapRenderPass::Execute()
@@ -71,8 +71,7 @@ namespace DX12Engine
 				);
 				m_CommandList.ResourceBarrier(1, &barrierToRead);
 				shadowMap->SetUsageState(D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
-				UINT fenceVal = m_QueueManager.GetGraphicsQueue().ExecuteCommandList();
-				m_QueueManager.GetGraphicsQueue().WaitForFenceCPUBlocking(fenceVal);
+				m_QueueManager.GetGraphicsQueue().ExecuteCommandList();
 			}
 			return;
 		}
@@ -154,8 +153,7 @@ namespace DX12Engine
 		m_CommandList.ResourceBarrier(1, &barrier);
 		shadowMap->SetUsageState(D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
 
-		UINT fenceVal = m_QueueManager.GetGraphicsQueue().ExecuteCommandList();
-		m_QueueManager.GetGraphicsQueue().WaitForFenceCPUBlocking(fenceVal);
+		m_QueueManager.GetGraphicsQueue().ExecuteCommandList();
 	}
 
 	void ShadowMapRenderPass::RenderShadowCubeMap(RenderTexture* shadowMap, int lightIndex)
@@ -233,12 +231,11 @@ namespace DX12Engine
 			m_CommandList.ResourceBarrier(1, &barrier);
 			shadowMap->SetUsageState(D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
 
-			UINT fenceVal = m_QueueManager.GetGraphicsQueue().ExecuteCommandList();
-			m_QueueManager.GetGraphicsQueue().WaitForFenceCPUBlocking(fenceVal);
+			m_QueueManager.GetGraphicsQueue().ExecuteCommandList();
 		}
 	}
 
-	void ShadowMapRenderPass::CreateShadowMapPSO()
+	void ShadowMapRenderPass::CreatePSO()
 	{
 		PipelineStateBuilder pipelineStateBuilder;
 		RootSignatureBuilder rootSignatureBuilder;

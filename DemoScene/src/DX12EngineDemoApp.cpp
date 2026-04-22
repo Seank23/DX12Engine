@@ -21,7 +21,7 @@ namespace DX12EngineDemo
 		DX12Engine::RendererOptions options;
 		options.AA_Mode = DX12Engine::AntiAliasingMode::TAA;
 		//options.RenderScale = 1.5f;
-		options.CSM.CascadeCount = 4;
+		options.CSM.CascadeCount = 8;
 		m_Renderer->SetOptions(options);
 
 		m_PhysicsEngine = std::make_shared<DX12Engine::PhysicsEngine>();

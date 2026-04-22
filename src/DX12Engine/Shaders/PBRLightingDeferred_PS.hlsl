@@ -1,4 +1,5 @@
 ﻿#define MAX_LIGHTS 4
+#define MAX_CSM_CASCADES 8
 
 struct Light
 {
@@ -32,9 +33,9 @@ cbuffer LightBuffer : register(b1)
 
 cbuffer CascadedShadowBuffer : register(b2)
 {
-    float4x4 CascadeViewProj[4];
-    float4 CascadeSplits;
-    float4 CascadeTexelSize;
+    float4x4 CascadeViewProj[MAX_CSM_CASCADES];
+    float CascadeSplits[MAX_CSM_CASCADES];
+    float CascadeTexelSize[MAX_CSM_CASCADES];
     float4 Params0; // x=count, y=maxDist, z=blend, w=unused
     float4 BiasParams; // x=const, y=slope, z=normal, w=unused
 };
@@ -280,8 +281,8 @@ float ViewDepthFromWorldPos(float3 worldPos)
 int SelectCascadeIndex(float viewDepth, int cascadeCount)
 {
     int cascadeIndex = 0;
-    [unroll]
-    for (int i = 0; i < 3; ++i)
+    [loop]
+    for (int i = 0; i < MAX_CSM_CASCADES - 1; ++i)
     {
         if (i < cascadeCount - 1 && viewDepth > CascadeSplits[i])
             cascadeIndex = i + 1;
@@ -291,7 +292,7 @@ int SelectCascadeIndex(float viewDepth, int cascadeCount)
 
 float CascadedDirectionalShadow(float3 worldPos, float3 worldNormal, float3 L)
 {
-    int cascadeCount = clamp((int)Params0.x, 1, 4);
+    int cascadeCount = clamp((int)Params0.x, 1, MAX_CSM_CASCADES);
     if (Params0.x < 0.5)
         return 1.0;
 
@@ -300,10 +301,11 @@ float CascadedDirectionalShadow(float3 worldPos, float3 worldNormal, float3 L)
         return 1.0;
 
     int cascadeIndex = SelectCascadeIndex(viewDepth, cascadeCount);
+    float softnessBias = 1.5;
 
     float NdotL = saturate(dot(worldNormal, L));
     float3 shadowCoord = GetCascadeShadowCoord(cascadeIndex, worldPos, worldNormal, NdotL);
-    float shadow = CascadedShadowPCF(cascadeIndex, shadowCoord, 2.0 + cascadeIndex);
+    float shadow = CascadedShadowPCF(cascadeIndex, shadowCoord, softnessBias + cascadeIndex);
 
     if (cascadeIndex < cascadeCount - 1)
     {
@@ -317,7 +319,7 @@ float CascadedDirectionalShadow(float3 worldPos, float3 worldNormal, float3 L)
         {
             int nextCascade = cascadeIndex + 1;
             float3 nextCoord = GetCascadeShadowCoord(nextCascade, worldPos, worldNormal, NdotL);
-            float nextShadow = CascadedShadowPCF(nextCascade, nextCoord, 2.0 + nextCascade);
+            float nextShadow = CascadedShadowPCF(nextCascade, nextCoord, softnessBias + nextCascade);
             shadow = lerp(shadow, nextShadow, blendWeight);
         }
     }

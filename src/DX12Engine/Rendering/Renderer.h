@@ -77,6 +77,8 @@ namespace DX12Engine
 
 		DirectX::XMMATRIX m_JitteredProjection;
 		bool m_RequestTAAHistoryReset = true;
+
+		uint64_t m_LocalShaderGeneration = 0;
 	};
 }
 

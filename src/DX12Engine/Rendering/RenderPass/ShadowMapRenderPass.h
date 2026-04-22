@@ -33,18 +33,15 @@ namespace DX12Engine
 		std::shared_ptr<RenderTexture> GetShadowMapOutput() { return m_RenderTargets[0]; }
 
 	private:
+		void CreatePSO() override;
 		void RenderShadowMap(RenderTexture* shadowMap, int lightIndex);
 		void RenderShadowCubeMap(RenderTexture* shadowMap, int lightIndex);
-		void CreateShadowMapPSO();
 
 		int m_ShadowMapCount;
 		bool m_IsCubeMap;
 		std::vector<Light*> m_Lights;
 		std::vector<DrawItem> m_DrawItems;
 		ShadowMapData m_ShadowMapData;
-
-		Microsoft::WRL::ComPtr<ID3D12RootSignature> m_RootSignature;
-		Microsoft::WRL::ComPtr<ID3D12PipelineState> m_PipelineState;
 	};
 }
 

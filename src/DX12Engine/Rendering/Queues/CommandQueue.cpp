@@ -6,6 +6,11 @@
 
 namespace DX12Engine
 {
+	namespace
+	{
+		constexpr size_t kCommandAllocatorPoolSize = 8;
+	}
+
 	CommandQueue::CommandQueue(ID3D12Device* device, D3D12_COMMAND_LIST_TYPE commandType)
 		: m_QueueType(commandType), m_CommandQueue(nullptr), m_Fence(nullptr)
 	{
@@ -17,7 +22,12 @@ namespace DX12Engine
 		queueDesc.NodeMask = 0;
 		EngineUtils::ThrowIfFailed(device->CreateCommandQueue(&queueDesc, IID_PPV_ARGS(&m_CommandQueue)));
 
-		EngineUtils::ThrowIfFailed(device->CreateCommandAllocator(commandType, IID_PPV_ARGS(&m_CommandAllocator)));
+		m_CommandAllocatorSlots.resize(kCommandAllocatorPoolSize);
+		for (CommandAllocatorSlot& slot : m_CommandAllocatorSlots)
+			EngineUtils::ThrowIfFailed(device->CreateCommandAllocator(commandType, IID_PPV_ARGS(&slot.Allocator)));
+
+		m_CurrentAllocatorSlot = 0;
+		m_CommandAllocator = m_CommandAllocatorSlots[m_CurrentAllocatorSlot].Allocator;
 		EngineUtils::ThrowIfFailed(device->CreateCommandList(0, commandType, m_CommandAllocator.Get(), nullptr, IID_PPV_ARGS(&m_CommandList)));
 		m_CommandList->Close();
 		ResetCommandAllocatorAndList();
@@ -84,13 +94,45 @@ namespace DX12Engine
 		auto commandList = (ID3D12CommandList*)m_CommandList.Get();
 		m_CommandQueue->ExecuteCommandLists(1, &commandList);
 
+		const UINT64 fenceValue = m_NextFenceValue;
+		m_CommandAllocatorSlots[m_CurrentAllocatorSlot].FenceValue = fenceValue;
+
 		std::lock_guard<std::mutex> lockGuard(m_EventMutex);
-		m_CommandQueue->Signal(m_Fence.Get(), m_NextFenceValue);
-		return m_NextFenceValue++;
+		m_CommandQueue->Signal(m_Fence.Get(), fenceValue);
+		m_NextFenceValue++;
+		return static_cast<UINT>(fenceValue);
 	}
 
 	void CommandQueue::ResetCommandAllocatorAndList()
 	{
+		if (m_CommandAllocatorSlots.empty())
+			return;
+
+		size_t selectedSlot = m_CurrentAllocatorSlot;
+		bool foundReadySlot = false;
+		for (size_t i = 1; i <= m_CommandAllocatorSlots.size(); i++)
+		{
+			size_t candidate = (m_CurrentAllocatorSlot + i) % m_CommandAllocatorSlots.size();
+			if (IsAllocatorSlotReady(m_CommandAllocatorSlots[candidate]))
+			{
+				selectedSlot = candidate;
+				foundReadySlot = true;
+				break;
+			}
+		}
+
+		if (!foundReadySlot)
+		{
+			selectedSlot = (m_CurrentAllocatorSlot + 1) % m_CommandAllocatorSlots.size();
+			if (m_CommandAllocatorSlots[selectedSlot].FenceValue > 0)
+			{
+				WaitForFenceCPUBlocking(static_cast<UINT>(m_CommandAllocatorSlots[selectedSlot].FenceValue));
+				m_CommandAllocatorSlots[selectedSlot].FenceValue = 0;
+			}
+		}
+
+		m_CurrentAllocatorSlot = selectedSlot;
+		m_CommandAllocator = m_CommandAllocatorSlots[m_CurrentAllocatorSlot].Allocator;
 		m_CommandAllocator->Reset();
 		m_CommandList->Reset(m_CommandAllocator.Get(), nullptr);
 	}
@@ -98,6 +140,11 @@ namespace DX12Engine
 	void CommandQueue::ResetCommandList()
 	{
 		m_CommandList->Reset(m_CommandAllocator.Get(), nullptr);
+	}
+
+	bool CommandQueue::IsAllocatorSlotReady(const CommandAllocatorSlot& slot) const
+	{
+		return slot.FenceValue == 0 || slot.FenceValue <= m_Fence->GetCompletedValue();
 	}
 
 	void CommandQueue::FlushQueue()

@@ -136,6 +136,9 @@ namespace DX12Engine
 	void Renderer::ExecutePipeline(RenderPipeline pipeline, float frameTime)
 	{
 		m_RenderContext->GetHeapManager().BeginFrame(m_FrameIndex++);
+		#ifdef _DEBUG
+		ResourceManager::GetInstance().ReloadChangedShaders();
+		#endif
 		SetSceneData(pipeline, frameTime);
 		auto projectionOverride = m_Options.AA_Mode == AntiAliasingMode::TAA ? &m_JitteredProjection : nullptr;
 		m_RenderContext->UpdateScreenData(m_CurrentScene ? m_CurrentScene->GetCamera() : nullptr, m_Jitter, m_PrevJitter, projectionOverride);
@@ -325,7 +328,11 @@ namespace DX12Engine
 				DirectX::XMMATRIX projectionMatrix = (m_Options.AA_Mode == AntiAliasingMode::TAA) ? m_JitteredProjection : unjitteredProjectionMatrix;
 				comp->UpdateConstantBufferData(binding, modelMatrix, sceneCamera->GetViewMatrix(), projectionMatrix, unjitteredProjectionMatrix, sceneCamera->GetPosition());
 
-				if (tmpl && !tmpl->HasResolvedPSO())
+				auto currentShaderGeneration = ResourceManager::GetInstance().GetShaderGeneration();
+				bool reloadPSO = m_LocalShaderGeneration != currentShaderGeneration;
+				m_LocalShaderGeneration = currentShaderGeneration;
+
+				if (tmpl && (!tmpl->HasResolvedPSO() || reloadPSO))
 					tmpl->ResolvePSO();
 
 				DrawItem item{};

@@ -43,7 +43,7 @@ namespace DX12Engine
 		m_Viewport = { 0.0f, 0.0f, (float)renderSize.x, (float)renderSize.y, 0.0f, 1.0f };
 		m_ScissorRect = { 0, 0, (LONG)renderSize.x, (LONG)renderSize.y };
 
-		CreateTransparentPassPSO();
+		CreatePSO();
 	}
 
 	void TransparentRenderPass::Execute()
@@ -178,8 +178,7 @@ namespace DX12Engine
 		renderTarget->SetUsageState(D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
 		m_CommandList.ResourceBarrier(static_cast<UINT>(barriers.size()), barriers.data());
 
-		UINT fenceVal = m_QueueManager.GetGraphicsQueue().ExecuteCommandList();
-		m_QueueManager.GetGraphicsQueue().WaitForFenceCPUBlocking(fenceVal);
+		m_QueueManager.GetGraphicsQueue().ExecuteCommandList();
 	}
 
 	std::shared_ptr<RenderTexture> TransparentRenderPass::GetRenderTarget(ResourceSlot type)
@@ -193,7 +192,7 @@ namespace DX12Engine
 		}
 	}
 
-	void TransparentRenderPass::CreateTransparentPassPSO()
+	void TransparentRenderPass::CreatePSO()
 	{
 		PipelineStateBuilder pipelineStateBuilder;
 		RootSignatureBuilder rootSignatureBuilder;

@@ -34,17 +34,17 @@ namespace DX12Engine
 	void CascadedShadowMapRenderPass::Init()
 	{
 		RenderPass::Init();
-		m_Settings.CascadeCount = (std::clamp)(m_Settings.CascadeCount, 1, 4);
+		m_Settings.CascadeCount = (std::clamp)(m_Settings.CascadeCount, 1, MAX_CSM_CASCADES);
 
 		m_RenderTargets.emplace_back(ResourceManager::GetInstance().CreateDepthMap(
-			DirectX::XMINT3(SHADOW_MAP_SIZE, SHADOW_MAP_SIZE, m_Settings.CascadeCount),
+			DirectX::XMINT3(m_Settings.ShadowMapSize, m_Settings.ShadowMapSize, m_Settings.CascadeCount),
 			DXGI_FORMAT_D32_FLOAT,
 			DXGI_FORMAT_R32_FLOAT,
 			false));
 
 		m_CascadedShadowCB = ResourceManager::GetInstance().CreateConstantBuffer(sizeof(CascadedShadowData));
 
-		CreateShadowMapPSO();
+		CreatePSO();
 	}
 
 	void CascadedShadowMapRenderPass::Execute()
@@ -75,13 +75,12 @@ namespace DX12Engine
 				);
 				m_CommandList.ResourceBarrier(1, &barrierToRead);
 				shadowMap->SetUsageState(D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
-				UINT fenceVal = m_QueueManager.GetGraphicsQueue().ExecuteCommandList();
-				m_QueueManager.GetGraphicsQueue().WaitForFenceCPUBlocking(fenceVal);
+				m_QueueManager.GetGraphicsQueue().ExecuteCommandList();
 			}
 			return;
 		}
 
-		const int activeCascadeCount = (std::min)((std::clamp)(m_Settings.CascadeCount, 1, 4), shadowMap->GetTextureDescriptorCount());
+		const int activeCascadeCount = (std::min)((std::clamp)(m_Settings.CascadeCount, 1, MAX_CSM_CASCADES), shadowMap->GetTextureDescriptorCount());
 		if (activeCascadeCount <= 0)
 			return;
 
@@ -142,8 +141,7 @@ namespace DX12Engine
 			m_CommandList.ResourceBarrier(1, &barrier);
 			shadowMap->SetUsageState(D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
 
-			UINT fenceVal = m_QueueManager.GetGraphicsQueue().ExecuteCommandList();
-			m_QueueManager.GetGraphicsQueue().WaitForFenceCPUBlocking(fenceVal);
+			m_QueueManager.GetGraphicsQueue().ExecuteCommandList();
 		}
 	}
 
@@ -193,8 +191,8 @@ namespace DX12Engine
 			worldUp = DirectX::XMVectorSet(1.0f, 0.0f, 0.0f, 0.0f);
 
 		m_CascadeMatrices.assign(cascadeCount, DirectX::XMMatrixIdentity());
-		std::vector<float> texelSizes(4, 0.0f);
-		std::array<float, 4> splitEndsForShader{ farZ, farZ, farZ, farZ };
+		std::vector<float> texelSizes(MAX_CSM_CASCADES, 0.0f);
+		std::array<float, MAX_CSM_CASCADES> splitEndsForShader{ farZ, farZ, farZ, farZ, farZ, farZ, farZ, farZ };
 
 		for (int i = 0; i < cascadeCount; i++)
 		{
@@ -253,40 +251,50 @@ namespace DX12Engine
 			eye = DirectX::XMVectorSubtract(centerWS, DirectX::XMVectorScale(lightDir, radius * 2.5f));
 			lightView = DirectX::XMMatrixLookAtLH(eye, centerWS, worldUp);
 
+			DirectX::XMVECTOR cornersLS[8];
+			for (int c = 0; c < 8; c++)
+				cornersLS[c] = DirectX::XMVector3TransformCoord(cornersWS[c], lightView);
+
 			float minZ = FLT_MAX;
 			float maxZ = -FLT_MAX;
+			float minX = FLT_MAX;
+			float maxX = -FLT_MAX;
+			float minY = FLT_MAX;
+			float maxY = -FLT_MAX;
 			for (int c = 0; c < 8; c++)
 			{
-				const DirectX::XMVECTOR cornerLS = DirectX::XMVector3TransformCoord(cornersWS[c], lightView);
-				const float z = DirectX::XMVectorGetZ(cornerLS);
+				const float z = DirectX::XMVectorGetZ(cornersLS[c]);
 				minZ = (std::min)(minZ, z);
 				maxZ = (std::max)(maxZ, z);
+				const float x = DirectX::XMVectorGetX(cornersLS[c]);
+				minX = (std::min)(minX, x);
+				maxX = (std::max)(maxX, x);
+				const float y = DirectX::XMVectorGetY(cornersLS[c]);
+				minY = (std::min)(minY, y);
+				maxY = (std::max)(maxY, y);
 			}
 
 			const float zPadding = (std::max)(10.0f, radius);
 			const float nearPlane = (std::max)(0.1f, minZ - zPadding);
 			const float farPlane = (std::max)(nearPlane + 1.0f, maxZ + zPadding);
 			const DirectX::XMMATRIX lightProj = DirectX::XMMatrixOrthographicOffCenterLH(
-				-radius, radius, -radius, radius, nearPlane, farPlane);
+				minX, maxX, minY, maxY, nearPlane, farPlane);
 
 			m_CascadeMatrices[i] = DirectX::XMMatrixMultiply(lightView, lightProj);
 		}
 
-		for (int i = 0; i < 4; i++)
+		for (int i = 0; i < MAX_CSM_CASCADES; i++)
+		{
 			m_CascadedShadowData.CascadeViewProj[i] = (i < cascadeCount) ? m_CascadeMatrices[i] : DirectX::XMMatrixIdentity();
-
-		m_CascadedShadowData.CascadeSplits = DirectX::XMFLOAT4(
-			splitEndsForShader[0],
-			splitEndsForShader[1],
-			splitEndsForShader[2],
-			splitEndsForShader[3]);
-		m_CascadedShadowData.CascadeTexelSize = DirectX::XMFLOAT4(texelSizes[0], texelSizes[1], texelSizes[2], texelSizes[3]);
+			m_CascadedShadowData.CascadeSplits[i].Value = splitEndsForShader[i];
+			m_CascadedShadowData.CascadeTexelSize[i].Value = texelSizes[i];
+		}
 		m_CascadedShadowData.Params0 = DirectX::XMFLOAT4(static_cast<float>(cascadeCount), farZ, m_Settings.CascadeBlend, 0.0f);
 		m_CascadedShadowData.BiasParams = DirectX::XMFLOAT4(m_Settings.ConstantBias, m_Settings.SlopeBias, m_Settings.NormalBias, 0.0f);
 		m_CascadedShadowCB->Update(&m_CascadedShadowData, sizeof(CascadedShadowData));
 	}
 
-	void CascadedShadowMapRenderPass::CreateShadowMapPSO()
+	void CascadedShadowMapRenderPass::CreatePSO()
 	{
 		PipelineStateBuilder pipelineStateBuilder;
 		RootSignatureBuilder rootSignatureBuilder;

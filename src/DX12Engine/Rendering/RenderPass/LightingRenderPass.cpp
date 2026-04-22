@@ -50,7 +50,7 @@ namespace DX12Engine
 			m_FallbackCascadedShadowCB->Update(&noCSMData, sizeof(CascadedShadowData));
 		}
 
-		CreateLightingPassPSO();
+		CreatePSO();
 	}
 
 	void LightingRenderPass::Execute()
@@ -106,8 +106,7 @@ namespace DX12Engine
 		m_CommandList.ResourceBarrier(1, &barrier);
 		renderTarget->SetUsageState(D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
 
-		UINT fenceVal = m_QueueManager.GetGraphicsQueue().ExecuteCommandList();
-		m_QueueManager.GetGraphicsQueue().WaitForFenceCPUBlocking(fenceVal);
+		m_QueueManager.GetGraphicsQueue().ExecuteCommandList();
 	}
 
 	std::shared_ptr<RenderTexture> LightingRenderPass::GetRenderTarget(ResourceSlot type)
@@ -121,7 +120,7 @@ namespace DX12Engine
 		}
 	}
 
-	void LightingRenderPass::CreateLightingPassPSO()
+	void LightingRenderPass::CreatePSO()
 	{
 		PipelineStateBuilder pipelineStateBuilder;
 		RootSignatureBuilder rootSignatureBuilder;
