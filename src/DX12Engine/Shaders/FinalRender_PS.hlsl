@@ -29,60 +29,57 @@ static const int ITERATIONS = 12;
 static const float SUBPIXEL_QUALITY = 0.75;
 static const float STEP_MULTIPLIER[12] = { 1.0, 1.0, 1.0, 1.0, 1.0, 1.5, 2.0, 2.0, 2.0, 2.0, 4.0, 8.0 };
 
-float rgbToLuminance(float3 color)
-{
-    return sqrt(dot(color, float3(0.299, 0.587, 0.114))); // Standard luminance conversion
-}
+#include "Common/ColorUtils.hlsli"
 
 float3 applyFXAA(float3 colorCenter, float2 texCoord)
 {
     float deltaX = 1.0 / ScreenSize.x;
     float deltaY = 1.0 / ScreenSize.y;
-    float lumaCenter = rgbToLuminance(colorCenter);
-    float lumaRight = rgbToLuminance(finalRenderMap.Sample(samp, texCoord + float2(deltaX, 0)).rgb);
-    float lumaLeft = rgbToLuminance(finalRenderMap.Sample(samp, texCoord + float2(-deltaX, 0)).rgb);
-    float lumaDown = rgbToLuminance(finalRenderMap.Sample(samp, texCoord + float2(0, -deltaY)).rgb);
-    float lumaUp = rgbToLuminance(finalRenderMap.Sample(samp, texCoord + float2(0, deltaY)).rgb);
+    float LumaCenter = Luma(colorCenter);
+    float LumaRight = Luma(finalRenderMap.Sample(samp, texCoord + float2(deltaX, 0)).rgb);
+    float LumaLeft = Luma(finalRenderMap.Sample(samp, texCoord + float2(-deltaX, 0)).rgb);
+    float LumaDown = Luma(finalRenderMap.Sample(samp, texCoord + float2(0, -deltaY)).rgb);
+    float LumaUp = Luma(finalRenderMap.Sample(samp, texCoord + float2(0, deltaY)).rgb);
     
-    float lumaMin = min(lumaCenter, min(min(lumaDown, lumaUp), min(lumaLeft, lumaRight)));
-    float lumaMax = max(lumaCenter, max(max(lumaDown, lumaUp), max(lumaLeft, lumaRight)));
-    float lumaRange = lumaMax - lumaMin;
+    float LumaMin = min(LumaCenter, min(min(LumaDown, LumaUp), min(LumaLeft, LumaRight)));
+    float LumaMax = max(LumaCenter, max(max(LumaDown, LumaUp), max(LumaLeft, LumaRight)));
+    float LumaRange = LumaMax - LumaMin;
     
-    if (lumaRange < max(EDGE_THRESHOLD_MIN, lumaMax * EDGE_THRESHOLD_MAX))
+    if (LumaRange < max(EDGE_THRESHOLD_MIN, LumaMax * EDGE_THRESHOLD_MAX))
         return colorCenter;
     
-    float lumaDownRight = rgbToLuminance(finalRenderMap.Sample(samp, texCoord + float2(deltaX, -deltaY)).rgb);
-    float lumaDownLeft = rgbToLuminance(finalRenderMap.Sample(samp, texCoord + float2(-deltaX, -deltaY)).rgb);
-    float lumaUpRight = rgbToLuminance(finalRenderMap.Sample(samp, texCoord + float2(deltaX, deltaY)).rgb);
-    float lumaUpLeft = rgbToLuminance(finalRenderMap.Sample(samp, texCoord + float2(-deltaX, deltaY)).rgb);
-    float lumaDownUp = lumaDown + lumaUp;
-    float lumaLeftRight = lumaLeft + lumaRight;
-    float lumaLeftCorners = lumaDownLeft + lumaUpLeft;
-    float lumaRightCorners = lumaDownRight + lumaUpRight;
-    float lumaDownCorners = lumaDownLeft + lumaDownRight;
-    float lumaUpCorners = lumaUpLeft + lumaUpRight;
-    float edgeHorizontal = abs(-2.0 * lumaLeft + lumaLeftCorners) + abs(-2.0 * lumaCenter + lumaDownUp) * 2.0 + abs(-2.0 * lumaRight + lumaRightCorners);
-    float edgeVertical = abs(-2.0 * lumaUp + lumaUpCorners) + abs(-2.0 * lumaCenter + lumaLeftRight) * 2.0 + abs(-2.0 * lumaDown + lumaDownCorners);
+    float LumaDownRight = Luma(finalRenderMap.Sample(samp, texCoord + float2(deltaX, -deltaY)).rgb);
+    float LumaDownLeft = Luma(finalRenderMap.Sample(samp, texCoord + float2(-deltaX, -deltaY)).rgb);
+    float LumaUpRight = Luma(finalRenderMap.Sample(samp, texCoord + float2(deltaX, deltaY)).rgb);
+    float LumaUpLeft = Luma(finalRenderMap.Sample(samp, texCoord + float2(-deltaX, deltaY)).rgb);
+    float LumaDownUp = LumaDown + LumaUp;
+    float LumaLeftRight = LumaLeft + LumaRight;
+    float LumaLeftCorners = LumaDownLeft + LumaUpLeft;
+    float LumaRightCorners = LumaDownRight + LumaUpRight;
+    float LumaDownCorners = LumaDownLeft + LumaDownRight;
+    float LumaUpCorners = LumaUpLeft + LumaUpRight;
+    float edgeHorizontal = abs(-2.0 * LumaLeft + LumaLeftCorners) + abs(-2.0 * LumaCenter + LumaDownUp) * 2.0 + abs(-2.0 * LumaRight + LumaRightCorners);
+    float edgeVertical = abs(-2.0 * LumaUp + LumaUpCorners) + abs(-2.0 * LumaCenter + LumaLeftRight) * 2.0 + abs(-2.0 * LumaDown + LumaDownCorners);
     
     bool isHorizontal = edgeHorizontal >= edgeVertical;
     
-    float luma1 = isHorizontal ? lumaDown : lumaLeft;
-    float luma2 = isHorizontal ? lumaUp : lumaRight;
-    float gradient1 = luma1 - lumaCenter;
-    float gradient2 = luma2 - lumaCenter;
+    float Luma1 = isHorizontal ? LumaDown : LumaLeft;
+    float Luma2 = isHorizontal ? LumaUp : LumaRight;
+    float gradient1 = Luma1 - LumaCenter;
+    float gradient2 = Luma2 - LumaCenter;
     float is1Steepest = abs(gradient1) >= abs(gradient2);
-    float gradientScaled = 0.25 * max(abs(gradient1), abs(gradient2)) / max(lumaRange, 1e-5);
+    float gradientScaled = 0.25 * max(abs(gradient1), abs(gradient2)) / max(LumaRange, 1e-5);
     
     float stepLength = isHorizontal ? deltaY : deltaX;
-    float lumaLocalAverage = 0.0;
+    float LumaLocalAverage = 0.0;
     if (is1Steepest)
     {
         stepLength = -stepLength;
-        lumaLocalAverage = 0.5 * (luma1 + lumaCenter);
+        LumaLocalAverage = 0.5 * (Luma1 + LumaCenter);
     }
     else
     {
-        lumaLocalAverage = 0.5 * (luma2 + lumaCenter);
+        LumaLocalAverage = 0.5 * (Luma2 + LumaCenter);
     }
     float2 currentTexCoord = texCoord;
     isHorizontal ? currentTexCoord.y += stepLength * 0.5 : currentTexCoord.x += stepLength * 0.5;
@@ -90,12 +87,12 @@ float3 applyFXAA(float3 colorCenter, float2 texCoord)
     float2 offset = isHorizontal ? float2(deltaX, 0) : float2(0, deltaY);
     float2 uv1 = currentTexCoord - offset;
     float2 uv2 = currentTexCoord + offset;
-    float lumaEnd1 = rgbToLuminance(finalRenderMap.Sample(samp, uv1).rgb);
-    float lumaEnd2 = rgbToLuminance(finalRenderMap.Sample(samp, uv2).rgb);
-    lumaEnd1 -= lumaLocalAverage;
-    lumaEnd2 -= lumaLocalAverage;
-    bool reached1 = abs(lumaEnd1) >= gradientScaled;
-    bool reached2 = abs(lumaEnd2) >= gradientScaled;
+    float LumaEnd1 = Luma(finalRenderMap.Sample(samp, uv1).rgb);
+    float LumaEnd2 = Luma(finalRenderMap.Sample(samp, uv2).rgb);
+    LumaEnd1 -= LumaLocalAverage;
+    LumaEnd2 -= LumaLocalAverage;
+    bool reached1 = abs(LumaEnd1) >= gradientScaled;
+    bool reached2 = abs(LumaEnd2) >= gradientScaled;
     bool reachedBoth = reached1 && reached2;
     if (!reached1)
         uv1 -= offset;
@@ -107,12 +104,12 @@ float3 applyFXAA(float3 colorCenter, float2 texCoord)
         for (int i = 2; i < ITERATIONS; i++)
         {
             if (!reached1)
-                lumaEnd1 = rgbToLuminance(finalRenderMap.Sample(samp, uv1).rgb) - lumaLocalAverage;
+                LumaEnd1 = Luma(finalRenderMap.Sample(samp, uv1).rgb) - LumaLocalAverage;
             if (!reached2)
-                lumaEnd2 = rgbToLuminance(finalRenderMap.Sample(samp, uv2).rgb) - lumaLocalAverage;
+                LumaEnd2 = Luma(finalRenderMap.Sample(samp, uv2).rgb) - LumaLocalAverage;
             
-            reached1 = abs(lumaEnd1) >= gradientScaled;
-            reached2 = abs(lumaEnd2) >= gradientScaled;
+            reached1 = abs(LumaEnd1) >= gradientScaled;
+            reached2 = abs(LumaEnd2) >= gradientScaled;
             reachedBoth = reached1 && reached2;
             
             if (reachedBoth)
@@ -131,12 +128,12 @@ float3 applyFXAA(float3 colorCenter, float2 texCoord)
     float edgeThickness = distance1 + distance2;
     float pixelOffset = -distanceFinal / max(edgeThickness, 1e-5) + 0.5;
     
-    bool isLumaCenterSmaller = lumaCenter < lumaLocalAverage;
-    bool correctVariation = ((isDirection1 ? lumaEnd1 : lumaEnd2) < 0.0) != isLumaCenterSmaller;
+    bool isLumaCenterSmaller = LumaCenter < LumaLocalAverage;
+    bool correctVariation = ((isDirection1 ? LumaEnd1 : LumaEnd2) < 0.0) != isLumaCenterSmaller;
     float finalOffset = correctVariation ? pixelOffset : 0.0;
     
-    float lumaAverage = (1.0 / 9.0) * (2.0 * (lumaDownUp + lumaLeftRight) + lumaLeftCorners + lumaRightCorners);
-    float subPixelOffset1 = clamp(abs(lumaAverage - lumaCenter) / lumaRange, 0.0, 1.0);
+    float LumaAverage = (1.0 / 9.0) * (2.0 * (LumaDownUp + LumaLeftRight) + LumaLeftCorners + LumaRightCorners);
+    float subPixelOffset1 = clamp(abs(LumaAverage - LumaCenter) / LumaRange, 0.0, 1.0);
     float subPixelOffset2 = (-2.0 * subPixelOffset1 + 3.0) * subPixelOffset1 * subPixelOffset1;
     float subPixelOffsetFinal = subPixelOffset2 * subPixelOffset2 * SUBPIXEL_QUALITY;
     finalOffset = max(finalOffset, subPixelOffsetFinal);

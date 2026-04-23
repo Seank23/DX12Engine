@@ -8,6 +8,7 @@ file(GLOB_RECURSE DEMO_SOURCES CONFIGURE_DEPENDS
     src/*.cpp
     src/*.h
     src/*.hlsl
+    src/*.hlsli
 )
 
 add_executable(DemoScene ${DEMO_SOURCES})
@@ -29,9 +30,14 @@ set(DEMO_BUILD_ROOT_RES_DIR "${CMAKE_CURRENT_BINARY_DIR}/res")
 set(DEMO_EXE_RES_DIR "$<TARGET_FILE_DIR:DemoScene>/res")
 
 file(GLOB_RECURSE ENGINE_SHADER_FILES CONFIGURE_DEPENDS
-    "${CMAKE_SOURCE_DIR}/src/*.hlsl"
+    "${CMAKE_SOURCE_DIR}/src/DX12Engine/Shaders/*.hlsl"
+    "${CMAKE_SOURCE_DIR}/src/DX12Engine/Shaders/*.hlsli"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/*.hlsl"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/*.hlsli"
 )
+
+set(ENGINE_SHADER_ROOT "${CMAKE_SOURCE_DIR}/src/DX12Engine/Shaders")
+set(DEMO_SHADER_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/src")
 
 add_custom_target(CopyDemoResources ALL
     COMMAND ${CMAKE_COMMAND} -E copy_directory
@@ -42,13 +48,34 @@ add_custom_target(CopyDemoResources ALL
     COMMENT "Copying DemoScene resources to build root"
 )
 
-foreach(SHADER_FILE ${ENGINE_SHADER_FILES})
-    add_custom_command(TARGET CopyDemoResources POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -E copy_if_different
-            "${SHADER_FILE}"
-            "${DEMO_BUILD_ROOT_RES_DIR}/Shaders"
-    )
-endforeach()
+function(add_shader_copy_commands target_name shaders_output_dir)
+    foreach(SHADER_FILE ${ENGINE_SHADER_FILES})
+        file(RELATIVE_PATH SHADER_REL_ENGINE "${ENGINE_SHADER_ROOT}" "${SHADER_FILE}")
+        if(NOT SHADER_REL_ENGINE MATCHES "^\\.\\.")
+            set(SHADER_REL_PATH "${SHADER_REL_ENGINE}")
+        else()
+            file(RELATIVE_PATH SHADER_REL_PATH "${DEMO_SHADER_ROOT}" "${SHADER_FILE}")
+        endif()
+
+        get_filename_component(SHADER_REL_DIR "${SHADER_REL_PATH}" DIRECTORY)
+        if(SHADER_REL_DIR STREQUAL "")
+            set(SHADER_DEST_DIR "${shaders_output_dir}")
+        else()
+            set(SHADER_DEST_DIR "${shaders_output_dir}/${SHADER_REL_DIR}")
+        endif()
+
+        add_custom_command(TARGET ${target_name} POST_BUILD
+            COMMAND ${CMAKE_COMMAND} -E make_directory "${SHADER_DEST_DIR}"
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                "${SHADER_FILE}"
+                "${SHADER_DEST_DIR}"
+        )
+    endforeach()
+endfunction()
+
+add_shader_copy_commands(CopyDemoResources "${DEMO_BUILD_ROOT_RES_DIR}/Shaders")
+add_shader_copy_commands(CopyDemoResources "${CMAKE_SOURCE_DIR}/Debug/res/Shaders")
+add_shader_copy_commands(CopyDemoResources "${CMAKE_SOURCE_DIR}/Release/res/Shaders")
 
 add_dependencies(DemoScene CopyDemoResources)
 
@@ -61,13 +88,7 @@ add_custom_command(TARGET DemoScene POST_BUILD
     COMMENT "Copying DemoScene resources to executable directory"
 )
 
-foreach(SHADER_FILE ${ENGINE_SHADER_FILES})
-    add_custom_command(TARGET DemoScene POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -E copy_if_different
-            "${SHADER_FILE}"
-            "${DEMO_EXE_RES_DIR}/Shaders"
-    )
-endforeach()
+add_shader_copy_commands(DemoScene "${DEMO_EXE_RES_DIR}/Shaders")
 
 file(GLOB DXCOMPILER_DLL_CANDIDATES
     "$ENV{WindowsSdkDir}/bin/*/x64/dxcompiler.dll"

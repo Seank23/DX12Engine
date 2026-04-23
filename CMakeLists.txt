@@ -43,6 +43,7 @@ file(GLOB_RECURSE ENGINE_SOURCES CONFIGURE_DEPENDS
     src/*.cpp
     src/*.h
     src/*.hlsl
+    src/*.hlsli
 )
 
 # Your executable

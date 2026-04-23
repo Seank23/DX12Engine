@@ -44,15 +44,7 @@ Texture2D historyMap : register(t4);
 
 SamplerState samp : register(s0);
 
-float Luma(float3 c)
-{
-    return dot(c, float3(0.2126, 0.7152, 0.0722));
-}
-
-float Max3(float3 c)
-{
-    return max(c.x, max(c.y, c.z));
-}
+#include "Common/ColorUtils.hlsli"
 
 float3 SampleCurrent(float2 uv)
 {

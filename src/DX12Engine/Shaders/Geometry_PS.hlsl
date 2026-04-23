@@ -58,10 +58,7 @@ struct PSOutput
     float2 velocity : SV_Target6;
 };
 
-float3 sRGBToLinear(float3 color)
-{
-    return pow(max(color, 0.0), 2.2);
-}
+#include "Common/ColorUtils.hlsli"
 
 PSOutput main(PSInput input)
 {

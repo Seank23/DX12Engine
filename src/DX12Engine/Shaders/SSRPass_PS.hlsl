@@ -45,6 +45,9 @@ Texture2D historyMap : register(t9);
 
 SamplerState samp : register(s0);
 
+#include "Common/ColorUtils.hlsli"
+#include "Lighting/PBRShading.hlsli"
+
 // ---------------------------------------------------------------------------
 // Interleaved gradient noise – spatially varied, low-discrepancy, no obvious
 // hash bands. Much better perceptual quality than a raw hash function.
@@ -53,37 +56,6 @@ float InterleavedGradientNoise(float2 screenPos, uint frame)
 {
     screenPos += float(frame) * 5.588238f;
     return frac(52.9829189f * frac(dot(screenPos, float2(0.06711056f, 0.00583715f))));
-}
-
-float3 FresnelSchlick(float cosTheta, float3 F0)
-{
-    return F0 + (1.0 - F0) * pow(saturate(1.0 - cosTheta), 5.0);
-}
-
-float3 FresnelSchlickRoughness(float cosTheta, float3 F0, float roughness)
-{
-    return F0 + (max(float3(1.0 - roughness, 1.0 - roughness, 1.0 - roughness), F0) - F0) * pow(saturate(1.0 - cosTheta), 5.0);
-}
-
-float SpecularOcclusion(float NdotV, float ao, float roughness)
-{
-    float exponent = exp2(-16.0 * roughness - 1.0);
-    return saturate(pow(saturate(NdotV + ao), exponent) - 1.0 + ao);
-}
-
-float Luma(float3 color)
-{
-    return dot(color, float3(0.2126, 0.7152, 0.0722));
-}
-
-float Max3(float3 value)
-{
-    return max(value.x, max(value.y, value.z));
-}
-
-float3 sRGBToLinear(float3 color)
-{
-    return pow(max(color, 0.0), 2.2);
 }
 
 // ---------------------------------------------------------------------------

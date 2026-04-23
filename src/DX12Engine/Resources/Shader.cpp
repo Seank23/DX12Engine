@@ -3,6 +3,7 @@
 #include <windows.h>
 #include <sstream>
 #include <stdexcept>
+#include <vector>
 
 namespace DX12Engine
 {
@@ -74,16 +75,31 @@ namespace DX12Engine
 		}
 
 		Microsoft::WRL::ComPtr<IDxcOperationResult> compileResult;
+		Microsoft::WRL::ComPtr<IDxcIncludeHandler> includeHandler;
+		hr = dxcLibrary->CreateIncludeHandler(&includeHandler);
+		if (FAILED(hr) || !includeHandler)
+		{
+			m_LastError = "Failed to create DXC include handler.";
+			OutputDebugStringA(("[Shader] " + m_LastError + "\n").c_str());
+			return false;
+		}
+
+		std::filesystem::path shaderPathFs(m_ShaderPath);
+		std::wstring shaderDir = shaderPathFs.parent_path().wstring();
+		std::vector<LPCWSTR> compileArgs;
+		compileArgs.push_back(L"-I");
+		compileArgs.push_back(shaderDir.c_str());
+
 		hr = dxcCompiler->Compile(
 			sourceBlob.Get(),
 			m_ShaderPath.c_str(),
 			L"main",
 			targetProfile,
+			compileArgs.data(),
+			static_cast<UINT32>(compileArgs.size()),
 			nullptr,
 			0,
-			nullptr,
-			0,
-			nullptr,
+			includeHandler.Get(),
 			&compileResult);
 		if (FAILED(hr) || !compileResult)
 		{

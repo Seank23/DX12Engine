@@ -61,15 +61,8 @@ struct PSInput
     float3 viewDirWS : TEXCOORD5;
 };
 
-float3 SRGBToLinear(float3 c)
-{
-    return pow(max(c, 0.0), 2.2);
-}
-
-float3 FresnelSchlick(float cosTheta, float3 F0)
-{
-    return F0 + (1.0 - F0) * pow(1.0 - cosTheta, 5.0);
-}
+#include "Common/ColorUtils.hlsli"
+#include "Lighting/PBRShading.hlsli"
 
 float4 main(PSInput i, bool isFrontFace : SV_IsFrontFace) : SV_TARGET
 {
@@ -83,7 +76,7 @@ float4 main(PSInput i, bool isFrontFace : SV_IsFrontFace) : SV_TARGET
     if (fragDepth > opaqueDepth)
         discard;
     float4 baseSample = HasAlbedoMap ? albedoMap.Sample(sampWrap, i.uv) : float4(1, 1, 1, 1);
-    float3 baseColor = SRGBToLinear(baseSample.rgb * Albedo);
+    float3 baseColor = sRGBToLinear(baseSample.rgb * Albedo);
 
     float baseAlpha = saturate(baseSample.a * BaseColorAlpha);
 
@@ -161,7 +154,7 @@ float4 main(PSInput i, bool isFrontFace : SV_IsFrontFace) : SV_TARGET
     float3 emissive = Emissive * EmissiveStrength;
     if (HasEmissiveMap != 0)
     {
-        float3 e = SRGBToLinear(emissiveMap.Sample(sampWrap, i.uv).rgb);
+        float3 e = sRGBToLinear(emissiveMap.Sample(sampWrap, i.uv).rgb);
         emissive *= e;
     }
 
