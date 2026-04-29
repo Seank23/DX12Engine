@@ -8,10 +8,12 @@
 #include "RenderPass/RenderPass.h"
 #include "RendererOptions.h"
 #include <cstdint>
+#include <unordered_map>
 
 namespace DX12Engine
 {
 	class GameObject;
+	struct ResolvedPrimitiveBinding;
 	struct RenderPipelineConfig;
 	enum class RenderPassType;
 	enum class ResourceSlot;
@@ -79,6 +81,7 @@ namespace DX12Engine
 		bool m_RequestTAAHistoryReset = true;
 
 		uint64_t m_LocalShaderGeneration = 0;
+		std::unordered_map<const ResolvedPrimitiveBinding*, UINT> m_BindingActiveLods;
 	};
 }
 

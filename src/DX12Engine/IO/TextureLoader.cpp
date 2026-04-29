@@ -43,16 +43,32 @@ namespace DX12Engine
 	std::unordered_map<TextureType, std::shared_ptr<Texture>> TextureLoader::LoadMaterial(std::wstring path)
 	{
 		std::unordered_map<TextureType, std::shared_ptr<Texture>> textures;
-		if (std::filesystem::exists(path + L"/albedo.png"))
+
+		if (std::filesystem::exists(path + L"/albedo.dds"))
+			textures[TextureType::Albedo] = LoadDDS(path + L"/albedo.dds");
+		else if (std::filesystem::exists(path + L"/albedo.png"))
 			textures[TextureType::Albedo] = LoadWIC(path + L"/albedo.png");
-		if (std::filesystem::exists(path + L"/normal.png"))
+
+		if (std::filesystem::exists(path + L"/normal.dds"))
+			textures[TextureType::Normal] = LoadDDS(path + L"/normal.dds");
+		else if (std::filesystem::exists(path + L"/normal.png"))
 			textures[TextureType::Normal] = LoadWIC(path + L"/normal.png");
-		if (std::filesystem::exists(path + L"/metallic.png"))
+
+		if (std::filesystem::exists(path + L"/metallic.dds"))
+			textures[TextureType::Metallic] = LoadDDS(path + L"/metallic.dds");
+		else if (std::filesystem::exists(path + L"/metallic.png"))
 			textures[TextureType::Metallic] = LoadWIC(path + L"/metallic.png");
-		if (std::filesystem::exists(path + L"/roughness.png"))
+
+		if (std::filesystem::exists(path + L"/roughness.dds"))
+			textures[TextureType::Roughness] = LoadDDS(path + L"/roughness.dds");
+		else if (std::filesystem::exists(path + L"/roughness.png"))
 			textures[TextureType::Roughness] = LoadWIC(path + L"/roughness.png");
-		if (std::filesystem::exists(path + L"/ao.png"))
+
+		if (std::filesystem::exists(path + L"/ao.dds"))
+			textures[TextureType::AOMap] = LoadDDS(path + L"/ao.dds");
+		else if (std::filesystem::exists(path + L"/ao.png"))
 			textures[TextureType::AOMap] = LoadWIC(path + L"/ao.png");
+
 		return textures;
 	}
 }

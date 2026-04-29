@@ -14,16 +14,85 @@
 #include "RenderPipelineConfig.h"
 #include "../Entity/GameObject.h"
 #include "../Entity/RenderComponent.h"
+#include "../Asset/MeshPrimitive.h"
 #include "DrawItem.h"
 
 #include <array>
 #include <algorithm>
+#include <cmath>
 #include <unordered_set>
 #include <cstdint>
 #include <cstdio>
 
 namespace DX12Engine
 {
+	float ComputePrimitiveScreenMetric(const MeshPrimitive* primitive, DirectX::XMMATRIX modelMatrix, const Camera* camera)
+	{
+		if (!primitive || !camera) return 1.0f;
+
+		const MeshBounds& bounds = primitive->GetBounds();
+		const DirectX::XMFLOAT3 centerLocal = {
+			(bounds.Min.x + bounds.Max.x) * 0.5f,
+			(bounds.Min.y + bounds.Max.y) * 0.5f,
+			(bounds.Min.z + bounds.Max.z) * 0.5f
+		};
+		const DirectX::XMFLOAT3 extents = {
+			(bounds.Max.x - bounds.Min.x) * 0.5f,
+			(bounds.Max.y - bounds.Min.y) * 0.5f,
+			(bounds.Max.z - bounds.Min.z) * 0.5f
+		};
+
+		float radiusLocal = std::sqrt(extents.x * extents.x + extents.y * extents.y + extents.z * extents.z);
+		if (radiusLocal <= 1e-5f)
+			radiusLocal = 0.5f;
+
+		const float sx = DirectX::XMVectorGetX(DirectX::XMVector3Length(modelMatrix.r[0]));
+		const float sy = DirectX::XMVectorGetX(DirectX::XMVector3Length(modelMatrix.r[1]));
+		const float sz = DirectX::XMVectorGetX(DirectX::XMVector3Length(modelMatrix.r[2]));
+		const float maxScale = (std::max)(sx, (std::max)(sy, sz));
+		const float radiusWorld = (std::max)(radiusLocal * maxScale, 1e-5f);
+
+		DirectX::XMVECTOR centerWorld = DirectX::XMVector3TransformCoord(DirectX::XMLoadFloat3(&centerLocal), modelMatrix);
+		const DirectX::XMFLOAT3 cameraPosition = camera->GetPosition();
+		const DirectX::XMVECTOR cameraPositionVec = DirectX::XMLoadFloat3(&cameraPosition);
+		float distance = DirectX::XMVectorGetX(DirectX::XMVector3Length(DirectX::XMVectorSubtract(centerWorld, cameraPositionVec)));
+		distance = (std::max)(distance, 0.001f);
+
+		const float tanHalfFov = std::tan(DirectX::XMConvertToRadians(camera->GetFOV()) * 0.5f);
+		const float denom = distance * (std::max)(tanHalfFov, 0.001f);
+		return radiusWorld / denom;
+	}
+
+	UINT SelectLodLevelWithHysteresis(UINT lodCount, float screenMetric, UINT currentLevel)
+	{
+		if (lodCount == 0) return 0;
+
+		constexpr std::array<float, 4> kEnterLowerThresholds = { 0.050f, 0.025f, 0.0125f, 0.0060f };
+		constexpr std::array<float, 4> kExitLowerThresholds = { 0.060f, 0.030f, 0.0150f, 0.0075f };
+
+		const UINT thresholdCount = static_cast<UINT>(kEnterLowerThresholds.size());
+		UINT level = (std::min)(currentLevel, lodCount - 1);
+
+		while (level + 1 < lodCount)
+		{
+			const UINT thresholdIdx = (std::min)(level, thresholdCount - 1);
+			if (screenMetric < kEnterLowerThresholds[thresholdIdx])
+				++level;
+			else
+				break;
+		}
+
+		while (level > 0)
+		{
+			const UINT thresholdIdx = (std::min)(level - 1, thresholdCount - 1);
+			if (screenMetric > kExitLowerThresholds[thresholdIdx])
+				--level;
+			else
+				break;
+		}
+		return level;
+	}
+
 	float Renderer::Halton(uint32_t index, uint32_t base)
 	{
 		float result = 0.0f;
@@ -310,6 +379,7 @@ namespace DX12Engine
 
 		std::vector<DrawItem> geometryPassDrawItems;
 		std::vector<DrawItem> transparentPassDrawItems;
+		std::unordered_set<const ResolvedPrimitiveBinding*> liveBindings;
 		for (auto& comp : renderComponents)
 		{
 			if (!comp)
@@ -317,6 +387,8 @@ namespace DX12Engine
 
 			for (ResolvedPrimitiveBinding& binding : comp->GetResolvedPrimitiveBindings())
 			{
+				liveBindings.insert(&binding);
+
 				MaterialTemplate* tmpl = binding.MaterialAsset ? binding.MaterialAsset->GetTemplate() : nullptr;
 				Material* material = binding.MaterialAsset ? binding.MaterialAsset->GetMaterial() : nullptr;
 				if (!material || !binding.PrimitiveConstantBuffer)
@@ -324,6 +396,20 @@ namespace DX12Engine
 
 				DirectX::XMMATRIX nodeWorldTransform = DirectX::XMLoadFloat4x4(&binding.NodeWorldTransform);
 				DirectX::XMMATRIX modelMatrix = nodeWorldTransform * comp->GetModelMatrix();
+				UINT selectedLodLevel = 0;
+				if (binding.Primitive)
+				{
+					const auto currentLodIt = m_BindingActiveLods.find(&binding);
+					const UINT currentLod = currentLodIt == m_BindingActiveLods.end() ? 0 : currentLodIt->second;
+					const float screenMetric = ComputePrimitiveScreenMetric(binding.Primitive, modelMatrix, sceneCamera);
+					selectedLodLevel = SelectLodLevelWithHysteresis(binding.Primitive->GetLODCount(), screenMetric, currentLod);
+					if (!binding.Primitive->SetActiveLOD(selectedLodLevel))
+						binding.Primitive->SetActiveLOD(0);
+
+					selectedLodLevel = binding.Primitive->GetActiveLODLevel();
+					m_BindingActiveLods[&binding] = selectedLodLevel;
+				}
+
 				DirectX::XMMATRIX unjitteredProjectionMatrix = sceneCamera->GetProjectionMatrix();
 				DirectX::XMMATRIX projectionMatrix = (m_Options.AA_Mode == AntiAliasingMode::TAA) ? m_JitteredProjection : unjitteredProjectionMatrix;
 				comp->UpdateConstantBufferData(binding, modelMatrix, sceneCamera->GetViewMatrix(), projectionMatrix, unjitteredProjectionMatrix, sceneCamera->GetPosition());
@@ -340,14 +426,17 @@ namespace DX12Engine
 				item.Material     = material;
 				item.Template     = tmpl;
 				item.CBVAddress   = binding.CBVAddress;
-				item.IndexCount   = binding.Primitive->GetIndexCount();
-				item.FirstIndex   = binding.Primitive->GetFirstIndex();
-				item.BaseVertex   = binding.Primitive->GetBaseVertex();
+				item.IndexCount   = binding.Primitive->GetActiveIndexCount();
+				item.FirstIndex   = binding.Primitive->GetActiveFirstIndex();
+				item.BaseVertex   = binding.Primitive->GetActiveBaseVertex();
+				item.ActiveLODLevel = selectedLodLevel;
 				item.ModelMatrix  = modelMatrix;
 				item.PipelineKey  = tmpl ? tmpl->GetPipelineKey() : 0;
 				item.MaterialKey  = reinterpret_cast<uint64_t>(material);
 				item.MeshKey      = reinterpret_cast<uint64_t>(binding.Primitive);
 				item.BlendMode    = tmpl ? tmpl->GetBlendPolicy() : AlphaMode::Opaque;
+
+				if (item.IndexCount == 0) continue;
 
 				if (item.BlendMode == AlphaMode::Blend)
 					transparentPassDrawItems.push_back(item);
@@ -366,6 +455,15 @@ namespace DX12Engine
 				}
 			}
 		}
+
+		for (auto it = m_BindingActiveLods.begin(); it != m_BindingActiveLods.end(); )
+		{
+			if (liveBindings.find(it->first) == liveBindings.end())
+				it = m_BindingActiveLods.erase(it);
+			else
+				++it;
+		}
+
 		if (!texturesToUpload.empty())
 			m_RenderContext->GetUploader().UploadTextureBatch(texturesToUpload);
 

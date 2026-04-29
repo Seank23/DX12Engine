@@ -111,6 +111,7 @@ namespace DX12Engine
 		D3D12_GPU_VIRTUAL_ADDRESS lastCBV = 0;
 		Material* lastMaterial = nullptr;
 		MeshPrimitive* lastPrimitive = nullptr;
+		UINT lastLodLevel = UINT_MAX;
 		uint64_t lastPipelineKey = UINT64_MAX;
 
 		for (const DrawItem& item : m_DrawItems)
@@ -159,11 +160,20 @@ namespace DX12Engine
 
 			if (item.Primitive != lastPrimitive)
 			{
+				item.Primitive->SetActiveLOD(item.ActiveLODLevel);
 				auto vertexBufferView = item.Primitive->GetVertexBufferView();
-				auto indexBufferView = item.Primitive->GetIndexBufferView();
+				auto indexBufferView = item.Primitive->GetActiveIndexBufferView();
 				m_CommandList.IASetVertexBuffers(0, 1, &vertexBufferView);
 				m_CommandList.IASetIndexBuffer(&indexBufferView);
 				lastPrimitive = item.Primitive;
+				lastLodLevel = item.ActiveLODLevel;
+			}
+			else if (item.ActiveLODLevel != lastLodLevel)
+			{
+				item.Primitive->SetActiveLOD(item.ActiveLODLevel);
+				auto indexBufferView = item.Primitive->GetActiveIndexBufferView();
+				m_CommandList.IASetIndexBuffer(&indexBufferView);
+				lastLodLevel = item.ActiveLODLevel;
 			}
 
 			m_CommandList.DrawIndexedInstanced(item.IndexCount, 1, item.FirstIndex, item.BaseVertex, 0);

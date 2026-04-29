@@ -82,7 +82,6 @@ namespace DX12EngineDemo
 		floorPhysicsComp->SetKineticFriction(0.2f);
 		m_SceneObjects.Add("Floor", floor);
 
-		auto bodyMaterial = mazdaModel->GetMaterial("Mazda3_Body");
 		std::shared_ptr<DX12Engine::GameObject> mazda = std::make_shared<DX12Engine::GameObject>();
 		mazda->CreateComponent<DX12Engine::RenderComponent>(std::make_shared<DX12Engine::ModelInstance>(mazdaModel));
 		mazda->Scale({ 5.0f, 5.0f, 5.0f });

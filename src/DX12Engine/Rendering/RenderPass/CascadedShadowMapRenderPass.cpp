@@ -113,6 +113,7 @@ namespace DX12Engine
 			m_CommandList.IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
 			MeshPrimitive* lastPrimitive = nullptr;
+			UINT lastLodLevel = UINT_MAX;
 			for (const DrawItem& item : m_DrawItems)
 			{
 				if (!item.Primitive)
@@ -124,11 +125,20 @@ namespace DX12Engine
 
 				if (item.Primitive != lastPrimitive)
 				{
+					item.Primitive->SetActiveLOD(item.ActiveLODLevel);
 					auto vertexBufferView = item.Primitive->GetVertexBufferView();
-					auto indexBufferView = item.Primitive->GetIndexBufferView();
+					auto indexBufferView = item.Primitive->GetActiveIndexBufferView();
 					m_CommandList.IASetVertexBuffers(0, 1, &vertexBufferView);
 					m_CommandList.IASetIndexBuffer(&indexBufferView);
 					lastPrimitive = item.Primitive;
+					lastLodLevel = item.ActiveLODLevel;
+				}
+				else if (item.ActiveLODLevel != lastLodLevel)
+				{
+					item.Primitive->SetActiveLOD(item.ActiveLODLevel);
+					auto indexBufferView = item.Primitive->GetActiveIndexBufferView();
+					m_CommandList.IASetIndexBuffer(&indexBufferView);
+					lastLodLevel = item.ActiveLODLevel;
 				}
 
 				m_CommandList.DrawIndexedInstanced(item.IndexCount, 1, item.FirstIndex, item.BaseVertex, 0);

@@ -26,7 +26,10 @@ target_include_directories(DemoScene PRIVATE
 
 source_group(TREE ${CMAKE_CURRENT_SOURCE_DIR}/src PREFIX "Source Files" FILES ${DEMO_SOURCES})
 
-set(DEMO_BUILD_ROOT_RES_DIR "${CMAKE_CURRENT_BINARY_DIR}/res")
+set(COOKED_ASSET_DIR "${CMAKE_BINARY_DIR}/res")
+set(DEMO_STAGE_ROOT_DIR "${CMAKE_BINARY_DIR}/DemoScene")
+set(DEMO_STAGE_ROOT_RES_DIR "${DEMO_STAGE_ROOT_DIR}/res")
+set(DEMO_STAGE_CONFIG_RES_DIR "${DEMO_STAGE_ROOT_DIR}/$<CONFIG>/res")
 set(DEMO_EXE_RES_DIR "$<TARGET_FILE_DIR:DemoScene>/res")
 
 file(GLOB_RECURSE ENGINE_SHADER_FILES CONFIGURE_DEPENDS
@@ -40,12 +43,17 @@ set(ENGINE_SHADER_ROOT "${CMAKE_SOURCE_DIR}/src/DX12Engine/Shaders")
 set(DEMO_SHADER_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/src")
 
 add_custom_target(CopyDemoResources ALL
+    COMMAND ${CMAKE_COMMAND} -E remove_directory
+        "${DEMO_STAGE_ROOT_RES_DIR}"
+    COMMAND ${CMAKE_COMMAND} -E remove_directory
+        "${DEMO_STAGE_CONFIG_RES_DIR}"
     COMMAND ${CMAKE_COMMAND} -E copy_directory
-        "${CMAKE_SOURCE_DIR}/res"
-        "${DEMO_BUILD_ROOT_RES_DIR}"
-    COMMAND ${CMAKE_COMMAND} -E make_directory
-        "${DEMO_BUILD_ROOT_RES_DIR}/Shaders"
-    COMMENT "Copying DemoScene resources to build root"
+        "${COOKED_ASSET_DIR}"
+        "${DEMO_STAGE_ROOT_RES_DIR}"
+    COMMAND ${CMAKE_COMMAND} -E copy_directory
+        "${COOKED_ASSET_DIR}"
+        "${DEMO_STAGE_CONFIG_RES_DIR}"
+    COMMENT "Staging cooked DemoScene resources in build output directories"
 )
 
 function(add_shader_copy_commands target_name shaders_output_dir)
@@ -73,16 +81,16 @@ function(add_shader_copy_commands target_name shaders_output_dir)
     endforeach()
 endfunction()
 
-add_shader_copy_commands(CopyDemoResources "${DEMO_BUILD_ROOT_RES_DIR}/Shaders")
-add_shader_copy_commands(CopyDemoResources "${CMAKE_SOURCE_DIR}/Debug/res/Shaders")
-add_shader_copy_commands(CopyDemoResources "${CMAKE_SOURCE_DIR}/Release/res/Shaders")
+add_shader_copy_commands(CopyDemoResources "${DEMO_STAGE_ROOT_RES_DIR}/Shaders")
+add_shader_copy_commands(CopyDemoResources "${DEMO_STAGE_CONFIG_RES_DIR}/Shaders")
 
 add_dependencies(DemoScene CopyDemoResources)
 
 add_custom_command(TARGET DemoScene POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy_directory
-        "${CMAKE_SOURCE_DIR}/res"
-        "${DEMO_EXE_RES_DIR}"
+    COMMAND ${CMAKE_COMMAND}
+        -DSOURCE_DIR="${DEMO_STAGE_CONFIG_RES_DIR}"
+        -DDEST_DIR="${DEMO_EXE_RES_DIR}"
+        -P "${CMAKE_SOURCE_DIR}/cmake/CopyDirectoryIfDifferent.cmake"
     COMMAND ${CMAKE_COMMAND} -E make_directory
         "${DEMO_EXE_RES_DIR}/Shaders"
     COMMENT "Copying DemoScene resources to executable directory"

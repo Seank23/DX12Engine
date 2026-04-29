@@ -67,6 +67,9 @@ namespace DX12Engine
 		static std::string GetModelPath(std::string path) { return "res/Models/" + path; }
 		static std::string GetShaderPath(std::string path) { return "res/Shaders/" + path; }
 		static std::string GetShaderFolder() { return "res/Shaders/"; }
+		static std::string GetCookedModelPath(std::string assetName) { return "res/Models/" + assetName; }
+		static std::string GetCookedModelLodsPath(const std::string& modelName) { return GetCookedModelPath(modelName) + "/lods.json"; }
+		static std::string GetCookedModelLodsFolder(const std::string& modelName) { return GetCookedModelPath(modelName) + "/LODs"; }
 
 		bool ReloadChangedShaders();
 		uint64_t GetShaderGeneration() const { return m_ShaderGeneration; }

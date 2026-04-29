@@ -23,8 +23,12 @@
 #include <stdexcept>
 #include <iostream>
 #include <unordered_map>
+#include <filesystem>
+#include <fstream>
+#include <iterator>
 #include <cfloat>
 #include <cmath>
+#include <nlohmann/json.hpp>
 #include "../Asset/MeshAsset.h"
 #include "../Asset/ModelAsset.h"
 #include "../Asset/MaterialAsset.h"
@@ -35,6 +39,8 @@
 
 namespace DX12Engine
 {
+    namespace fs = std::filesystem;
+
     ModelLoader::ModelLoader()
     {
     }
@@ -118,7 +124,7 @@ namespace DX12Engine
                         std::to_string(idx.normal_index) + "/" +
                         std::to_string(idx.texcoord_index);
 
-                    // Add the vertex if it hasn’t been added yet
+                    // Add the vertex if it hasnï¿½t been added yet
                     if (uniqueVertices.find(key) == uniqueVertices.end())
                     {
                         uniqueVertices[key] = static_cast<uint32_t>(vertices.size());
@@ -433,8 +439,87 @@ namespace DX12Engine
         int importedPrimitives = 0;
     };
 
+    struct CookedLodLevelRecord
+    {
+        int level = 0;
+        float ratio = 1.0f;
+        float error = 0.0f;
+        std::string output;
+    };
+
+    struct CookedPrimitiveLodRecord
+    {
+        int meshIndex = -1;
+        int primitiveIndex = -1;
+        bool skipped = false;
+        std::vector<CookedLodLevelRecord> lods;
+    };
+
+    static bool ParseCookedLodManifest(const std::string& jsonText, std::vector<CookedPrimitiveLodRecord>& outRecords)
+    {
+        outRecords.clear();
+
+        try
+        {
+            const nlohmann::json root = nlohmann::json::parse(jsonText);
+            if (!root.contains("primitives") || !root["primitives"].is_array())
+                return false;
+
+            for (const nlohmann::json& primJson : root["primitives"])
+            {
+                if (!primJson.is_object()) continue;
+
+                CookedPrimitiveLodRecord primRecord;
+                primRecord.meshIndex = primJson.value("meshIndex", -1);
+                primRecord.primitiveIndex = primJson.value("primitiveIndex", -1);
+                primRecord.skipped = primJson.value("skipped", false);
+                if (primRecord.meshIndex < 0 || primRecord.primitiveIndex < 0) continue;
+
+                if (primJson.contains("lods") && primJson["lods"].is_array())
+                {
+                    for (const nlohmann::json& lodJson : primJson["lods"])
+                    {
+                        if (!lodJson.is_object()) continue;
+
+                        CookedLodLevelRecord lodRecord;
+                        lodRecord.level = lodJson.value("level", -1);
+                        if (lodRecord.level < 0) continue;
+
+                        lodRecord.ratio = lodJson.value("ratio", 1.0f);
+                        lodRecord.error = lodJson.value("error", 0.0f);
+                        lodRecord.output = lodJson.value("output", std::string{});
+                        primRecord.lods.push_back(std::move(lodRecord));
+                    }
+                }
+                outRecords.push_back(std::move(primRecord));
+            }
+            return true;
+        }
+        catch (const nlohmann::json::exception& ex)
+        {
+            std::cerr << "[glTF] Failed to parse cooked LOD JSON: " << ex.what() << "\n";
+            return false;
+        }
+    }
+
+    static bool ReadCookedIndexBuffer(const fs::path& filePath, std::vector<UINT>& outIndices)
+    {
+        std::ifstream input(filePath, std::ios::binary);
+        if (!input) return false;
+
+        input.seekg(0, std::ios::end);
+        const std::streamoff size = input.tellg();
+        if (size <= 0 || (size % static_cast<std::streamoff>(sizeof(UINT))) != 0)
+            return false;
+
+        input.seekg(0, std::ios::beg);
+        outIndices.resize(static_cast<size_t>(size / static_cast<std::streamoff>(sizeof(UINT))));
+        input.read(reinterpret_cast<char*>(outIndices.data()), size);
+        return input.good();
+    }
+
     // -------------------------------------------------------------------------
-    // Step 1 – textures
+    // Step 1 ï¿½ textures
     // -------------------------------------------------------------------------
 
     static void ImportTextures(GltfImportContext& ctx)
@@ -452,7 +537,7 @@ namespace DX12Engine
 
             if (img.image.empty() || img.width <= 0 || img.height <= 0 || img.component <= 0)
             {
-                std::cerr << "[glTF] Texture " << ti << " has no decoded pixel data – skipped.\n";
+                std::cerr << "[glTF] Texture " << ti << " has no decoded pixel data ï¿½ skipped.\n";
                 continue;
             }
 
@@ -508,7 +593,7 @@ namespace DX12Engine
     }
 
     // -------------------------------------------------------------------------
-    // Step 2 – materials
+    // Step 2 ï¿½ materials
     // -------------------------------------------------------------------------
 
     static void ImportMaterials(GltfImportContext& ctx)
@@ -664,7 +749,7 @@ namespace DX12Engine
     }
 
     // -------------------------------------------------------------------------
-    // Step 3 – meshes
+    // Step 3 ï¿½ meshes
     // -------------------------------------------------------------------------
 
     static void ImportMeshes(GltfImportContext& ctx)
@@ -701,7 +786,7 @@ namespace DX12Engine
                 if (mode != TINYGLTF_MODE_TRIANGLES)
                 {
                     std::cerr << "[glTF] Mesh \"" << meshName << "\" primitive " << pi
-                              << " is not TRIANGLES (mode=" << mode << ") – skipped.\n";
+                              << " is not TRIANGLES (mode=" << mode << ") ï¿½ skipped.\n";
                     ++ctx.skippedPrimitives;
                     continue;
                 }
@@ -711,7 +796,7 @@ namespace DX12Engine
                 if (posIt == prim.attributes.end())
                 {
                     std::cerr << "[glTF] Mesh \"" << meshName << "\" primitive " << pi
-                              << " has no POSITION – skipped.\n";
+                              << " has no POSITION ï¿½ skipped.\n";
                     ++ctx.skippedPrimitives;
                     continue;
                 }
@@ -805,7 +890,7 @@ namespace DX12Engine
                 if (indices.empty() || indices.size() % 3 != 0)
                 {
                     std::cerr << "[glTF] Mesh \"" << meshName << "\" primitive " << pi
-                              << " has invalid index count (" << indices.size() << ") – skipped.\n";
+                              << " has invalid index count (" << indices.size() << ") ï¿½ skipped.\n";
                     ++ctx.skippedPrimitives;
                     continue;
                 }
@@ -846,7 +931,7 @@ namespace DX12Engine
     }
 
     // -------------------------------------------------------------------------
-    // Step 4 – node hierarchy
+    // Step 4 ï¿½ node hierarchy
     // -------------------------------------------------------------------------
 
     static void ImportNodeRecursive(GltfImportContext& ctx,
@@ -999,6 +1084,72 @@ namespace DX12Engine
                ctx.model.textures.size());
     }
 
+    void ModelLoader::TryApplyCookedMeshLods(const std::string& modelName, ModelAsset& modelAsset)
+    {
+        const fs::path lodManifestPath = fs::path(ResourceManager::GetCookedModelLodsPath(modelName));
+        if (!fs::exists(lodManifestPath))
+        {
+            return;
+        }
+
+        std::ifstream manifestInput(lodManifestPath);
+        if (!manifestInput)
+        {
+            std::cerr << "[glTF] Failed to open cooked LOD manifest: " << lodManifestPath.string() << "\n";
+            return;
+        }
+
+        std::string jsonText((std::istreambuf_iterator<char>(manifestInput)), std::istreambuf_iterator<char>());
+        std::vector<CookedPrimitiveLodRecord> lodRecords;
+        if (!ParseCookedLodManifest(jsonText, lodRecords))
+        {
+            std::cerr << "[glTF] Failed to parse cooked LOD manifest: " << lodManifestPath.string() << "\n";
+            return;
+        }
+
+        int appliedBuffers = 0;
+        for (const CookedPrimitiveLodRecord& primRecord : lodRecords)
+        {
+            if (primRecord.meshIndex < 0 || primRecord.primitiveIndex < 0) continue;
+
+            MeshAsset* meshAsset = modelAsset.GetMesh(static_cast<size_t>(primRecord.meshIndex));
+            if (!meshAsset) continue;
+
+            MeshPrimitive* primitive = meshAsset->GetPrimitive(static_cast<size_t>(primRecord.primitiveIndex));
+            if (!primitive || !primitive->HasGeometry()) continue;
+
+            primitive->ClearAdditionalLODs();
+            for (const CookedLodLevelRecord& lodRecord : primRecord.lods)
+            {
+                if (lodRecord.level <= 0 || lodRecord.output.empty()) continue;
+
+                fs::path lodBinaryPath = fs::path(lodRecord.output);
+                if (!lodBinaryPath.is_absolute())
+                    lodBinaryPath = "res" / lodBinaryPath;
+
+                std::vector<UINT> lodIndices;
+                if (!ReadCookedIndexBuffer(lodBinaryPath, lodIndices))
+                {
+                    std::cerr << "[glTF] Failed to read cooked LOD indices: " << lodBinaryPath.string() << "\n";
+                    continue;
+                }
+
+                auto lodIndexBuffer = ResourceManager::GetInstance().CreateIndexBuffer(lodIndices);
+                if (!lodIndexBuffer)
+                {
+                    std::cerr << "[glTF] Failed to create GPU index buffer for LOD: " << lodBinaryPath.string() << "\n";
+                    continue;
+                }
+
+                if (primitive->AddLODBuffer(std::move(lodIndexBuffer), static_cast<UINT>(lodIndices.size()), lodRecord.ratio, lodRecord.error))
+                    ++appliedBuffers;
+            }
+            primitive->SetActiveLOD(0);
+        }
+        if (appliedBuffers > 0)
+            std::cout << "[glTF] Applied " << appliedBuffers << " cooked LOD index buffers from " << lodManifestPath.string() << "\n";
+    }
+
     // -------------------------------------------------------------------------
     // Public entry point
     // -------------------------------------------------------------------------
@@ -1043,6 +1194,7 @@ namespace DX12Engine
         ImportTextures(ctx);
         ImportMaterials(ctx);
         ImportMeshes(ctx);
+        TryApplyCookedMeshLods(modelName, *ctx.outModel);
         ImportNodes(ctx);
         ValidateAndLog(ctx);
 

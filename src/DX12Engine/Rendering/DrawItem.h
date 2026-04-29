@@ -20,6 +20,7 @@ namespace DX12Engine
 		UINT IndexCount;
 		UINT FirstIndex;
 		INT  BaseVertex;
+		UINT ActiveLODLevel;
 
 		DirectX::XMMATRIX ModelMatrix;
 

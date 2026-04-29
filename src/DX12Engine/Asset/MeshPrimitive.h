@@ -2,8 +2,10 @@
 #include "../Rendering/Buffers/IndexBuffer.h"
 #include "../Rendering/Buffers/VertexBuffer.h"
 #include <DirectXMath.h>
+#include <algorithm>
 #include <cstdint>
 #include <memory>
+#include <vector>
 
 namespace DX12Engine
 {
@@ -16,18 +18,30 @@ namespace DX12Engine
     class MeshPrimitive
     {
     public:
+        struct LOD
+        {
+            std::unique_ptr<IndexBuffer> Buffer;
+            UINT IndexCount = 0;
+            float Ratio = 1.0f;
+            float Error = 0.0f;
+        };
+
         MeshPrimitive() = default;
         MeshPrimitive(std::unique_ptr<VertexBuffer> vertexBuffer, std::unique_ptr<IndexBuffer> indexBuffer,
             UINT indexCount = 0, UINT firstIndex = 0, INT baseVertex = 0, UINT materialIndex = 0)
             : m_VertexBuffer(std::move(vertexBuffer)),
-            m_IndexBuffer(std::move(indexBuffer)),
-            m_IndexCount(indexCount),
             m_FirstIndex(firstIndex),
             m_BaseVertex(baseVertex),
             m_MaterialIndex(materialIndex)
         {
-            if (m_IndexCount == 0 && m_IndexBuffer)
-                m_IndexCount = InferIndexCount(m_IndexBuffer.get());
+            LOD baseLod;
+            baseLod.Buffer = std::move(indexBuffer);
+            baseLod.IndexCount = indexCount;
+            baseLod.Ratio = 1.0f;
+            baseLod.Error = 0.0f;
+            if (baseLod.IndexCount == 0 && baseLod.Buffer)
+                baseLod.IndexCount = InferIndexCount(baseLod.Buffer.get());
+            m_LODs.push_back(std::move(baseLod));
         }
 
         MeshPrimitive(const MeshPrimitive&) = delete;
@@ -39,16 +53,31 @@ namespace DX12Engine
         void SetVertexBuffer(std::unique_ptr<VertexBuffer> vertexBuffer) { m_VertexBuffer = std::move(vertexBuffer); }
         void SetIndexBuffer(std::unique_ptr<IndexBuffer> indexBuffer)
         {
-            m_IndexBuffer = std::move(indexBuffer);
-            if (m_IndexCount == 0 && m_IndexBuffer)
-                m_IndexCount = InferIndexCount(m_IndexBuffer.get());
+            if (m_LODs.empty())
+                m_LODs.resize(1);
+
+            m_LODs[0].Buffer = std::move(indexBuffer);
+            m_LODs[0].IndexCount = m_LODs[0].Buffer ? InferIndexCount(m_LODs[0].Buffer.get()) : 0;
+
+            if (m_ActiveLODLevel >= m_LODs.size())
+                m_ActiveLODLevel = 0;
         }
 
         std::unique_ptr<VertexBuffer> TakeVertexBuffer() { return std::move(m_VertexBuffer); }
-        std::unique_ptr<IndexBuffer> TakeIndexBuffer() { return std::move(m_IndexBuffer); }
+        std::unique_ptr<IndexBuffer> TakeIndexBuffer()
+        {
+            if (m_LODs.empty()) return nullptr;
+
+            return std::move(m_LODs[0].Buffer);
+        }
 
         VertexBuffer* GetVertexBuffer() const { return m_VertexBuffer.get(); }
-        IndexBuffer* GetIndexBuffer() const { return m_IndexBuffer.get(); }
+        IndexBuffer* GetIndexBuffer() const
+        {
+            if (m_LODs.empty()) return nullptr;
+
+            return m_LODs[0].Buffer.get();
+        }
 
         D3D12_VERTEX_BUFFER_VIEW GetVertexBufferView() const
         {
@@ -57,19 +86,101 @@ namespace DX12Engine
 
         D3D12_INDEX_BUFFER_VIEW GetIndexBufferView() const
         {
-            return m_IndexBuffer ? m_IndexBuffer->GetIndexBufferView() : D3D12_INDEX_BUFFER_VIEW{};
+            return GetIndexBuffer() ? GetIndexBuffer()->GetIndexBufferView() : D3D12_INDEX_BUFFER_VIEW{};
         }
 
         void SetDrawRange(UINT indexCount, UINT firstIndex = 0, INT baseVertex = 0)
         {
-            m_IndexCount = indexCount;
+            if (m_LODs.empty())
+                m_LODs.resize(1);
+
+            m_LODs[0].IndexCount = indexCount;
             m_FirstIndex = firstIndex;
             m_BaseVertex = baseVertex;
         }
 
-        UINT GetIndexCount() const { return m_IndexCount; }
+        UINT GetIndexCount() const
+        {
+            if (m_LODs.empty()) return 0;
+
+            return m_LODs[0].IndexCount;
+        }
         UINT GetFirstIndex() const { return m_FirstIndex; }
         INT GetBaseVertex() const { return m_BaseVertex; }
+
+        bool AddLODBuffer(std::unique_ptr<IndexBuffer> indexBuffer, UINT indexCount, float ratio, float error)
+        {
+            if (!indexBuffer) return false;
+
+            LOD lod;
+            lod.Buffer = std::move(indexBuffer);
+            lod.IndexCount = indexCount;
+            lod.Ratio = ratio;
+            lod.Error = error;
+            if (lod.IndexCount == 0)
+                lod.IndexCount = InferIndexCount(lod.Buffer.get());
+
+            if (lod.IndexCount == 0) return false;
+
+            m_LODs.push_back(std::move(lod));
+            return true;
+        }
+
+        void ClearAdditionalLODs()
+        {
+            if (m_LODs.size() > 1)
+                m_LODs.erase(m_LODs.begin() + 1, m_LODs.end());
+
+            if (m_ActiveLODLevel >= m_LODs.size())
+                m_ActiveLODLevel = 0;
+        }
+
+        bool SetActiveLOD(UINT level)
+        {
+            if (m_LODs.empty())
+            {
+                m_ActiveLODLevel = 0;
+                return false;
+            }
+
+            const UINT clampedLevel = (std::min)(level, static_cast<UINT>(m_LODs.size() - 1));
+            if (!m_LODs[clampedLevel].Buffer || m_LODs[clampedLevel].IndexCount == 0)
+            {
+                m_ActiveLODLevel = 0;
+                return false;
+            }
+
+            m_ActiveLODLevel = clampedLevel;
+            return true;
+        }
+
+        UINT GetActiveLODLevel() const { return m_ActiveLODLevel; }
+        UINT GetLODCount() const { return static_cast<UINT>(m_LODs.size()); }
+
+        const LOD* GetLOD(UINT level) const
+        {
+            if (level >= m_LODs.size()) return nullptr;
+
+            return &m_LODs[level];
+        }
+
+        D3D12_INDEX_BUFFER_VIEW GetActiveIndexBufferView() const
+        {
+            if (m_ActiveLODLevel >= m_LODs.size()) return D3D12_INDEX_BUFFER_VIEW{};
+
+            const IndexBuffer* buffer = m_LODs[m_ActiveLODLevel].Buffer.get();
+            return buffer ? buffer->GetIndexBufferView() : D3D12_INDEX_BUFFER_VIEW{};
+        }
+
+        UINT GetActiveIndexCount() const
+        {
+            if (m_ActiveLODLevel >= m_LODs.size()) return 0;
+
+            return m_LODs[m_ActiveLODLevel].IndexCount;
+        }
+
+        UINT GetActiveFirstIndex() const { return m_ActiveLODLevel == 0 ? m_FirstIndex : 0; }
+        INT GetActiveBaseVertex() const { return m_ActiveLODLevel == 0 ? m_BaseVertex : 0; }
 
         void SetMaterialIndex(UINT materialIndex) { m_MaterialIndex = materialIndex; }
         UINT GetMaterialIndex() const { return m_MaterialIndex; }
@@ -77,13 +188,16 @@ namespace DX12Engine
         void SetBounds(const MeshBounds& bounds) { m_Bounds = bounds; }
         const MeshBounds& GetBounds() const { return m_Bounds; }
 
-        bool HasGeometry() const { return m_VertexBuffer != nullptr && m_IndexBuffer != nullptr && m_IndexCount > 0; }
+        bool HasGeometry() const
+        {
+            const IndexBuffer* baseIndexBuffer = GetIndexBuffer();
+            return m_VertexBuffer != nullptr && baseIndexBuffer != nullptr && GetIndexCount() > 0;
+        }
 
     private:
         static UINT InferIndexCount(const IndexBuffer* indexBuffer)
         {
-            if (!indexBuffer)
-                return 0;
+            if (!indexBuffer) return 0;
 
             D3D12_INDEX_BUFFER_VIEW view = indexBuffer->GetIndexBufferView();
             if (view.Format == DXGI_FORMAT_R16_UINT)
@@ -93,11 +207,11 @@ namespace DX12Engine
         }
 
         std::unique_ptr<VertexBuffer> m_VertexBuffer;
-        std::unique_ptr<IndexBuffer> m_IndexBuffer;
-        UINT m_IndexCount = 0;
+        std::vector<LOD> m_LODs;
         UINT m_FirstIndex = 0;
         INT m_BaseVertex = 0;
         UINT m_MaterialIndex = 0;
         MeshBounds m_Bounds;
+        UINT m_ActiveLODLevel = 0;
     };
 }

@@ -82,6 +82,9 @@ namespace DX12Engine
             staticSamplerDesc.AddressW = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
             staticSamplerDesc.ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
             staticSamplerDesc.ShaderRegister = shaderRegister;
+            staticSamplerDesc.MaxLOD = D3D12_FLOAT32_MAX;
+            staticSamplerDesc.MinLOD = 0.0f;
+            staticSamplerDesc.MipLODBias = 0.0f;
             m_StaticSamplers.push_back(staticSamplerDesc);
             return *this;
         }

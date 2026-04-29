@@ -82,6 +82,8 @@ This produces:
 
 - `DX12Engine` static library
 - `DemoScene` executable target
+- `AssetCooker` command-line tool target
+- `CookAssets` build target (runs automatically in default builds)
 
 If you are generating with Visual Studio, the solution will be written to the build directory, for example:
 
@@ -111,6 +113,51 @@ When `DemoScene` is built, CMake also copies runtime content automatically:
 - `dxcompiler.dll` and `dxil.dll` are copied beside `DemoScene.exe`
 
 This means you can usually launch the built executable directly from Visual Studio or from the build output folder without manually copying assets.
+
+## Asset Cooker
+
+`AssetCooker` is a standalone offline tool that scans a source assets directory and cooks supported textures into DDS files with mip chains.
+
+### What it does
+
+- Recursively scans an input directory for texture files (`.dds`, `.png`, `.jpg`, `.jpeg`, `.bmp`, `.tga`, `.hdr`, `.tif`, `.tiff`)
+- Parses `.glb` files, extracts referenced textures/material bindings, and cooks embedded textures
+- Generates mesh LOD index buffers for GLB primitives using mesh simplification
+- Generates mip chains when source textures only contain a base level
+- Writes cooked textures as `.dds` into the output directory while preserving relative folder structure
+- Writes sidecar metadata files (`.dds.meta`) with dimensions, mip count, semantic hint, and format
+- Writes a `materials.json` manifest per cooked GLB with texture-slot mappings
+- Writes a `lods.json` manifest per cooked GLB plus binary LOD index buffers under `LODs/`
+- Uses an incremental cache (`asset_cooker.cache`) so unchanged assets are skipped
+
+### Usage
+
+```bash
+AssetCooker --in <raw-assets-dir> --out <cooked-assets-dir> [--force] [--clean-cache]
+```
+
+Example:
+
+```bash
+build/tools/AssetCooker/Debug/AssetCooker.exe --in res --out build/cooked
+```
+
+Options:
+
+- `--force`: recook all supported textures regardless of cache
+- `--clean-cache`: ignore existing cache and rebuild cache entries on this run
+
+### Build pipeline integration
+
+The root `CMakeLists.txt` now wires asset cooking into the normal build:
+
+- raw assets are read from `res/`
+- cooked/staged runtime assets are written to `build/res/`
+- `CookAssets` runs `AssetCooker` automatically for default builds
+- staged raw texture source files (`.png/.jpg/.tga/...`) are pruned from `build/res/` after cooking
+- `DemoScene` depends on `CookAssets` and copies from `build/res/` to `DemoScene/<Config>/res/`
+
+This means newly added texture files under `res/` are automatically discovered and cooked on the next build.
 
 ## Runtime resources
 

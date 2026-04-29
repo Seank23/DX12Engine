@@ -15,6 +15,9 @@ namespace DX12Engine
 
 		MeshAsset LoadObj(const std::string& filename);
 		std::shared_ptr<ModelAsset> LoadGlb(const std::string& filename);
+
+	private:
+		void TryApplyCookedMeshLods(const std::string& modelName, ModelAsset& modelAsset);
 	};
 }
 
