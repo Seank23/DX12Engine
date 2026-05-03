@@ -3,10 +3,13 @@
 #include <algorithm>
 #include <array>
 #include <cctype>
+#include <chrono>
 #include <cstdint>
+#include <ctime>
 #include <cstring>
 #include <filesystem>
 #include <fstream>
+#include <functional>
 #include <iomanip>
 #include <iostream>
 #include <limits>
@@ -30,6 +33,8 @@
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include "tiny_gltf.h"
 #include "meshoptimizer.h"
+#include <DX12Engine/Asset/CookedModelFormat.h>
+#include <DX12Engine/Asset/Vertex.h>
 
 namespace fs = std::filesystem;
 
@@ -37,7 +42,11 @@ namespace
 {
     constexpr std::uint64_t kFnvOffsetBasis = 14695981039346656037ull;
     constexpr std::uint64_t kFnvPrime = 1099511628211ull;
-    constexpr const char* kCacheVersion = "asset-cooker-cache-v2";
+    constexpr const char* kCacheVersion = "asset-cooker-cache-v4";
+    constexpr const char* kModelCompilerVersion = "dxmd-compiler-v1";
+    constexpr std::array<float, 4> kCookLodRatios = { 1.0f, 0.5f, 0.25f, 0.125f };
+    constexpr std::array<float, 4> kCookLodTargetErrors = { 0.0f, 0.01f, 0.02f, 0.04f };
+    constexpr const char* kCookCompressionProfile = "meshopt-default";
 
     enum class TextureSemantic
     {
@@ -241,6 +250,78 @@ namespace
         hash = HashText(hash, SemanticToString(settings.semantic));
         hash = HashText(hash, settings.srgbHint ? "srgb=1" : "srgb=0");
         return hash;
+    }
+
+    std::optional<std::uint64_t> HashFileContents(const fs::path& sourcePath)
+    {
+        std::ifstream input(sourcePath, std::ios::binary);
+        if (!input)
+        {
+            return std::nullopt;
+        }
+
+        std::uint64_t hash = kFnvOffsetBasis;
+        std::vector<std::uint8_t> buffer(64 * 1024);
+        while (input)
+        {
+            input.read(reinterpret_cast<char*>(buffer.data()), static_cast<std::streamsize>(buffer.size()));
+            const auto readCount = static_cast<std::size_t>(input.gcount());
+            if (readCount > 0)
+            {
+                hash = HashBytes(hash, buffer.data(), readCount);
+            }
+        }
+
+        return hash;
+    }
+
+    std::optional<std::uint64_t> HashGlbForCache(const fs::path& sourcePath)
+    {
+        const std::optional<std::uint64_t> sourceHash = HashFileContents(sourcePath);
+        if (!sourceHash.has_value())
+        {
+            return std::nullopt;
+        }
+
+        std::uint64_t hash = *sourceHash;
+        hash = HashText(hash, kCacheVersion);
+        hash = HashText(hash, kModelCompilerVersion);
+        hash = HashText(hash, kCookCompressionProfile);
+        for (float ratio : kCookLodRatios)
+        {
+            hash = HashText(hash, std::to_string(ratio));
+        }
+        for (float error : kCookLodTargetErrors)
+        {
+            hash = HashText(hash, std::to_string(error));
+        }
+
+        return hash;
+    }
+
+    std::uint64_t GetFileSizeSafe(const fs::path& path)
+    {
+        std::error_code ec;
+        const std::uint64_t size = static_cast<std::uint64_t>(fs::file_size(path, ec));
+        return ec ? 0ull : size;
+    }
+
+    std::string FormatUtcTimestampIso8601()
+    {
+        const std::time_t now = std::time(nullptr);
+        std::tm utcTime{};
+        gmtime_s(&utcTime, &now);
+
+        char buffer[32] = {};
+        std::strftime(buffer, sizeof(buffer), "%Y-%m-%dT%H:%M:%SZ", &utcTime);
+        return buffer;
+    }
+
+    std::string Hex64(std::uint64_t value)
+    {
+        std::ostringstream out;
+        out << "0x" << std::hex << std::setw(16) << std::setfill('0') << value;
+        return out.str();
     }
 
     bool ParseArgs(int argc, wchar_t* argv[], Args& outArgs)
@@ -705,18 +786,14 @@ namespace
         return modelRoot / "Textures" / filename.str();
     }
 
-    struct GlbPrimitiveMeshData
-    {
-        std::vector<std::uint32_t> indices;
-        std::vector<float> positions; // xyz, tightly packed
-    };
-
     struct GlbLodLevelInfo
     {
         int level = 0;
         float ratio = 1.0f;
         float error = 0.0f;
         std::size_t indexCount = 0;
+        DirectX::XMFLOAT3 min = { 0.0f, 0.0f, 0.0f };
+        DirectX::XMFLOAT3 max = { 0.0f, 0.0f, 0.0f };
         std::string output;
     };
 
@@ -726,9 +803,227 @@ namespace
         std::size_t primitiveIndex = 0;
         std::size_t vertexCount = 0;
         std::size_t sourceIndexCount = 0;
+        DirectX::XMFLOAT3 min = { 0.0f, 0.0f, 0.0f };
+        DirectX::XMFLOAT3 max = { 0.0f, 0.0f, 0.0f };
         bool skipped = false;
         std::string reason;
         std::vector<GlbLodLevelInfo> lods;
+    };
+
+    struct GlbManifestInfo
+    {
+        std::uint64_t sourceGlbHash = 0;
+        std::string cookTimestampUtc;
+        std::uint64_t chunkVerticesBytes = 0;
+        std::uint64_t chunkIndicesLodBytes = 0;
+        std::uint64_t chunkMeshesBytes = 0;
+        std::uint64_t chunkNodesBytes = 0;
+        std::uint64_t chunkMaterialsBytes = 0;
+        std::uint64_t chunkStringsBytes = 0;
+        std::uint64_t materialManifestBytes = 0;
+        std::uint64_t lodManifestBytes = 0;
+        std::uint64_t textureDdsBytes = 0;
+        std::uint64_t lodIndexBytes = 0;
+        std::vector<std::string> textureFiles;
+    };
+
+    struct Aabb
+    {
+        DirectX::XMFLOAT3 Min = { std::numeric_limits<float>::max(), std::numeric_limits<float>::max(), std::numeric_limits<float>::max() };
+        DirectX::XMFLOAT3 Max = { -std::numeric_limits<float>::max(), -std::numeric_limits<float>::max(), -std::numeric_limits<float>::max() };
+    };
+
+    struct CompiledLodData
+    {
+        std::uint32_t Level = 0;
+        float Ratio = 1.0f;
+        float Error = 0.0f;
+        std::vector<std::uint32_t> Indices;
+        Aabb Bounds;
+    };
+
+    struct CompiledPrimitiveData
+    {
+        std::uint32_t MeshIndex = 0;
+        std::uint32_t PrimitiveIndex = 0;
+        std::uint32_t MaterialIndex = 0;
+        std::vector<DX12Engine::Vertex> Vertices;
+        std::vector<CompiledLodData> Lods;
+        Aabb Bounds;
+    };
+
+    struct CompiledMeshData
+    {
+        std::string Name;
+        std::vector<std::uint32_t> PrimitiveGlobalIndices;
+    };
+
+    struct CompiledNodeData
+    {
+        std::string Name;
+        std::int32_t ParentIndex = -1;
+        std::int32_t MeshIndex = -1;
+        std::array<float, 16> LocalTransform = { 1.0f, 0.0f, 0.0f, 0.0f,
+                                                  0.0f, 1.0f, 0.0f, 0.0f,
+                                                  0.0f, 0.0f, 1.0f, 0.0f,
+                                                  0.0f, 0.0f, 0.0f, 1.0f };
+    };
+
+    struct CompiledMaterialData
+    {
+        std::string Name;
+        std::array<float, 4> BaseColorFactor = { 1.0f, 1.0f, 1.0f, 1.0f };
+        float Metallic = 1.0f;
+        float Roughness = 1.0f;
+        std::array<float, 3> EmissiveFactor = { 0.0f, 0.0f, 0.0f };
+        std::uint32_t AlphaMode = 0; // 0=OPAQUE,1=MASK,2=BLEND
+        float AlphaCutoff = 0.5f;
+        std::uint32_t DoubleSided = 0;
+        std::array<std::uint32_t, 5> TextureRefIds = {
+            std::numeric_limits<std::uint32_t>::max(),
+            std::numeric_limits<std::uint32_t>::max(),
+            std::numeric_limits<std::uint32_t>::max(),
+            std::numeric_limits<std::uint32_t>::max(),
+            std::numeric_limits<std::uint32_t>::max()
+        };
+    };
+
+    struct CompiledModelData
+    {
+        std::string ModelName;
+        std::vector<CompiledPrimitiveData> Primitives;
+        std::vector<CompiledMeshData> Meshes;
+        std::vector<CompiledNodeData> Nodes;
+        std::vector<CompiledMaterialData> Materials;
+        std::vector<std::string> TextureRefPaths;
+    };
+
+    struct ParsedGlbData
+    {
+        tinygltf::Model Model;
+    };
+
+    struct ModelCompilerWriteResult
+    {
+        std::uint64_t ChunkVerticesBytes = 0;
+        std::uint64_t ChunkIndicesLodBytes = 0;
+        std::uint64_t ChunkMeshesBytes = 0;
+        std::uint64_t ChunkNodesBytes = 0;
+        std::uint64_t ChunkMaterialsBytes = 0;
+        std::uint64_t ChunkStringsBytes = 0;
+        std::uint64_t TotalVertexStreamBytes = 0;
+        std::uint64_t TotalIndexStreamBytes = 0;
+    };
+
+    struct CookedVertexChunkHeader
+    {
+        std::uint32_t PrimitiveCount = 0;
+        std::uint32_t VertexCount = 0;
+        std::uint64_t PrimitiveTableOffset = 0;
+        std::uint64_t VertexDataOffset = 0;
+    };
+
+    struct CookedVertexPrimitiveRecord
+    {
+        std::uint32_t PrimitiveIndex = 0;
+        std::uint32_t VertexOffset = 0;
+        std::uint32_t VertexCount = 0;
+        std::uint32_t Reserved = 0;
+    };
+
+    struct CookedIndexChunkHeader
+    {
+        std::uint32_t LodRecordCount = 0;
+        std::uint32_t TotalIndexCount = 0;
+        std::uint64_t LodRecordOffset = 0;
+        std::uint64_t IndexDataOffset = 0;
+    };
+
+    struct CookedIndexLodRecord
+    {
+        std::uint32_t PrimitiveIndex = 0;
+        std::uint32_t LodLevel = 0;
+        std::uint32_t IndexOffset = 0;
+        std::uint32_t IndexCount = 0;
+        float Ratio = 1.0f;
+        float Error = 0.0f;
+        DirectX::XMFLOAT3 Min = { 0.0f, 0.0f, 0.0f };
+        DirectX::XMFLOAT3 Max = { 0.0f, 0.0f, 0.0f };
+    };
+
+    struct CookedMeshesChunkHeader
+    {
+        std::uint32_t MeshCount = 0;
+        std::uint32_t PrimitiveCount = 0;
+        std::uint64_t MeshTableOffset = 0;
+        std::uint64_t PrimitiveTableOffset = 0;
+    };
+
+    struct CookedMeshRecord
+    {
+        std::uint32_t NameStringOffset = 0;
+        std::uint32_t PrimitiveStart = 0;
+        std::uint32_t PrimitiveCount = 0;
+        std::uint32_t Reserved = 0;
+    };
+
+    struct CookedPrimitiveRecord
+    {
+        std::uint32_t MeshIndex = 0;
+        std::uint32_t MaterialIndex = 0;
+        std::uint32_t VertexOffset = 0;
+        std::uint32_t VertexCount = 0;
+        std::uint32_t LodStart = 0;
+        std::uint32_t LodCount = 0;
+        DirectX::XMFLOAT3 Min = { 0.0f, 0.0f, 0.0f };
+        DirectX::XMFLOAT3 Max = { 0.0f, 0.0f, 0.0f };
+    };
+
+    struct CookedNodeRecord
+    {
+        std::uint32_t NameStringOffset = 0;
+        std::int32_t ParentIndex = -1;
+        std::int32_t MeshIndex = -1;
+        std::uint32_t Reserved = 0;
+        std::array<float, 16> LocalTransform = { 1.0f, 0.0f, 0.0f, 0.0f,
+                                                  0.0f, 1.0f, 0.0f, 0.0f,
+                                                  0.0f, 0.0f, 1.0f, 0.0f,
+                                                  0.0f, 0.0f, 0.0f, 1.0f };
+    };
+
+    struct CookedMaterialsChunkHeader
+    {
+        std::uint32_t MaterialCount = 0;
+        std::uint32_t TextureRefCount = 0;
+        std::uint64_t MaterialTableOffset = 0;
+        std::uint64_t TextureRefTableOffset = 0;
+    };
+
+    struct CookedTextureRefRecord
+    {
+        std::uint32_t PathStringOffset = 0;
+        std::uint32_t Reserved0 = 0;
+        std::uint64_t Reserved1 = 0;
+    };
+
+    struct CookedMaterialRecord
+    {
+        std::uint32_t NameStringOffset = 0;
+        std::uint32_t AlphaMode = 0;
+        float AlphaCutoff = 0.5f;
+        std::uint32_t DoubleSided = 0;
+        std::array<float, 4> BaseColorFactor = { 1.0f, 1.0f, 1.0f, 1.0f };
+        float Metallic = 1.0f;
+        float Roughness = 1.0f;
+        std::array<float, 3> EmissiveFactor = { 0.0f, 0.0f, 0.0f };
+        std::uint32_t Padding = 0;
+        std::array<std::uint32_t, 5> TextureRefIds = {
+            std::numeric_limits<std::uint32_t>::max(),
+            std::numeric_limits<std::uint32_t>::max(),
+            std::numeric_limits<std::uint32_t>::max(),
+            std::numeric_limits<std::uint32_t>::max(),
+            std::numeric_limits<std::uint32_t>::max()
+        };
     };
 
     const std::uint8_t* AccessorElementPointer(const tinygltf::Model& model, const tinygltf::Accessor& accessor, std::size_t index)
@@ -829,101 +1124,555 @@ namespace
         };
     }
 
-    bool ExtractGlbPrimitiveMeshData(const tinygltf::Model& model, const tinygltf::Primitive& primitive, GlbPrimitiveMeshData& outData, std::string& reason)
+    std::array<float, 2> ReadVec2(const std::uint8_t* bytes, int componentType, bool normalized)
     {
-        int mode = primitive.mode;
-        if (mode < 0)
+        if (!bytes)
         {
-            mode = TINYGLTF_MODE_TRIANGLES;
-        }
-        if (mode != TINYGLTF_MODE_TRIANGLES)
-        {
-            reason = "non-triangle primitive";
-            return false;
+            return { 0.0f, 0.0f };
         }
 
-        const auto positionIt = primitive.attributes.find("POSITION");
-        if (positionIt == primitive.attributes.end())
+        if (componentType == TINYGLTF_COMPONENT_TYPE_FLOAT)
         {
-            reason = "missing POSITION accessor";
-            return false;
+            const float* values = reinterpret_cast<const float*>(bytes);
+            return { values[0], values[1] };
         }
 
-        if (positionIt->second < 0 || static_cast<std::size_t>(positionIt->second) >= model.accessors.size())
+        const int componentSize = tinygltf::GetComponentSizeInBytes(componentType);
+        return {
+            ReadScalarFloat(bytes, componentType, normalized),
+            ReadScalarFloat(bytes + componentSize, componentType, normalized)
+        };
+    }
+
+    std::array<float, 4> ReadVec4(const std::uint8_t* bytes, int componentType, bool normalized)
+    {
+        if (!bytes)
         {
-            reason = "invalid POSITION accessor index";
-            return false;
+            return { 0.0f, 0.0f, 0.0f, 1.0f };
         }
 
-        const tinygltf::Accessor& positionAccessor = model.accessors[positionIt->second];
-        if (tinygltf::GetNumComponentsInType(positionAccessor.type) != 3 || positionAccessor.count == 0)
+        if (componentType == TINYGLTF_COMPONENT_TYPE_FLOAT)
         {
-            reason = "POSITION accessor is not VEC3 or empty";
-            return false;
+            const float* values = reinterpret_cast<const float*>(bytes);
+            return { values[0], values[1], values[2], values[3] };
         }
 
-        const std::size_t vertexCount = positionAccessor.count;
-        outData.positions.resize(vertexCount * 3);
-        for (std::size_t i = 0; i < vertexCount; ++i)
+        const int componentSize = tinygltf::GetComponentSizeInBytes(componentType);
+        return {
+            ReadScalarFloat(bytes, componentType, normalized),
+            ReadScalarFloat(bytes + componentSize, componentType, normalized),
+            ReadScalarFloat(bytes + componentSize * 2, componentType, normalized),
+            ReadScalarFloat(bytes + componentSize * 3, componentType, normalized)
+        };
+    }
+
+    void ExpandBounds(Aabb& bounds, const DirectX::XMFLOAT3& p)
+    {
+        bounds.Min.x = (std::min)(bounds.Min.x, p.x);
+        bounds.Min.y = (std::min)(bounds.Min.y, p.y);
+        bounds.Min.z = (std::min)(bounds.Min.z, p.z);
+        bounds.Max.x = (std::max)(bounds.Max.x, p.x);
+        bounds.Max.y = (std::max)(bounds.Max.y, p.y);
+        bounds.Max.z = (std::max)(bounds.Max.z, p.z);
+    }
+
+    Aabb ComputeBoundsFromIndexedVertices(const std::vector<DX12Engine::Vertex>& vertices, const std::vector<std::uint32_t>& indices)
+    {
+        Aabb bounds;
+        if (vertices.empty())
         {
-            const std::uint8_t* elem = AccessorElementPointer(model, positionAccessor, i);
-            if (!elem)
+            bounds.Min = { 0.0f, 0.0f, 0.0f };
+            bounds.Max = { 0.0f, 0.0f, 0.0f };
+            return bounds;
+        }
+
+        if (indices.empty())
+        {
+            for (const DX12Engine::Vertex& v : vertices)
             {
-                reason = "POSITION accessor points outside buffer";
-                return false;
+                ExpandBounds(bounds, v.Position);
+            }
+            return bounds;
+        }
+
+        for (std::uint32_t idx : indices)
+        {
+            if (idx < vertices.size())
+            {
+                ExpandBounds(bounds, vertices[idx].Position);
+            }
+        }
+        return bounds;
+    }
+
+    void GenerateFlatNormals(std::vector<DX12Engine::Vertex>& vertices, const std::vector<std::uint32_t>& indices)
+    {
+        if (vertices.empty() || indices.size() < 3)
+        {
+            return;
+        }
+
+        for (std::size_t i = 0; i + 2 < indices.size(); i += 3)
+        {
+            const std::uint32_t i0 = indices[i + 0];
+            const std::uint32_t i1 = indices[i + 1];
+            const std::uint32_t i2 = indices[i + 2];
+            if (i0 >= vertices.size() || i1 >= vertices.size() || i2 >= vertices.size())
+            {
+                continue;
             }
 
-            const std::array<float, 3> p = ReadVec3(elem, positionAccessor.componentType, positionAccessor.normalized);
-            outData.positions[i * 3 + 0] = p[0];
-            outData.positions[i * 3 + 1] = p[1];
-            outData.positions[i * 3 + 2] = p[2];
+            DirectX::XMVECTOR p0 = DirectX::XMLoadFloat3(&vertices[i0].Position);
+            DirectX::XMVECTOR p1 = DirectX::XMLoadFloat3(&vertices[i1].Position);
+            DirectX::XMVECTOR p2 = DirectX::XMLoadFloat3(&vertices[i2].Position);
+            DirectX::XMVECTOR normal = DirectX::XMVector3Normalize(
+                DirectX::XMVector3Cross(
+                    DirectX::XMVectorSubtract(p1, p0),
+                    DirectX::XMVectorSubtract(p2, p0)));
+
+            DirectX::XMFLOAT3 n;
+            DirectX::XMStoreFloat3(&n, normal);
+            vertices[i0].Normal = n;
+            vertices[i1].Normal = n;
+            vertices[i2].Normal = n;
+        }
+    }
+
+    void ComputeTangents(std::vector<DX12Engine::Vertex>& vertices, const std::vector<std::uint32_t>& indices)
+    {
+        if (vertices.empty() || indices.size() < 3)
+        {
+            return;
         }
 
-        outData.indices.clear();
-        if (primitive.indices >= 0)
+        std::vector<DirectX::XMFLOAT3> tan(vertices.size(), { 0.0f, 0.0f, 0.0f });
+
+        for (std::size_t i = 0; i + 2 < indices.size(); i += 3)
         {
-            if (static_cast<std::size_t>(primitive.indices) >= model.accessors.size())
+            const std::uint32_t i0 = indices[i + 0];
+            const std::uint32_t i1 = indices[i + 1];
+            const std::uint32_t i2 = indices[i + 2];
+            if (i0 >= vertices.size() || i1 >= vertices.size() || i2 >= vertices.size())
             {
-                reason = "invalid index accessor";
-                return false;
+                continue;
             }
 
-            const tinygltf::Accessor& indexAccessor = model.accessors[primitive.indices];
-            if (tinygltf::GetNumComponentsInType(indexAccessor.type) != 1)
+            const DirectX::XMFLOAT3& p0 = vertices[i0].Position;
+            const DirectX::XMFLOAT3& p1 = vertices[i1].Position;
+            const DirectX::XMFLOAT3& p2 = vertices[i2].Position;
+            const DirectX::XMFLOAT2& uv0 = vertices[i0].TexCoord;
+            const DirectX::XMFLOAT2& uv1 = vertices[i1].TexCoord;
+            const DirectX::XMFLOAT2& uv2 = vertices[i2].TexCoord;
+
+            const float x1 = p1.x - p0.x;
+            const float y1 = p1.y - p0.y;
+            const float z1 = p1.z - p0.z;
+            const float x2 = p2.x - p0.x;
+            const float y2 = p2.y - p0.y;
+            const float z2 = p2.z - p0.z;
+
+            const float s1 = uv1.x - uv0.x;
+            const float t1 = uv1.y - uv0.y;
+            const float s2 = uv2.x - uv0.x;
+            const float t2 = uv2.y - uv0.y;
+
+            const float denom = s1 * t2 - s2 * t1;
+            if (std::abs(denom) <= 1e-8f)
             {
-                reason = "index accessor is not scalar";
-                return false;
+                continue;
             }
 
-            outData.indices.resize(indexAccessor.count);
-            for (std::size_t i = 0; i < indexAccessor.count; ++i)
-            {
-                const std::uint8_t* elem = AccessorElementPointer(model, indexAccessor, i);
-                if (!elem)
-                {
-                    reason = "index accessor points outside buffer";
-                    return false;
-                }
+            const float r = 1.0f / denom;
+            const DirectX::XMFLOAT3 sdir = {
+                (t2 * x1 - t1 * x2) * r,
+                (t2 * y1 - t1 * y2) * r,
+                (t2 * z1 - t1 * z2) * r
+            };
 
-                outData.indices[i] = ReadIndexScalar(elem, indexAccessor.componentType);
+            tan[i0] = sdir;
+            tan[i1] = sdir;
+            tan[i2] = sdir;
+        }
+
+        for (std::size_t i = 0; i < vertices.size(); ++i)
+        {
+            const DirectX::XMVECTOR n = DirectX::XMLoadFloat3(&vertices[i].Normal);
+            const DirectX::XMVECTOR t = DirectX::XMLoadFloat3(&tan[i]);
+            const float ndott = DirectX::XMVectorGetX(DirectX::XMVector3Dot(n, t));
+            const DirectX::XMVECTOR ortho = DirectX::XMVectorSubtract(t, DirectX::XMVectorScale(n, ndott));
+
+            DirectX::XMFLOAT3 tangent;
+            DirectX::XMStoreFloat3(&tangent, DirectX::XMVector3Normalize(ortho));
+            vertices[i].Tangent = { tangent.x, tangent.y, tangent.z, 1.0f };
+        }
+    }
+
+    bool ParseGlbStage(const fs::path& sourcePath, ParsedGlbData& outParsed, std::string& outWarn, std::string& outErr)
+    {
+        tinygltf::TinyGLTF loader;
+        outWarn.clear();
+        outErr.clear();
+        outParsed.Model = {};
+        return loader.LoadBinaryFromFile(&outParsed.Model, &outErr, &outWarn, sourcePath.string());
+    }
+
+    std::uint32_t ToAlphaMode(const std::string& alphaMode)
+    {
+        if (alphaMode == "MASK")
+        {
+            return 1;
+        }
+        if (alphaMode == "BLEND")
+        {
+            return 2;
+        }
+        return 0;
+    }
+
+    bool ExtractCompiledModelDataStage(
+        const tinygltf::Model& model,
+        const std::string& modelName,
+        const std::vector<std::string>& textureOutputs,
+        CompiledModelData& outData)
+    {
+        outData = {};
+        outData.ModelName = modelName;
+
+        std::unordered_map<std::string, std::uint32_t> textureRefMap;
+        auto getTextureRefId = [&](int textureIndex) -> std::uint32_t
+        {
+            if (textureIndex < 0 || static_cast<std::size_t>(textureIndex) >= textureOutputs.size())
+            {
+                return std::numeric_limits<std::uint32_t>::max();
             }
+
+            const std::string& path = textureOutputs[textureIndex];
+            if (path.empty())
+            {
+                return std::numeric_limits<std::uint32_t>::max();
+            }
+
+            const auto it = textureRefMap.find(path);
+            if (it != textureRefMap.end())
+            {
+                return it->second;
+            }
+
+            const std::uint32_t newId = static_cast<std::uint32_t>(outData.TextureRefPaths.size());
+            outData.TextureRefPaths.push_back(path);
+            textureRefMap.insert({ path, newId });
+            return newId;
+        };
+
+        if (model.materials.empty())
+        {
+            CompiledMaterialData defaultMat;
+            defaultMat.Name = "default_material";
+            outData.Materials.push_back(std::move(defaultMat));
         }
         else
         {
-            outData.indices.resize(vertexCount);
-            for (std::size_t i = 0; i < vertexCount; ++i)
+            outData.Materials.reserve(model.materials.size());
+            for (std::size_t mi = 0; mi < model.materials.size(); ++mi)
             {
-                outData.indices[i] = static_cast<std::uint32_t>(i);
+                const tinygltf::Material& srcMat = model.materials[mi];
+                CompiledMaterialData mat;
+                mat.Name = srcMat.name.empty() ? ("material_" + std::to_string(mi)) : srcMat.name;
+                mat.AlphaMode = ToAlphaMode(srcMat.alphaMode);
+                mat.AlphaCutoff = static_cast<float>(srcMat.alphaCutoff);
+                mat.DoubleSided = srcMat.doubleSided ? 1u : 0u;
+
+                if (srcMat.pbrMetallicRoughness.baseColorFactor.size() == 4)
+                {
+                    mat.BaseColorFactor = {
+                        static_cast<float>(srcMat.pbrMetallicRoughness.baseColorFactor[0]),
+                        static_cast<float>(srcMat.pbrMetallicRoughness.baseColorFactor[1]),
+                        static_cast<float>(srcMat.pbrMetallicRoughness.baseColorFactor[2]),
+                        static_cast<float>(srcMat.pbrMetallicRoughness.baseColorFactor[3])
+                    };
+                }
+
+                mat.Metallic = static_cast<float>(srcMat.pbrMetallicRoughness.metallicFactor);
+                mat.Roughness = static_cast<float>(srcMat.pbrMetallicRoughness.roughnessFactor);
+                if (srcMat.emissiveFactor.size() == 3)
+                {
+                    mat.EmissiveFactor = {
+                        static_cast<float>(srcMat.emissiveFactor[0]),
+                        static_cast<float>(srcMat.emissiveFactor[1]),
+                        static_cast<float>(srcMat.emissiveFactor[2])
+                    };
+                }
+
+                mat.TextureRefIds[0] = getTextureRefId(srcMat.pbrMetallicRoughness.baseColorTexture.index);
+                mat.TextureRefIds[1] = getTextureRefId(srcMat.normalTexture.index);
+                mat.TextureRefIds[2] = getTextureRefId(srcMat.pbrMetallicRoughness.metallicRoughnessTexture.index);
+                mat.TextureRefIds[3] = getTextureRefId(srcMat.occlusionTexture.index);
+                mat.TextureRefIds[4] = getTextureRefId(srcMat.emissiveTexture.index);
+
+                outData.Materials.push_back(std::move(mat));
             }
         }
 
-        if (outData.indices.size() < 3 || (outData.indices.size() % 3) != 0)
+        outData.Meshes.reserve(model.meshes.size());
+        for (std::size_t meshIndex = 0; meshIndex < model.meshes.size(); ++meshIndex)
         {
-            reason = "index count is not a triangle list";
-            return false;
+            const tinygltf::Mesh& srcMesh = model.meshes[meshIndex];
+            CompiledMeshData mesh;
+            mesh.Name = srcMesh.name.empty() ? ("mesh_" + std::to_string(meshIndex)) : srcMesh.name;
+
+            for (std::size_t primitiveIndex = 0; primitiveIndex < srcMesh.primitives.size(); ++primitiveIndex)
+            {
+                const tinygltf::Primitive& srcPrim = srcMesh.primitives[primitiveIndex];
+                int mode = srcPrim.mode;
+                if (mode < 0)
+                {
+                    mode = TINYGLTF_MODE_TRIANGLES;
+                }
+                if (mode != TINYGLTF_MODE_TRIANGLES)
+                {
+                    continue;
+                }
+
+                const auto posIt = srcPrim.attributes.find("POSITION");
+                if (posIt == srcPrim.attributes.end() || posIt->second < 0 || static_cast<std::size_t>(posIt->second) >= model.accessors.size())
+                {
+                    continue;
+                }
+
+                const tinygltf::Accessor& posAccessor = model.accessors[posIt->second];
+                if (tinygltf::GetNumComponentsInType(posAccessor.type) != 3 || posAccessor.count == 0)
+                {
+                    continue;
+                }
+
+                const tinygltf::Accessor* normAccessor = nullptr;
+                const tinygltf::Accessor* uvAccessor = nullptr;
+                const tinygltf::Accessor* tangentAccessor = nullptr;
+
+                const auto normIt = srcPrim.attributes.find("NORMAL");
+                if (normIt != srcPrim.attributes.end() && normIt->second >= 0 && static_cast<std::size_t>(normIt->second) < model.accessors.size())
+                {
+                    normAccessor = &model.accessors[normIt->second];
+                }
+
+                const auto uvIt = srcPrim.attributes.find("TEXCOORD_0");
+                if (uvIt != srcPrim.attributes.end() && uvIt->second >= 0 && static_cast<std::size_t>(uvIt->second) < model.accessors.size())
+                {
+                    uvAccessor = &model.accessors[uvIt->second];
+                }
+
+                const auto tangentIt = srcPrim.attributes.find("TANGENT");
+                if (tangentIt != srcPrim.attributes.end() && tangentIt->second >= 0 && static_cast<std::size_t>(tangentIt->second) < model.accessors.size())
+                {
+                    tangentAccessor = &model.accessors[tangentIt->second];
+                }
+
+                CompiledPrimitiveData prim;
+                prim.MeshIndex = static_cast<std::uint32_t>(meshIndex);
+                prim.PrimitiveIndex = static_cast<std::uint32_t>(primitiveIndex);
+                prim.MaterialIndex = (srcPrim.material >= 0 && static_cast<std::size_t>(srcPrim.material) < outData.Materials.size())
+                    ? static_cast<std::uint32_t>(srcPrim.material)
+                    : 0u;
+
+                prim.Vertices.resize(posAccessor.count);
+                for (std::size_t vi = 0; vi < posAccessor.count; ++vi)
+                {
+                    const std::uint8_t* posBytes = AccessorElementPointer(model, posAccessor, vi);
+                    if (!posBytes)
+                    {
+                        prim.Vertices.clear();
+                        break;
+                    }
+
+                    const std::array<float, 3> p = ReadVec3(posBytes, posAccessor.componentType, posAccessor.normalized);
+                    prim.Vertices[vi].Position = { p[0], p[1], -p[2] };
+                    ExpandBounds(prim.Bounds, prim.Vertices[vi].Position);
+
+                    prim.Vertices[vi].Normal = { 0.0f, 1.0f, 0.0f };
+                    prim.Vertices[vi].TexCoord = { 0.0f, 0.0f };
+                    prim.Vertices[vi].Tangent = { 1.0f, 0.0f, 0.0f, 1.0f };
+
+                    if (normAccessor)
+                    {
+                        const std::uint8_t* nBytes = AccessorElementPointer(model, *normAccessor, vi);
+                        const std::array<float, 3> n = ReadVec3(nBytes, normAccessor->componentType, normAccessor->normalized);
+                        prim.Vertices[vi].Normal = { n[0], n[1], -n[2] };
+                    }
+
+                    if (uvAccessor)
+                    {
+                        const std::uint8_t* uvBytes = AccessorElementPointer(model, *uvAccessor, vi);
+                        const std::array<float, 2> uv = ReadVec2(uvBytes, uvAccessor->componentType, uvAccessor->normalized);
+                        prim.Vertices[vi].TexCoord = { uv[0], uv[1] };
+                    }
+
+                    if (tangentAccessor)
+                    {
+                        const std::uint8_t* tBytes = AccessorElementPointer(model, *tangentAccessor, vi);
+                        const std::array<float, 4> t = ReadVec4(tBytes, tangentAccessor->componentType, tangentAccessor->normalized);
+                        prim.Vertices[vi].Tangent = { t[0], t[1], -t[2], t[3] };
+                    }
+                }
+
+                if (prim.Vertices.empty())
+                {
+                    continue;
+                }
+
+                std::vector<std::uint32_t> lod0Indices;
+                if (srcPrim.indices >= 0)
+                {
+                    if (static_cast<std::size_t>(srcPrim.indices) >= model.accessors.size())
+                    {
+                        continue;
+                    }
+
+                    const tinygltf::Accessor& indexAccessor = model.accessors[srcPrim.indices];
+                    lod0Indices.resize(indexAccessor.count);
+                    for (std::size_t ii = 0; ii < indexAccessor.count; ++ii)
+                    {
+                        const std::uint8_t* idxBytes = AccessorElementPointer(model, indexAccessor, ii);
+                        lod0Indices[ii] = ReadIndexScalar(idxBytes, indexAccessor.componentType);
+                    }
+                }
+                else
+                {
+                    lod0Indices.resize(prim.Vertices.size());
+                    for (std::size_t ii = 0; ii < prim.Vertices.size(); ++ii)
+                    {
+                        lod0Indices[ii] = static_cast<std::uint32_t>(ii);
+                    }
+                }
+
+                if (lod0Indices.size() < 3 || (lod0Indices.size() % 3) != 0)
+                {
+                    continue;
+                }
+
+                for (std::size_t ii = 0; ii + 2 < lod0Indices.size(); ii += 3)
+                {
+                    std::swap(lod0Indices[ii + 1], lod0Indices[ii + 2]);
+                }
+
+                if (!normAccessor)
+                {
+                    GenerateFlatNormals(prim.Vertices, lod0Indices);
+                }
+
+                if (!tangentAccessor)
+                {
+                    ComputeTangents(prim.Vertices, lod0Indices);
+                }
+
+                CompiledLodData lod0;
+                lod0.Level = 0;
+                lod0.Ratio = 1.0f;
+                lod0.Error = 0.0f;
+                lod0.Indices = std::move(lod0Indices);
+                lod0.Bounds = ComputeBoundsFromIndexedVertices(prim.Vertices, lod0.Indices);
+                prim.Lods.push_back(std::move(lod0));
+                prim.Bounds = prim.Lods[0].Bounds;
+
+                const std::uint32_t globalPrimitiveIndex = static_cast<std::uint32_t>(outData.Primitives.size());
+                outData.Primitives.push_back(std::move(prim));
+                mesh.PrimitiveGlobalIndices.push_back(globalPrimitiveIndex);
+            }
+
+            outData.Meshes.push_back(std::move(mesh));
         }
 
-        return true;
+        outData.Nodes.clear();
+        if (!model.nodes.empty())
+        {
+            const int sceneIndex = model.defaultScene >= 0 ? model.defaultScene : 0;
+            if (sceneIndex >= 0 && static_cast<std::size_t>(sceneIndex) < model.scenes.size())
+            {
+                std::function<void(int, int)> buildNode = [&](int gltfNodeIndex, int parentOutIndex)
+                {
+                    if (gltfNodeIndex < 0 || static_cast<std::size_t>(gltfNodeIndex) >= model.nodes.size())
+                    {
+                        return;
+                    }
+
+                    const tinygltf::Node& srcNode = model.nodes[gltfNodeIndex];
+                    CompiledNodeData node;
+                    node.Name = srcNode.name.empty() ? ("node_" + std::to_string(gltfNodeIndex)) : srcNode.name;
+                    node.ParentIndex = parentOutIndex;
+                    node.MeshIndex = srcNode.mesh;
+
+                    DirectX::XMMATRIX local = DirectX::XMMatrixIdentity();
+                    if (srcNode.matrix.size() == 16)
+                    {
+                        DirectX::XMMATRIX m = DirectX::XMMatrixSet(
+                            static_cast<float>(srcNode.matrix[0]), static_cast<float>(srcNode.matrix[4]), static_cast<float>(srcNode.matrix[8]), static_cast<float>(srcNode.matrix[12]),
+                            static_cast<float>(srcNode.matrix[1]), static_cast<float>(srcNode.matrix[5]), static_cast<float>(srcNode.matrix[9]), static_cast<float>(srcNode.matrix[13]),
+                            static_cast<float>(srcNode.matrix[2]), static_cast<float>(srcNode.matrix[6]), static_cast<float>(srcNode.matrix[10]), static_cast<float>(srcNode.matrix[14]),
+                            static_cast<float>(srcNode.matrix[3]), static_cast<float>(srcNode.matrix[7]), static_cast<float>(srcNode.matrix[11]), static_cast<float>(srcNode.matrix[15]));
+                        const DirectX::XMMATRIX f = DirectX::XMMatrixScaling(1.0f, 1.0f, -1.0f);
+                        local = f * m * f;
+                    }
+                    else
+                    {
+                        DirectX::XMMATRIX t = DirectX::XMMatrixIdentity();
+                        DirectX::XMMATRIX r = DirectX::XMMatrixIdentity();
+                        DirectX::XMMATRIX s = DirectX::XMMatrixIdentity();
+
+                        if (srcNode.translation.size() == 3)
+                        {
+                            t = DirectX::XMMatrixTranslation(
+                                static_cast<float>(srcNode.translation[0]),
+                                static_cast<float>(srcNode.translation[1]),
+                                -static_cast<float>(srcNode.translation[2]));
+                        }
+
+                        if (srcNode.rotation.size() == 4)
+                        {
+                            const DirectX::XMVECTOR q = DirectX::XMVectorSet(
+                                -static_cast<float>(srcNode.rotation[0]),
+                                -static_cast<float>(srcNode.rotation[1]),
+                                static_cast<float>(srcNode.rotation[2]),
+                                static_cast<float>(srcNode.rotation[3]));
+                            r = DirectX::XMMatrixRotationQuaternion(q);
+                        }
+
+                        if (srcNode.scale.size() == 3)
+                        {
+                            s = DirectX::XMMatrixScaling(
+                                static_cast<float>(srcNode.scale[0]),
+                                static_cast<float>(srcNode.scale[1]),
+                                static_cast<float>(srcNode.scale[2]));
+                        }
+
+                        local = s * r * t;
+                    }
+
+                    DirectX::XMFLOAT4X4 localF;
+                    DirectX::XMStoreFloat4x4(&localF, local);
+                    node.LocalTransform = {
+                        localF._11, localF._12, localF._13, localF._14,
+                        localF._21, localF._22, localF._23, localF._24,
+                        localF._31, localF._32, localF._33, localF._34,
+                        localF._41, localF._42, localF._43, localF._44
+                    };
+
+                    const int outNodeIndex = static_cast<int>(outData.Nodes.size());
+                    outData.Nodes.push_back(std::move(node));
+
+                    for (int child : srcNode.children)
+                    {
+                        buildNode(child, outNodeIndex);
+                    }
+                };
+
+                const tinygltf::Scene& scene = model.scenes[sceneIndex];
+                for (int rootNode : scene.nodes)
+                {
+                    buildNode(rootNode, -1);
+                }
+            }
+        }
+
+        return !outData.Primitives.empty();
     }
 
     fs::path BuildGlbLodOutputRelativePath(const fs::path& sourceRelativePath, std::size_t meshIndex, std::size_t primitiveIndex, int lodLevel)
@@ -969,6 +1718,8 @@ namespace
             output << "      \"primitiveIndex\": " << prim.primitiveIndex << ",\n";
             output << "      \"vertexCount\": " << prim.vertexCount << ",\n";
             output << "      \"sourceIndexCount\": " << prim.sourceIndexCount << ",\n";
+                 output << "      \"bounds\": { \"min\": [" << prim.min.x << ", " << prim.min.y << ", " << prim.min.z
+                     << "], \"max\": [" << prim.max.x << ", " << prim.max.y << ", " << prim.max.z << "] },\n";
             output << "      \"skipped\": " << (prim.skipped ? "true" : "false") << ",\n";
             output << "      \"reason\": " << (prim.reason.empty() ? "null" : ("\"" + JsonEscape(prim.reason) + "\"")) << ",\n";
             output << "      \"lods\": [\n";
@@ -980,6 +1731,8 @@ namespace
                 output << "          \"ratio\": " << lod.ratio << ",\n";
                 output << "          \"error\": " << lod.error << ",\n";
                 output << "          \"indexCount\": " << lod.indexCount << ",\n";
+                  output << "          \"bounds\": { \"min\": [" << lod.min.x << ", " << lod.min.y << ", " << lod.min.z
+                      << "], \"max\": [" << lod.max.x << ", " << lod.max.y << ", " << lod.max.z << "] },\n";
                 output << "          \"output\": \"" << JsonEscape(lod.output) << "\"\n";
                 output << "        }" << (li + 1 == prim.lods.size() ? "\n" : ",\n");
             }
@@ -992,131 +1745,632 @@ namespace
         return true;
     }
 
-    bool CookGlbMeshLods(const tinygltf::Model& model, const fs::path& outputRoot, const fs::path& sourceRelativePath, std::vector<GlbPrimitiveLodInfo>& outPrimitiveLods)
+    bool WriteGlbCookManifest(const fs::path& manifestPath, const fs::path& sourceRelativePath, const GlbManifestInfo& info)
     {
-        constexpr std::array<float, 4> kLodRatios = { 1.0f, 0.5f, 0.25f, 0.125f };
-        constexpr std::array<float, 4> kTargetErrors = { 0.0f, 0.01f, 0.02f, 0.04f };
-
-        bool success = true;
-        for (std::size_t meshIndex = 0; meshIndex < model.meshes.size(); ++meshIndex)
+        std::ofstream output(manifestPath, std::ios::trunc);
+        if (!output)
         {
-            const tinygltf::Mesh& mesh = model.meshes[meshIndex];
-            for (std::size_t primitiveIndex = 0; primitiveIndex < mesh.primitives.size(); ++primitiveIndex)
+            return false;
+        }
+
+        output << "{\n";
+        output << "  \"source\": \"" << JsonEscape(sourceRelativePath.generic_string()) << "\",\n";
+        output << "  \"sourceGlbHash\": \"" << Hex64(info.sourceGlbHash) << "\",\n";
+        output << "  \"cookTimestampUtc\": \"" << JsonEscape(info.cookTimestampUtc) << "\",\n";
+        output << "  \"runtimeFormat\": {\n";
+        output << "    \"magic\": \"DXMD\",\n";
+        output << "    \"versionMajor\": " << DX12Engine::kCookedModelVersionMajor << ",\n";
+        output << "    \"versionMinor\": " << DX12Engine::kCookedModelVersionMinor << ",\n";
+        output << "    \"endianness\": \"little\",\n";
+        output << "    \"alignment\": " << DX12Engine::kCookedModelAlignment << "\n";
+        output << "  },\n";
+        output << "  \"chunkSizes\": {\n";
+        output << "    \"vertices\": " << info.chunkVerticesBytes << ",\n";
+        output << "    \"indicesLod\": " << info.chunkIndicesLodBytes << ",\n";
+        output << "    \"meshes\": " << info.chunkMeshesBytes << ",\n";
+        output << "    \"nodes\": " << info.chunkNodesBytes << ",\n";
+        output << "    \"materials\": " << info.chunkMaterialsBytes << ",\n";
+        output << "    \"strings\": " << info.chunkStringsBytes << "\n";
+        output << "  },\n";
+        output << "  \"auxiliaryFileSizes\": {\n";
+        output << "    \"materialsManifest\": " << info.materialManifestBytes << ",\n";
+        output << "    \"lodManifest\": " << info.lodManifestBytes << ",\n";
+        output << "    \"textureDdsTotal\": " << info.textureDdsBytes << "\n";
+        output << "  },\n";
+        output << "  \"textureFiles\": [\n";
+        for (std::size_t i = 0; i < info.textureFiles.size(); ++i)
+        {
+            output << "    \"" << JsonEscape(info.textureFiles[i]) << "\"" << (i + 1 == info.textureFiles.size() ? "\n" : ",\n");
+        }
+        output << "  ]\n";
+        output << "}\n";
+        return true;
+    }
+
+    std::uint64_t AlignUp(std::uint64_t value, std::uint64_t alignment)
+    {
+        if (alignment == 0)
+        {
+            return value;
+        }
+        const std::uint64_t mask = alignment - 1;
+        return (value + mask) & ~mask;
+    }
+
+    void AppendRawBytes(std::vector<std::uint8_t>& out, const void* data, std::size_t size)
+    {
+        if (!data || size == 0)
+        {
+            return;
+        }
+
+        const std::size_t offset = out.size();
+        out.resize(offset + size);
+        std::memcpy(out.data() + offset, data, size);
+    }
+
+    template <typename T>
+    void AppendPod(std::vector<std::uint8_t>& out, const T& value)
+    {
+        AppendRawBytes(out, &value, sizeof(T));
+    }
+
+    template <typename T>
+    void AppendPodVector(std::vector<std::uint8_t>& out, const std::vector<T>& values)
+    {
+        if (values.empty())
+        {
+            return;
+        }
+        AppendRawBytes(out, values.data(), values.size() * sizeof(T));
+    }
+
+    std::uint32_t AddStringToTable(
+        const std::string& text,
+        std::vector<char>& table,
+        std::unordered_map<std::string, std::uint32_t>& offsets)
+    {
+        if (text.empty())
+        {
+            return 0u;
+        }
+
+        const auto it = offsets.find(text);
+        if (it != offsets.end())
+        {
+            return it->second;
+        }
+
+        const std::uint32_t offset = static_cast<std::uint32_t>(table.size());
+        table.insert(table.end(), text.begin(), text.end());
+        table.push_back('\0');
+        offsets.emplace(text, offset);
+        return offset;
+    }
+
+    bool BuildCompiledModelLodStage(CompiledModelData& ioData, std::vector<GlbPrimitiveLodInfo>& outPrimitiveLods)
+    {
+        outPrimitiveLods.clear();
+        outPrimitiveLods.reserve(ioData.Primitives.size());
+
+        for (CompiledPrimitiveData& prim : ioData.Primitives)
+        {
+            GlbPrimitiveLodInfo record;
+            record.meshIndex = prim.MeshIndex;
+            record.primitiveIndex = prim.PrimitiveIndex;
+            record.vertexCount = prim.Vertices.size();
+
+            if (prim.Vertices.empty() || prim.Lods.empty() || prim.Lods[0].Indices.empty())
             {
-                const tinygltf::Primitive& primitive = mesh.primitives[primitiveIndex];
-                GlbPrimitiveMeshData primitiveData;
-                GlbPrimitiveLodInfo record;
-                record.meshIndex = meshIndex;
-                record.primitiveIndex = primitiveIndex;
+                record.skipped = true;
+                record.reason = "missing base mesh data";
+                outPrimitiveLods.push_back(std::move(record));
+                continue;
+            }
 
-                std::string reason;
-                if (!ExtractGlbPrimitiveMeshData(model, primitive, primitiveData, reason))
+            // Copy base LOD indices before clearing prim.Lods.
+            // Using a reference here would dangle after prim.Lods.clear().
+            const std::vector<std::uint32_t> sourceIndices = prim.Lods[0].Indices;
+            record.sourceIndexCount = sourceIndices.size();
+
+            std::vector<float> positions;
+            positions.resize(prim.Vertices.size() * 3);
+            for (std::size_t vi = 0; vi < prim.Vertices.size(); ++vi)
+            {
+                positions[vi * 3 + 0] = prim.Vertices[vi].Position.x;
+                positions[vi * 3 + 1] = prim.Vertices[vi].Position.y;
+                positions[vi * 3 + 2] = prim.Vertices[vi].Position.z;
+            }
+
+            prim.Lods.clear();
+
+            for (std::size_t lodLevel = 0; lodLevel < kCookLodRatios.size(); ++lodLevel)
+            {
+                const float ratio = kCookLodRatios[lodLevel];
+                std::size_t targetIndexCount = static_cast<std::size_t>(static_cast<double>(sourceIndices.size()) * ratio);
+                targetIndexCount = (std::max<std::size_t>)(targetIndexCount, 3u);
+                targetIndexCount = (targetIndexCount / 3) * 3;
+                targetIndexCount = (std::max<std::size_t>)(targetIndexCount, 3u);
+                targetIndexCount = (std::min<std::size_t>)(targetIndexCount, sourceIndices.size());
+
+                std::vector<std::uint32_t> lodIndices(sourceIndices.size());
+                float lodError = 0.0f;
+                std::size_t lodIndexCount = sourceIndices.size();
+
+                if (lodLevel == 0)
                 {
-                    record.skipped = true;
-                    record.reason = reason;
-                    outPrimitiveLods.push_back(std::move(record));
-                    continue;
+                    lodIndices = sourceIndices;
+                    lodError = 0.0f;
                 }
-
-                record.vertexCount = primitiveData.positions.size() / 3;
-                record.sourceIndexCount = primitiveData.indices.size();
-
-                const std::vector<std::uint32_t>& sourceIndices = primitiveData.indices;
-                for (std::size_t lodLevel = 0; lodLevel < kLodRatios.size(); ++lodLevel)
+                else
                 {
-                    const float ratio = kLodRatios[lodLevel];
-                    std::size_t targetIndexCount = static_cast<std::size_t>(static_cast<double>(sourceIndices.size()) * ratio);
-                    if (targetIndexCount < 3)
-                    {
-                        targetIndexCount = 3;
-                    }
-                    targetIndexCount = (targetIndexCount / 3) * 3;
-                    targetIndexCount = std::max<std::size_t>(3, targetIndexCount);
-                    targetIndexCount = std::min(targetIndexCount, sourceIndices.size());
+                    lodIndexCount = meshopt_simplify(
+                        lodIndices.data(),
+                        sourceIndices.data(),
+                        sourceIndices.size(),
+                        positions.data(),
+                        prim.Vertices.size(),
+                        sizeof(float) * 3,
+                        targetIndexCount,
+                        kCookLodTargetErrors[lodLevel],
+                        0,
+                        &lodError);
 
-                    std::vector<std::uint32_t> lodIndices(sourceIndices.size());
-                    float lodError = 0.0f;
-                    std::size_t lodIndexCount = sourceIndices.size();
-                    if (lodLevel == 0)
+                    if (lodIndexCount < 3 || (lodIndexCount % 3) != 0)
                     {
                         lodIndices = sourceIndices;
                         lodError = 0.0f;
                     }
                     else
                     {
-                        lodIndexCount = meshopt_simplify(
-                            lodIndices.data(),
-                            sourceIndices.data(),
-                            sourceIndices.size(),
-                            primitiveData.positions.data(),
-                            record.vertexCount,
-                            sizeof(float) * 3,
-                            targetIndexCount,
-                            kTargetErrors[lodLevel],
-                            0,
-                            &lodError);
-
-                        if (lodIndexCount < 3 || (lodIndexCount % 3) != 0)
-                        {
-                            lodIndexCount = sourceIndices.size();
-                            lodIndices = sourceIndices;
-                            lodError = 0.0f;
-                        }
-                        else
-                        {
-                            lodIndices.resize(lodIndexCount);
-                        }
+                        lodIndices.resize(lodIndexCount);
                     }
-
-                    const fs::path lodRelativePath = BuildGlbLodOutputRelativePath(sourceRelativePath, meshIndex, primitiveIndex, static_cast<int>(lodLevel));
-                    const fs::path lodOutputPath = outputRoot / lodRelativePath;
-
-                    std::error_code ec;
-                    fs::create_directories(lodOutputPath.parent_path(), ec);
-                    if (ec)
-                    {
-                        std::wcerr << L"[ERROR] Failed to create LOD output directory: " << lodOutputPath.parent_path() << L"\n";
-                        success = false;
-                        continue;
-                    }
-
-                    if (!WriteIndicesBinary(lodOutputPath, lodIndices))
-                    {
-                        std::wcerr << L"[ERROR] Failed to write LOD index file: " << lodOutputPath << L"\n";
-                        success = false;
-                        continue;
-                    }
-
-                    GlbLodLevelInfo lodInfo;
-                    lodInfo.level = static_cast<int>(lodLevel);
-                    lodInfo.ratio = ratio;
-                    lodInfo.error = lodError;
-                    lodInfo.indexCount = lodIndices.size();
-                    lodInfo.output = lodRelativePath.generic_string();
-                    record.lods.push_back(std::move(lodInfo));
                 }
 
-                outPrimitiveLods.push_back(std::move(record));
+                CompiledLodData lodData;
+                lodData.Level = static_cast<std::uint32_t>(lodLevel);
+                lodData.Ratio = ratio;
+                lodData.Error = lodError;
+                lodData.Indices = std::move(lodIndices);
+                lodData.Bounds = ComputeBoundsFromIndexedVertices(prim.Vertices, lodData.Indices);
+                prim.Lods.push_back(lodData);
+
+                GlbLodLevelInfo lodInfo;
+                lodInfo.level = static_cast<int>(lodLevel);
+                lodInfo.ratio = ratio;
+                lodInfo.error = lodError;
+                lodInfo.indexCount = lodData.Indices.size();
+                lodInfo.min = lodData.Bounds.Min;
+                lodInfo.max = lodData.Bounds.Max;
+                record.lods.push_back(std::move(lodInfo));
+            }
+
+            prim.Bounds = prim.Lods[0].Bounds;
+            record.min = prim.Bounds.Min;
+            record.max = prim.Bounds.Max;
+            outPrimitiveLods.push_back(std::move(record));
+        }
+
+        return true;
+    }
+
+    bool WriteCompiledLodIndexBinaries(
+        const fs::path& outputRoot,
+        const fs::path& sourceRelativePath,
+        const CompiledModelData& data,
+        std::vector<GlbPrimitiveLodInfo>& ioPrimitiveLods,
+        std::uint64_t& outTotalBytes)
+    {
+        outTotalBytes = 0;
+        if (ioPrimitiveLods.size() != data.Primitives.size())
+        {
+            return false;
+        }
+
+        bool success = true;
+        for (std::size_t pi = 0; pi < data.Primitives.size(); ++pi)
+        {
+            const CompiledPrimitiveData& prim = data.Primitives[pi];
+            GlbPrimitiveLodInfo& record = ioPrimitiveLods[pi];
+            if (record.skipped)
+            {
+                continue;
+            }
+
+            if (record.lods.size() != prim.Lods.size())
+            {
+                return false;
+            }
+
+            for (std::size_t li = 0; li < prim.Lods.size(); ++li)
+            {
+                const CompiledLodData& lod = prim.Lods[li];
+                const fs::path lodRel = BuildGlbLodOutputRelativePath(
+                    sourceRelativePath,
+                    prim.MeshIndex,
+                    prim.PrimitiveIndex,
+                    static_cast<int>(lod.Level));
+                const fs::path lodOut = outputRoot / lodRel;
+
+                std::error_code ec;
+                fs::create_directories(lodOut.parent_path(), ec);
+                if (ec)
+                {
+                    std::wcerr << L"[ERROR] Failed to create LOD output directory: " << lodOut.parent_path() << L"\n";
+                    success = false;
+                    continue;
+                }
+
+                if (!WriteIndicesBinary(lodOut, lod.Indices))
+                {
+                    std::wcerr << L"[ERROR] Failed to write LOD index file: " << lodOut << L"\n";
+                    success = false;
+                    continue;
+                }
+
+                record.lods[li].output = lodRel.generic_string();
+                outTotalBytes += static_cast<std::uint64_t>(lod.Indices.size()) * sizeof(std::uint32_t);
             }
         }
 
         return success;
     }
 
-    bool CookGlbFile(const fs::path& sourcePath, const fs::path& outputRoot, const fs::path& sourceRelativePath)
+    bool WriteCookedModelBinaryAtomic(
+        const fs::path& outputPath,
+        const CompiledModelData& modelData,
+        std::uint64_t sourceHash,
+        ModelCompilerWriteResult& outResult)
     {
-        tinygltf::TinyGLTF loader;
-        tinygltf::Model model;
-        std::string warn;
-        std::string err;
-        const bool ok = loader.LoadBinaryFromFile(&model, &err, &warn, sourcePath.string());
+        outResult = {};
 
-        if (!warn.empty())
+        std::vector<char> stringTable;
+        stringTable.push_back('\0');
+        std::unordered_map<std::string, std::uint32_t> stringOffsets;
+
+        std::vector<CookedVertexPrimitiveRecord> vertexPrimRecords;
+        std::vector<DX12Engine::Vertex> vertexData;
+        std::vector<std::uint32_t> primitiveLodStart(modelData.Primitives.size(), 0u);
+        std::vector<std::uint32_t> primitiveLodCount(modelData.Primitives.size(), 0u);
+        std::vector<CookedIndexLodRecord> lodRecords;
+        std::vector<std::uint32_t> lodIndexData;
+
+        vertexPrimRecords.reserve(modelData.Primitives.size());
+        for (std::size_t pi = 0; pi < modelData.Primitives.size(); ++pi)
         {
-            std::wcerr << L"[WARN] glb parse warning (" << sourcePath << L"): " << warn.c_str() << L"\n";
+            const CompiledPrimitiveData& prim = modelData.Primitives[pi];
+
+            CookedVertexPrimitiveRecord vp;
+            vp.PrimitiveIndex = static_cast<std::uint32_t>(pi);
+            vp.VertexOffset = static_cast<std::uint32_t>(vertexData.size());
+            vp.VertexCount = static_cast<std::uint32_t>(prim.Vertices.size());
+            vertexPrimRecords.push_back(vp);
+
+            vertexData.insert(vertexData.end(), prim.Vertices.begin(), prim.Vertices.end());
+
+            if (prim.Lods.empty() || prim.Lods[0].Level != 0 || prim.Lods[0].Indices.empty())
+            {
+                std::wcerr << L"[ERROR] Invalid compiled primitive LOD data for primitive " << pi
+                           << L" (missing non-empty LOD0 indices)\n";
+                return false;
+            }
+
+            primitiveLodStart[pi] = static_cast<std::uint32_t>(lodRecords.size());
+            for (const CompiledLodData& lod : prim.Lods)
+            {
+                if (lod.Indices.empty())
+                {
+                    std::wcerr << L"[ERROR] Encountered empty LOD index list while writing model.dxmd"
+                               << L" (primitive=" << pi << L", lod=" << lod.Level << L")\n";
+                    return false;
+                }
+
+                CookedIndexLodRecord lr;
+                lr.PrimitiveIndex = static_cast<std::uint32_t>(pi);
+                lr.LodLevel = lod.Level;
+                lr.IndexOffset = static_cast<std::uint32_t>(lodIndexData.size());
+                lr.IndexCount = static_cast<std::uint32_t>(lod.Indices.size());
+                lr.Ratio = lod.Ratio;
+                lr.Error = lod.Error;
+                lr.Min = lod.Bounds.Min;
+                lr.Max = lod.Bounds.Max;
+
+                lodRecords.push_back(lr);
+                lodIndexData.insert(lodIndexData.end(), lod.Indices.begin(), lod.Indices.end());
+            }
+            primitiveLodCount[pi] = static_cast<std::uint32_t>(lodRecords.size()) - primitiveLodStart[pi];
         }
 
-        if (!ok)
+        if (!modelData.Primitives.empty() && lodIndexData.empty())
+        {
+            std::wcerr << L"[ERROR] Refusing to write model.dxmd with empty index stream.\n";
+            return false;
+        }
+
+        std::vector<CookedMeshRecord> meshRecords;
+        std::vector<CookedPrimitiveRecord> primitiveRecords;
+        meshRecords.reserve(modelData.Meshes.size());
+
+        for (std::size_t mi = 0; mi < modelData.Meshes.size(); ++mi)
+        {
+            const CompiledMeshData& mesh = modelData.Meshes[mi];
+
+            CookedMeshRecord mr;
+            mr.NameStringOffset = AddStringToTable(mesh.Name, stringTable, stringOffsets);
+            mr.PrimitiveStart = static_cast<std::uint32_t>(primitiveRecords.size());
+
+            for (std::uint32_t globalPrimIndex : mesh.PrimitiveGlobalIndices)
+            {
+                if (globalPrimIndex >= modelData.Primitives.size())
+                {
+                    continue;
+                }
+
+                const CompiledPrimitiveData& prim = modelData.Primitives[globalPrimIndex];
+                CookedPrimitiveRecord pr;
+                pr.MeshIndex = static_cast<std::uint32_t>(mi);
+                pr.MaterialIndex = prim.MaterialIndex;
+                pr.VertexOffset = vertexPrimRecords[globalPrimIndex].VertexOffset;
+                pr.VertexCount = vertexPrimRecords[globalPrimIndex].VertexCount;
+                pr.LodStart = primitiveLodStart[globalPrimIndex];
+                pr.LodCount = primitiveLodCount[globalPrimIndex];
+                pr.Min = prim.Bounds.Min;
+                pr.Max = prim.Bounds.Max;
+                primitiveRecords.push_back(pr);
+            }
+
+            mr.PrimitiveCount = static_cast<std::uint32_t>(primitiveRecords.size()) - mr.PrimitiveStart;
+            meshRecords.push_back(mr);
+        }
+
+        std::vector<CookedNodeRecord> nodeRecords;
+        nodeRecords.reserve(modelData.Nodes.size());
+        for (const CompiledNodeData& node : modelData.Nodes)
+        {
+            CookedNodeRecord nr;
+            nr.NameStringOffset = AddStringToTable(node.Name, stringTable, stringOffsets);
+            nr.ParentIndex = node.ParentIndex;
+            nr.MeshIndex = node.MeshIndex;
+            nr.LocalTransform = node.LocalTransform;
+            nodeRecords.push_back(nr);
+        }
+
+        std::vector<CookedTextureRefRecord> textureRefRecords;
+        textureRefRecords.reserve(modelData.TextureRefPaths.size());
+        for (const std::string& texturePath : modelData.TextureRefPaths)
+        {
+            CookedTextureRefRecord tr;
+            tr.PathStringOffset = AddStringToTable(texturePath, stringTable, stringOffsets);
+            textureRefRecords.push_back(tr);
+        }
+
+        std::vector<CookedMaterialRecord> materialRecords;
+        materialRecords.reserve(modelData.Materials.size());
+        for (const CompiledMaterialData& mat : modelData.Materials)
+        {
+            CookedMaterialRecord mr;
+            mr.NameStringOffset = AddStringToTable(mat.Name, stringTable, stringOffsets);
+            mr.AlphaMode = mat.AlphaMode;
+            mr.AlphaCutoff = mat.AlphaCutoff;
+            mr.DoubleSided = mat.DoubleSided;
+            mr.BaseColorFactor = mat.BaseColorFactor;
+            mr.Metallic = mat.Metallic;
+            mr.Roughness = mat.Roughness;
+            mr.EmissiveFactor = mat.EmissiveFactor;
+            for (std::size_t ti = 0; ti < mr.TextureRefIds.size(); ++ti)
+            {
+                mr.TextureRefIds[ti] = mat.TextureRefIds[ti];
+            }
+            materialRecords.push_back(mr);
+        }
+
+        std::vector<std::uint8_t> verticesChunk;
+        {
+            CookedVertexChunkHeader header;
+            header.PrimitiveCount = static_cast<std::uint32_t>(vertexPrimRecords.size());
+            header.VertexCount = static_cast<std::uint32_t>(vertexData.size());
+            header.PrimitiveTableOffset = sizeof(CookedVertexChunkHeader);
+            header.VertexDataOffset = header.PrimitiveTableOffset + (vertexPrimRecords.size() * sizeof(CookedVertexPrimitiveRecord));
+
+            AppendPod(verticesChunk, header);
+            AppendPodVector(verticesChunk, vertexPrimRecords);
+            AppendPodVector(verticesChunk, vertexData);
+        }
+
+        std::vector<std::uint8_t> indicesChunk;
+        {
+            CookedIndexChunkHeader header;
+            header.LodRecordCount = static_cast<std::uint32_t>(lodRecords.size());
+            header.TotalIndexCount = static_cast<std::uint32_t>(lodIndexData.size());
+            header.LodRecordOffset = sizeof(CookedIndexChunkHeader);
+            header.IndexDataOffset = header.LodRecordOffset + (lodRecords.size() * sizeof(CookedIndexLodRecord));
+
+            AppendPod(indicesChunk, header);
+            AppendPodVector(indicesChunk, lodRecords);
+            AppendPodVector(indicesChunk, lodIndexData);
+        }
+
+        std::vector<std::uint8_t> meshesChunk;
+        {
+            CookedMeshesChunkHeader header;
+            header.MeshCount = static_cast<std::uint32_t>(meshRecords.size());
+            header.PrimitiveCount = static_cast<std::uint32_t>(primitiveRecords.size());
+            header.MeshTableOffset = sizeof(CookedMeshesChunkHeader);
+            header.PrimitiveTableOffset = header.MeshTableOffset + (meshRecords.size() * sizeof(CookedMeshRecord));
+
+            AppendPod(meshesChunk, header);
+            AppendPodVector(meshesChunk, meshRecords);
+            AppendPodVector(meshesChunk, primitiveRecords);
+        }
+
+        std::vector<std::uint8_t> nodesChunk;
+        AppendPodVector(nodesChunk, nodeRecords);
+
+        std::vector<std::uint8_t> materialsChunk;
+        {
+            CookedMaterialsChunkHeader header;
+            header.MaterialCount = static_cast<std::uint32_t>(materialRecords.size());
+            header.TextureRefCount = static_cast<std::uint32_t>(textureRefRecords.size());
+            header.MaterialTableOffset = sizeof(CookedMaterialsChunkHeader);
+            header.TextureRefTableOffset = header.MaterialTableOffset + (materialRecords.size() * sizeof(CookedMaterialRecord));
+
+            AppendPod(materialsChunk, header);
+            AppendPodVector(materialsChunk, materialRecords);
+            AppendPodVector(materialsChunk, textureRefRecords);
+        }
+
+        std::vector<std::uint8_t> stringsChunk;
+        if (!stringTable.empty())
+        {
+            AppendRawBytes(stringsChunk, stringTable.data(), stringTable.size());
+        }
+
+        struct ChunkPayload
+        {
+            DX12Engine::CookedModelChunkType Type;
+            std::vector<std::uint8_t>* Bytes;
+            std::uint32_t ElementCount;
+        };
+
+        std::array<ChunkPayload, 6> payloads = {
+            ChunkPayload { DX12Engine::CookedModelChunkType::Vertices, &verticesChunk, static_cast<std::uint32_t>(vertexData.size()) },
+            ChunkPayload { DX12Engine::CookedModelChunkType::IndicesLOD, &indicesChunk, static_cast<std::uint32_t>(lodRecords.size()) },
+            ChunkPayload { DX12Engine::CookedModelChunkType::Meshes, &meshesChunk, static_cast<std::uint32_t>(meshRecords.size()) },
+            ChunkPayload { DX12Engine::CookedModelChunkType::Nodes, &nodesChunk, static_cast<std::uint32_t>(nodeRecords.size()) },
+            ChunkPayload { DX12Engine::CookedModelChunkType::Materials, &materialsChunk, static_cast<std::uint32_t>(materialRecords.size()) },
+            ChunkPayload { DX12Engine::CookedModelChunkType::Strings, &stringsChunk, static_cast<std::uint32_t>(stringTable.size()) }
+        };
+
+        std::vector<DX12Engine::CookedModelChunkDesc> chunkDescs;
+        chunkDescs.reserve(payloads.size());
+
+        std::uint64_t cursor = sizeof(DX12Engine::CookedModelHeader);
+        cursor = AlignUp(cursor, DX12Engine::kCookedModelAlignment);
+
+        for (const ChunkPayload& payload : payloads)
+        {
+            DX12Engine::CookedModelChunkDesc desc;
+            desc.Type = static_cast<std::uint32_t>(payload.Type);
+            desc.Offset = cursor;
+            desc.Size = static_cast<std::uint64_t>(payload.Bytes->size());
+            desc.ElementCount = payload.ElementCount;
+            chunkDescs.push_back(desc);
+
+            cursor += desc.Size;
+            cursor = AlignUp(cursor, DX12Engine::kCookedModelAlignment);
+        }
+
+        const std::uint64_t chunkTableOffset = cursor;
+        const std::uint64_t chunkTableSize = static_cast<std::uint64_t>(chunkDescs.size() * sizeof(DX12Engine::CookedModelChunkDesc));
+        cursor += chunkTableSize;
+
+        std::vector<std::uint8_t> fileData(cursor, 0u);
+        for (std::size_t ci = 0; ci < payloads.size(); ++ci)
+        {
+            const std::vector<std::uint8_t>& bytes = *payloads[ci].Bytes;
+            if (!bytes.empty())
+            {
+                std::memcpy(fileData.data() + chunkDescs[ci].Offset, bytes.data(), bytes.size());
+            }
+        }
+
+        if (chunkTableSize > 0)
+        {
+            std::memcpy(fileData.data() + chunkTableOffset, chunkDescs.data(), static_cast<std::size_t>(chunkTableSize));
+        }
+
+        DX12Engine::CookedModelHeader header;
+        header.Magic = DX12Engine::kCookedModelMagic;
+        header.VersionMajor = DX12Engine::kCookedModelVersionMajor;
+        header.VersionMinor = DX12Engine::kCookedModelVersionMinor;
+        header.Endianness = DX12Engine::kCookedModelEndianLittle;
+        header.Alignment = DX12Engine::kCookedModelAlignment;
+        header.HeaderSize = sizeof(DX12Engine::CookedModelHeader);
+        header.FileSize = static_cast<std::uint64_t>(fileData.size());
+        header.ChunkCount = static_cast<std::uint32_t>(chunkDescs.size());
+        header.ChunkTableOffset = chunkTableOffset;
+        header.RequiredChunkMask = DX12Engine::GetDefaultRequiredChunkMask();
+        header.SourceContentHash = sourceHash;
+
+        const std::uint64_t payloadStart = sizeof(DX12Engine::CookedModelHeader);
+        header.PayloadChecksum = HashBytes(
+            kFnvOffsetBasis,
+            fileData.data() + payloadStart,
+            static_cast<std::size_t>(fileData.size() - payloadStart));
+
+        std::string layoutError;
+        if (!DX12Engine::ValidateCookedModelLayout(header, chunkDescs, fileData.size(), &layoutError))
+        {
+            //std::wcerr << L"[ERROR] model.dxmd validation failed: " << Utf8ToWide(layoutError) << L"\n";
+            return false;
+        }
+
+        std::memcpy(fileData.data(), &header, sizeof(header));
+
+        std::error_code ec;
+        fs::create_directories(outputPath.parent_path(), ec);
+        if (ec)
+        {
+            std::wcerr << L"[ERROR] Failed to create cooked model output directory: " << outputPath.parent_path() << L"\n";
+            return false;
+        }
+
+        const fs::path tempPath = outputPath.string() + ".tmp";
+        {
+            std::ofstream out(tempPath, std::ios::binary | std::ios::trunc);
+            if (!out)
+            {
+                std::wcerr << L"[ERROR] Failed to open temp cooked model file for write: " << tempPath << L"\n";
+                return false;
+            }
+
+            out.write(reinterpret_cast<const char*>(fileData.data()), static_cast<std::streamsize>(fileData.size()));
+            if (!out.good())
+            {
+                std::wcerr << L"[ERROR] Failed to write temp cooked model file: " << tempPath << L"\n";
+                return false;
+            }
+        }
+
+        if (fs::exists(outputPath))
+        {
+            fs::remove(outputPath, ec);
+            if (ec)
+            {
+                std::wcerr << L"[ERROR] Failed to replace cooked model file: " << outputPath << L"\n";
+                fs::remove(tempPath, ec);
+                return false;
+            }
+        }
+
+        fs::rename(tempPath, outputPath, ec);
+        if (ec)
+        {
+            std::wcerr << L"[ERROR] Failed to finalize cooked model file: " << outputPath << L"\n";
+            fs::remove(tempPath, ec);
+            return false;
+        }
+
+        outResult.ChunkVerticesBytes = verticesChunk.size();
+        outResult.ChunkIndicesLodBytes = indicesChunk.size();
+        outResult.ChunkMeshesBytes = meshesChunk.size();
+        outResult.ChunkNodesBytes = nodesChunk.size();
+        outResult.ChunkMaterialsBytes = materialsChunk.size();
+        outResult.ChunkStringsBytes = stringsChunk.size();
+        outResult.TotalVertexStreamBytes = vertexData.size() * sizeof(DX12Engine::Vertex);
+        outResult.TotalIndexStreamBytes = lodIndexData.size() * sizeof(std::uint32_t);
+        return true;
+    }
+
+    bool CookGlbFile(const fs::path& sourcePath, const fs::path& outputRoot, const fs::path& sourceRelativePath)
+    {
+        const std::uint64_t sourceGlbHash = HashFileContents(sourcePath).value_or(0ull);
+
+        ParsedGlbData parsed;
+        std::string warn;
+        std::string err;
+
+        if (!ParseGlbStage(sourcePath, parsed, warn, err))
         {
             std::wcerr << L"[ERROR] Failed to parse glb: " << sourcePath << L"\n";
             if (!err.empty())
@@ -1125,6 +2379,13 @@ namespace
             }
             return false;
         }
+
+        if (!warn.empty())
+        {
+            std::wcerr << L"[WARN] glb parse warning (" << sourcePath << L"): " << warn.c_str() << L"\n";
+        }
+
+        const tinygltf::Model& model = parsed.Model;
 
         std::vector<TextureSemantic> semantics = InferGlbTextureSemantics(model);
         std::vector<std::string> textureOutputs(model.textures.size());
@@ -1183,6 +2444,21 @@ namespace
             std::wcout << L"[COOKED] " << sourceRelativePath.c_str() << L" texture #" << textureIndex << L" -> " << outputRelativePath.c_str() << L"\n";
         }
 
+        CompiledModelData compiledModel;
+        const std::string modelName = sourcePath.stem().string();
+        if (!ExtractCompiledModelDataStage(model, modelName, textureOutputs, compiledModel))
+        {
+            std::wcerr << L"[ERROR] Failed to extract runtime model data from glb: " << sourcePath << L"\n";
+            return false;
+        }
+
+        std::vector<GlbPrimitiveLodInfo> primitiveLods;
+        if (!BuildCompiledModelLodStage(compiledModel, primitiveLods))
+        {
+            std::wcerr << L"[ERROR] Failed to generate LOD stages for glb: " << sourcePath << L"\n";
+            return false;
+        }
+
         fs::path manifestRelative = sourceRelativePath;
         manifestRelative.replace_extension();
         manifestRelative /= "materials.json";
@@ -1201,8 +2477,9 @@ namespace
             return false;
         }
 
-        std::vector<GlbPrimitiveLodInfo> primitiveLods;
-        const bool lodCookSuccess = CookGlbMeshLods(model, outputRoot, sourceRelativePath, primitiveLods);
+        std::uint64_t lodIndexBytes = 0;
+        const bool lodCookSuccess = WriteCompiledLodIndexBinaries(outputRoot, sourceRelativePath, compiledModel, primitiveLods, lodIndexBytes);
+
         fs::path lodManifestRelative = sourceRelativePath;
         lodManifestRelative.replace_extension();
         lodManifestRelative /= "lods.json";
@@ -1211,6 +2488,53 @@ namespace
         if (!WriteGlbLodManifest(lodManifestPath, sourceRelativePath, primitiveLods))
         {
             std::wcerr << L"[ERROR] Failed to write glb LOD manifest: " << lodManifestPath << L"\n";
+            return false;
+        }
+
+        fs::path modelBinaryRelative = sourceRelativePath;
+        modelBinaryRelative.replace_extension();
+        modelBinaryRelative /= "model.dxmd";
+        const fs::path modelBinaryPath = outputRoot / modelBinaryRelative;
+
+        ModelCompilerWriteResult modelWriteResult;
+        if (!WriteCookedModelBinaryAtomic(modelBinaryPath, compiledModel, sourceGlbHash, modelWriteResult))
+        {
+            std::wcerr << L"[ERROR] Failed to write cooked runtime model: " << modelBinaryPath << L"\n";
+            return false;
+        }
+
+        fs::path cookedManifestRelative = sourceRelativePath;
+        cookedManifestRelative.replace_extension();
+        cookedManifestRelative /= "manifest.json";
+        const fs::path cookedManifestPath = outputRoot / cookedManifestRelative;
+
+        GlbManifestInfo manifestInfo;
+        manifestInfo.sourceGlbHash = sourceGlbHash;
+        manifestInfo.cookTimestampUtc = FormatUtcTimestampIso8601();
+        manifestInfo.chunkVerticesBytes = modelWriteResult.ChunkVerticesBytes;
+        manifestInfo.chunkIndicesLodBytes = modelWriteResult.ChunkIndicesLodBytes;
+        manifestInfo.chunkMeshesBytes = modelWriteResult.ChunkMeshesBytes;
+        manifestInfo.chunkNodesBytes = modelWriteResult.ChunkNodesBytes;
+        manifestInfo.chunkMaterialsBytes = modelWriteResult.ChunkMaterialsBytes;
+        manifestInfo.chunkStringsBytes = modelWriteResult.ChunkStringsBytes;
+        manifestInfo.materialManifestBytes = GetFileSizeSafe(manifestPath);
+        manifestInfo.lodManifestBytes = GetFileSizeSafe(lodManifestPath);
+        manifestInfo.lodIndexBytes = lodIndexBytes;
+
+        for (const std::string& textureOutput : textureOutputs)
+        {
+            if (textureOutput.empty())
+            {
+                continue;
+            }
+
+            manifestInfo.textureFiles.push_back(textureOutput);
+            manifestInfo.textureDdsBytes += GetFileSizeSafe(outputRoot / fs::path(textureOutput));
+        }
+
+        if (!WriteGlbCookManifest(cookedManifestPath, sourceRelativePath, manifestInfo))
+        {
+            std::wcerr << L"[ERROR] Failed to write glb cook manifest: " << cookedManifestPath << L"\n";
             return false;
         }
 
@@ -1299,8 +2623,16 @@ int wmain(int argc, wchar_t* argv[])
         const fs::path relativePath = fs::relative(sourcePath, inputRoot).lexically_normal();
         const std::string cacheKey = relativePath.generic_string();
 
-        const CookSettings hashSettings = isGlbSource ? CookSettings{} : InferCookSettings(sourcePath);
-        const std::optional<std::uint64_t> sourceHash = HashFileWithSettings(sourcePath, hashSettings);
+        std::optional<std::uint64_t> sourceHash;
+        if (isGlbSource)
+        {
+            sourceHash = HashGlbForCache(sourcePath);
+        }
+        else
+        {
+            const CookSettings hashSettings = InferCookSettings(sourcePath);
+            sourceHash = HashFileWithSettings(sourcePath, hashSettings);
+        }
         if (!sourceHash.has_value())
         {
             ++stats.failed;
@@ -1324,10 +2656,14 @@ int wmain(int argc, wchar_t* argv[])
                 }
                 else
                 {
-                    fs::path manifestPath = outputRoot / relativePath;
-                    manifestPath.replace_extension();
-                    manifestPath /= "materials.json";
-                    upToDate = fs::exists(manifestPath);
+                    fs::path modelRootPath = outputRoot / relativePath;
+                    modelRootPath.replace_extension();
+
+                    const fs::path materialManifestPath = modelRootPath / "materials.json";
+                    const fs::path lodManifestPath = modelRootPath / "lods.json";
+                    const fs::path cookedManifestPath = modelRootPath / "manifest.json";
+                    const fs::path cookedModelPath = modelRootPath / "model.dxmd";
+                    upToDate = fs::exists(materialManifestPath) && fs::exists(lodManifestPath) && fs::exists(cookedManifestPath) && fs::exists(cookedModelPath);
                 }
             }
         }

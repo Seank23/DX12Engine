@@ -19,6 +19,9 @@
 #include "tiny_gltf.h"
 
 #include "ModelLoader.h"
+#include <algorithm>
+#include <array>
+#include <cctype>
 #include <string>
 #include <stdexcept>
 #include <iostream>
@@ -26,20 +29,80 @@
 #include <filesystem>
 #include <fstream>
 #include <iterator>
+#include <limits>
+#include <cstddef>
+#include <cstring>
+#include <cstdlib>
 #include <cfloat>
 #include <cmath>
 #include <nlohmann/json.hpp>
+#include "../Asset/CookedModelFormat.h"
 #include "../Asset/MeshAsset.h"
 #include "../Asset/ModelAsset.h"
 #include "../Asset/MaterialAsset.h"
 #include "../Asset/MaterialTemplate.h"
 #include "../Resources/ResourceManager.h"
+#include "TextureLoader.h"
 #include "../Resources/Materials/PBRMaterial.h"
 #include <DirectXTex.h>
 
 namespace DX12Engine
 {
     namespace fs = std::filesystem;
+
+    namespace
+    {
+        ModelLoader::CookedFallbackMode g_CookedFallbackMode = ModelLoader::CookedFallbackMode::Auto;
+
+        ModelLoader::CookedFallbackMode ParseCookedFallbackModeFromEnv(const char* envValue)
+        {
+            if (!envValue)
+                return ModelLoader::CookedFallbackMode::Auto;
+
+            std::string modeText(envValue);
+            std::transform(modeText.begin(), modeText.end(), modeText.begin(), [](unsigned char c) {
+                return static_cast<char>(std::tolower(c));
+            });
+
+            if (modeText == "allow" || modeText == "fallback" || modeText == "1" || modeText == "true")
+                return ModelLoader::CookedFallbackMode::AllowGlbFallback;
+
+            if (modeText == "strict" || modeText == "0" || modeText == "false")
+                return ModelLoader::CookedFallbackMode::StrictCookedOnly;
+
+            return ModelLoader::CookedFallbackMode::Auto;
+        }
+
+        ModelLoader::CookedFallbackMode GetDefaultCookedFallbackMode()
+        {
+#ifdef NDEBUG
+            return ModelLoader::CookedFallbackMode::StrictCookedOnly;
+#else
+            return ModelLoader::CookedFallbackMode::AllowGlbFallback;
+#endif
+        }
+
+        ModelLoader::CookedFallbackMode ResolveCookedFallbackMode(ModelLoader::CookedFallbackMode configured)
+        {
+            if (const char* envMode = std::getenv("DX12ENGINE_COOKED_FALLBACK_MODE"))
+                return ParseCookedFallbackModeFromEnv(envMode);
+
+            return configured;
+        }
+
+        bool ShouldAllowGlbFallback(ModelLoader::CookedFallbackMode mode)
+        {
+            mode = ResolveCookedFallbackMode(mode);
+
+            if (mode == ModelLoader::CookedFallbackMode::Auto)
+                mode = GetDefaultCookedFallbackMode();
+
+            if (mode == ModelLoader::CookedFallbackMode::AllowGlbFallback)
+                return true;
+
+            return false;
+        }
+    }
 
     ModelLoader::ModelLoader()
     {
@@ -444,6 +507,7 @@ namespace DX12Engine
         int level = 0;
         float ratio = 1.0f;
         float error = 0.0f;
+        std::uint64_t indexCount = 0;
         std::string output;
     };
 
@@ -451,6 +515,8 @@ namespace DX12Engine
     {
         int meshIndex = -1;
         int primitiveIndex = -1;
+        std::uint64_t vertexCount = 0;
+        std::uint64_t sourceIndexCount = 0;
         bool skipped = false;
         std::vector<CookedLodLevelRecord> lods;
     };
@@ -472,6 +538,8 @@ namespace DX12Engine
                 CookedPrimitiveLodRecord primRecord;
                 primRecord.meshIndex = primJson.value("meshIndex", -1);
                 primRecord.primitiveIndex = primJson.value("primitiveIndex", -1);
+                primRecord.vertexCount = primJson.value("vertexCount", static_cast<std::uint64_t>(0));
+                primRecord.sourceIndexCount = primJson.value("sourceIndexCount", static_cast<std::uint64_t>(0));
                 primRecord.skipped = primJson.value("skipped", false);
                 if (primRecord.meshIndex < 0 || primRecord.primitiveIndex < 0) continue;
 
@@ -487,6 +555,7 @@ namespace DX12Engine
 
                         lodRecord.ratio = lodJson.value("ratio", 1.0f);
                         lodRecord.error = lodJson.value("error", 0.0f);
+                        lodRecord.indexCount = lodJson.value("indexCount", static_cast<std::uint64_t>(0));
                         lodRecord.output = lodJson.value("output", std::string{});
                         primRecord.lods.push_back(std::move(lodRecord));
                     }
@@ -502,8 +571,9 @@ namespace DX12Engine
         }
     }
 
-    static bool ReadCookedIndexBuffer(const fs::path& filePath, std::vector<UINT>& outIndices)
+    static bool ReadCookedIndexBuffer(const fs::path& filePath, std::vector<UINT>& outIndices, std::uint64_t& outFileBytes)
     {
+        outFileBytes = 0;
         std::ifstream input(filePath, std::ios::binary);
         if (!input) return false;
 
@@ -512,10 +582,17 @@ namespace DX12Engine
         if (size <= 0 || (size % static_cast<std::streamoff>(sizeof(UINT))) != 0)
             return false;
 
+        if (size > static_cast<std::streamoff>(std::numeric_limits<size_t>::max()))
+            return false;
+
         input.seekg(0, std::ios::beg);
         outIndices.resize(static_cast<size_t>(size / static_cast<std::streamoff>(sizeof(UINT))));
         input.read(reinterpret_cast<char*>(outIndices.data()), size);
-        return input.good();
+        if (!input.good())
+            return false;
+
+        outFileBytes = static_cast<std::uint64_t>(size);
+        return true;
     }
 
     // -------------------------------------------------------------------------
@@ -1084,11 +1161,1070 @@ namespace DX12Engine
                ctx.model.textures.size());
     }
 
+    struct CookedVertexChunkHeaderDisk
+    {
+        std::uint32_t PrimitiveCount = 0;
+        std::uint32_t VertexCount = 0;
+        std::uint64_t PrimitiveTableOffset = 0;
+        std::uint64_t VertexDataOffset = 0;
+    };
+
+    struct CookedVertexPrimitiveRecordDisk
+    {
+        std::uint32_t PrimitiveIndex = 0;
+        std::uint32_t VertexOffset = 0;
+        std::uint32_t VertexCount = 0;
+        std::uint32_t Reserved = 0;
+    };
+
+    struct CookedIndexChunkHeaderDisk
+    {
+        std::uint32_t LodRecordCount = 0;
+        std::uint32_t TotalIndexCount = 0;
+        std::uint64_t LodRecordOffset = 0;
+        std::uint64_t IndexDataOffset = 0;
+    };
+
+    struct CookedIndexLodRecordDisk
+    {
+        std::uint32_t PrimitiveIndex = 0;
+        std::uint32_t LodLevel = 0;
+        std::uint32_t IndexOffset = 0;
+        std::uint32_t IndexCount = 0;
+        float Ratio = 1.0f;
+        float Error = 0.0f;
+        DirectX::XMFLOAT3 Min = { 0.0f, 0.0f, 0.0f };
+        DirectX::XMFLOAT3 Max = { 0.0f, 0.0f, 0.0f };
+    };
+
+    struct CookedMeshesChunkHeaderDisk
+    {
+        std::uint32_t MeshCount = 0;
+        std::uint32_t PrimitiveCount = 0;
+        std::uint64_t MeshTableOffset = 0;
+        std::uint64_t PrimitiveTableOffset = 0;
+    };
+
+    struct CookedMeshRecordDisk
+    {
+        std::uint32_t NameStringOffset = 0;
+        std::uint32_t PrimitiveStart = 0;
+        std::uint32_t PrimitiveCount = 0;
+        std::uint32_t Reserved = 0;
+    };
+
+    struct CookedPrimitiveRecordDisk
+    {
+        std::uint32_t MeshIndex = 0;
+        std::uint32_t MaterialIndex = 0;
+        std::uint32_t VertexOffset = 0;
+        std::uint32_t VertexCount = 0;
+        std::uint32_t LodStart = 0;
+        std::uint32_t LodCount = 0;
+        DirectX::XMFLOAT3 Min = { 0.0f, 0.0f, 0.0f };
+        DirectX::XMFLOAT3 Max = { 0.0f, 0.0f, 0.0f };
+    };
+
+    struct CookedNodeRecordDisk
+    {
+        std::uint32_t NameStringOffset = 0;
+        std::int32_t ParentIndex = -1;
+        std::int32_t MeshIndex = -1;
+        std::uint32_t Reserved = 0;
+        std::array<float, 16> LocalTransform = {
+            1.0f, 0.0f, 0.0f, 0.0f,
+            0.0f, 1.0f, 0.0f, 0.0f,
+            0.0f, 0.0f, 1.0f, 0.0f,
+            0.0f, 0.0f, 0.0f, 1.0f
+        };
+    };
+
+    struct CookedMaterialsChunkHeaderDisk
+    {
+        std::uint32_t MaterialCount = 0;
+        std::uint32_t TextureRefCount = 0;
+        std::uint64_t MaterialTableOffset = 0;
+        std::uint64_t TextureRefTableOffset = 0;
+    };
+
+    struct CookedTextureRefRecordDisk
+    {
+        std::uint32_t PathStringOffset = 0;
+        std::uint32_t Reserved0 = 0;
+        std::uint64_t Reserved1 = 0;
+    };
+
+    struct CookedMaterialRecordDisk
+    {
+        std::uint32_t NameStringOffset = 0;
+        std::uint32_t AlphaMode = 0;
+        float AlphaCutoff = 0.5f;
+        std::uint32_t DoubleSided = 0;
+        std::array<float, 4> BaseColorFactor = { 1.0f, 1.0f, 1.0f, 1.0f };
+        float Metallic = 1.0f;
+        float Roughness = 1.0f;
+        std::array<float, 3> EmissiveFactor = { 0.0f, 0.0f, 0.0f };
+        std::uint32_t Padding = 0;
+        std::array<std::uint32_t, 5> TextureRefIds = {
+            std::numeric_limits<std::uint32_t>::max(),
+            std::numeric_limits<std::uint32_t>::max(),
+            std::numeric_limits<std::uint32_t>::max(),
+            std::numeric_limits<std::uint32_t>::max(),
+            std::numeric_limits<std::uint32_t>::max()
+        };
+    };
+
+    struct CookedChunkView
+    {
+        const std::uint8_t* Data = nullptr;
+        std::size_t Size = 0;
+        const CookedModelChunkDesc* Desc = nullptr;
+    };
+
+    struct CookedModelMappedView
+    {
+        CookedModelHeader Header{};
+        std::vector<std::uint8_t> FileBytes;
+        std::vector<CookedModelChunkDesc> Chunks;
+
+        CookedChunkView VerticesChunk;
+        CookedChunkView IndicesChunk;
+        CookedChunkView MeshesChunk;
+        CookedChunkView NodesChunk;
+        CookedChunkView MaterialsChunk;
+        CookedChunkView StringsChunk;
+
+        const CookedVertexChunkHeaderDisk* VertexHeader = nullptr;
+        const CookedVertexPrimitiveRecordDisk* VertexPrimitiveRecords = nullptr;
+        const Vertex* Vertices = nullptr;
+
+        const CookedIndexChunkHeaderDisk* IndexHeader = nullptr;
+        const CookedIndexLodRecordDisk* IndexLodRecords = nullptr;
+        const std::uint32_t* IndexData = nullptr;
+
+        const CookedMeshesChunkHeaderDisk* MeshesHeader = nullptr;
+        const CookedMeshRecordDisk* MeshRecords = nullptr;
+        const CookedPrimitiveRecordDisk* PrimitiveRecords = nullptr;
+
+        const CookedNodeRecordDisk* NodeRecords = nullptr;
+
+        const CookedMaterialsChunkHeaderDisk* MaterialsHeader = nullptr;
+        const CookedMaterialRecordDisk* MaterialRecords = nullptr;
+        const CookedTextureRefRecordDisk* TextureRefRecords = nullptr;
+    };
+
+    static void ValidateAndLogCooked(
+        const std::string& modelId,
+        const CookedModelMappedView& mapped,
+        const ModelAsset& model)
+    {
+        int invalidPrimCount = 0;
+        std::size_t importedPrimitives = 0;
+
+        for (size_t mi = 0; mi < model.GetMeshCount(); ++mi)
+        {
+            const MeshAsset* mesh = model.GetMesh(mi);
+            if (!mesh) continue;
+            importedPrimitives += mesh->GetPrimitiveCount();
+
+            for (size_t pi = 0; pi < mesh->GetPrimitiveCount(); ++pi)
+            {
+                const MeshPrimitive* prim = mesh->GetPrimitive(pi);
+                if (!prim) continue;
+
+                if (!prim->HasGeometry())
+                {
+                    std::cerr << "[CookedModel] Mesh " << mi << " primitive " << pi << " has no geometry!\n";
+                    ++invalidPrimCount;
+                }
+                if (prim->GetMaterialIndex() >= model.GetMaterialCount())
+                {
+                    std::cerr << "[CookedModel] Mesh " << mi << " primitive " << pi
+                              << " has out-of-range material index " << prim->GetMaterialIndex() << "!\n";
+                    ++invalidPrimCount;
+                }
+            }
+        }
+
+        printf("[CookedModel] Import complete (%s): %zu nodes, %zu meshes, %zu primitives imported"
+               ", %d skipped, %d invalid, %zu materials, %u textures\n",
+               modelId.c_str(),
+               model.GetNodeCount(),
+               model.GetMeshCount(),
+               importedPrimitives,
+               0,
+               invalidPrimCount,
+               model.GetMaterialCount(),
+               mapped.MaterialsHeader ? mapped.MaterialsHeader->TextureRefCount : 0u);
+    }
+
+    static std::string DeriveModelIdFromPath(const std::string& path)
+    {
+        std::string modelId = path;
+        const std::size_t slash = modelId.find_last_of("/\\");
+        if (slash != std::string::npos)
+            modelId = modelId.substr(slash + 1);
+
+        const std::size_t dot = modelId.rfind('.');
+        if (dot != std::string::npos)
+            modelId = modelId.substr(0, dot);
+
+        return modelId;
+    }
+
+    static bool ReadFileBytes(const fs::path& filePath, std::vector<std::uint8_t>& outBytes, std::string& outError)
+    {
+        outBytes.clear();
+        std::error_code sizeEc;
+        const std::uintmax_t rawSize = fs::file_size(filePath, sizeEc);
+        if (sizeEc)
+        {
+            outError = "Failed to query file size: " + filePath.string();
+            return false;
+        }
+
+        if (rawSize == 0)
+        {
+            outError = "File is empty: " + filePath.string();
+            return false;
+        }
+
+        if (rawSize > static_cast<std::uintmax_t>(std::numeric_limits<std::size_t>::max()))
+        {
+            outError = "File is too large to map: " + filePath.string();
+            return false;
+        }
+
+        const std::size_t size = static_cast<std::size_t>(rawSize);
+        std::ifstream input(filePath, std::ios::binary);
+        if (!input)
+        {
+            outError = "Failed to open file: " + filePath.string();
+            return false;
+        }
+
+        outBytes.resize(size);
+        std::size_t totalRead = 0;
+        constexpr std::size_t kChunkSize = 8u * 1024u * 1024u;
+        while (totalRead < size)
+        {
+            const std::size_t remaining = size - totalRead;
+            const std::size_t toRead = std::min(remaining, kChunkSize);
+            input.read(reinterpret_cast<char*>(outBytes.data() + totalRead), static_cast<std::streamsize>(toRead));
+            const std::streamsize justRead = input.gcount();
+            if (justRead <= 0)
+            {
+                outError = "Failed to read file bytes: " + filePath.string();
+                outBytes.clear();
+                return false;
+            }
+
+            totalRead += static_cast<std::size_t>(justRead);
+        }
+
+        return true;
+    }
+
+    static bool CheckRange(std::uint64_t offset, std::uint64_t size, std::size_t containerSize)
+    {
+        if (offset > static_cast<std::uint64_t>(containerSize))
+            return false;
+        if (size > static_cast<std::uint64_t>(containerSize))
+            return false;
+        return offset + size <= static_cast<std::uint64_t>(containerSize);
+    }
+
+    template <typename T>
+    static bool MapChunkStruct(const CookedChunkView& chunk, std::uint64_t offset, const T*& outPtr, std::string& outError, const char* label)
+    {
+        outPtr = nullptr;
+        if (!CheckRange(offset, sizeof(T), chunk.Size))
+        {
+            outError = std::string("Chunk ") + label + " struct range is out of bounds";
+            return false;
+        }
+
+        outPtr = reinterpret_cast<const T*>(chunk.Data + static_cast<std::size_t>(offset));
+        return true;
+    }
+
+    template <typename T>
+    static bool MapChunkArray(const CookedChunkView& chunk, std::uint64_t offset, std::uint32_t count, const T*& outPtr, std::string& outError, const char* label)
+    {
+        outPtr = nullptr;
+        const std::uint64_t bytes = static_cast<std::uint64_t>(count) * sizeof(T);
+        if (!CheckRange(offset, bytes, chunk.Size))
+        {
+            outError = std::string("Chunk ") + label + " array range is out of bounds";
+            return false;
+        }
+
+        outPtr = reinterpret_cast<const T*>(chunk.Data + static_cast<std::size_t>(offset));
+        return true;
+    }
+
+    static bool ResolveCookedString(const CookedModelMappedView& mapped, std::uint32_t stringOffset, std::string& outString, std::string& outError)
+    {
+        outString.clear();
+        if (stringOffset >= mapped.StringsChunk.Size)
+        {
+            outError = "Cooked string offset is out of bounds";
+            return false;
+        }
+
+        const char* begin = reinterpret_cast<const char*>(mapped.StringsChunk.Data + stringOffset);
+        const char* end = reinterpret_cast<const char*>(mapped.StringsChunk.Data + mapped.StringsChunk.Size);
+        const char* cursor = begin;
+        while (cursor < end && *cursor != '\0')
+        {
+            ++cursor;
+        }
+
+        if (cursor >= end)
+        {
+            outError = "Cooked string is not null-terminated";
+            return false;
+        }
+
+        outString.assign(begin, cursor);
+        return true;
+    }
+
+    static bool GetChunkViewByType(const CookedModelMappedView& mapped, CookedModelChunkType type, CookedChunkView& outView, std::string& outError)
+    {
+        outView = {};
+        const std::uint32_t typeValue = static_cast<std::uint32_t>(type);
+        for (const CookedModelChunkDesc& desc : mapped.Chunks)
+        {
+            if (desc.Type != typeValue)
+                continue;
+
+            if (!CheckRange(desc.Offset, desc.Size, mapped.FileBytes.size()))
+            {
+                outError = "Chunk payload is out of file bounds";
+                return false;
+            }
+
+            outView.Desc = &desc;
+            outView.Data = mapped.FileBytes.data() + static_cast<std::size_t>(desc.Offset);
+            outView.Size = static_cast<std::size_t>(desc.Size);
+            return true;
+        }
+
+        outError = "Missing required cooked chunk";
+        return false;
+    }
+
+    static bool MapCookedModelBinary(const fs::path& modelBinaryPath, CookedModelMappedView& outMapped, std::string& outError)
+    {
+        outMapped = {};
+        if (!ReadFileBytes(modelBinaryPath, outMapped.FileBytes, outError))
+            return false;
+
+        if (outMapped.FileBytes.size() < sizeof(CookedModelHeader))
+        {
+            outError = "Cooked model file is too small for header";
+            return false;
+        }
+
+        std::memcpy(&outMapped.Header, outMapped.FileBytes.data(), sizeof(CookedModelHeader));
+        if (outMapped.Header.ChunkCount > (std::numeric_limits<std::uint64_t>::max() / sizeof(CookedModelChunkDesc)))
+        {
+            outError = "Cooked chunk table count overflows";
+            return false;
+        }
+
+        const std::uint64_t chunkTableBytes = static_cast<std::uint64_t>(outMapped.Header.ChunkCount) * sizeof(CookedModelChunkDesc);
+        if (!CheckRange(outMapped.Header.ChunkTableOffset, chunkTableBytes, outMapped.FileBytes.size()))
+        {
+            outError = "Cooked chunk table range is out of bounds";
+            return false;
+        }
+
+        outMapped.Chunks.resize(static_cast<std::size_t>(outMapped.Header.ChunkCount));
+        if (!outMapped.Chunks.empty())
+        {
+            std::memcpy(
+                outMapped.Chunks.data(),
+                outMapped.FileBytes.data() + static_cast<std::size_t>(outMapped.Header.ChunkTableOffset),
+                static_cast<std::size_t>(chunkTableBytes));
+        }
+
+        std::string layoutError;
+        if (!ValidateCookedModelLayout(outMapped.Header, outMapped.Chunks, outMapped.FileBytes.size(), &layoutError))
+        {
+            outError = "Cooked model layout validation failed: " + layoutError;
+            return false;
+        }
+
+        if (!GetChunkViewByType(outMapped, CookedModelChunkType::Vertices, outMapped.VerticesChunk, outError)) return false;
+        if (!GetChunkViewByType(outMapped, CookedModelChunkType::IndicesLOD, outMapped.IndicesChunk, outError)) return false;
+        if (!GetChunkViewByType(outMapped, CookedModelChunkType::Meshes, outMapped.MeshesChunk, outError)) return false;
+        if (!GetChunkViewByType(outMapped, CookedModelChunkType::Nodes, outMapped.NodesChunk, outError)) return false;
+        if (!GetChunkViewByType(outMapped, CookedModelChunkType::Materials, outMapped.MaterialsChunk, outError)) return false;
+        if (!GetChunkViewByType(outMapped, CookedModelChunkType::Strings, outMapped.StringsChunk, outError)) return false;
+
+        if (!MapChunkStruct(outMapped.VerticesChunk, 0, outMapped.VertexHeader, outError, "vertices")) return false;
+        if (!MapChunkArray(outMapped.VerticesChunk, outMapped.VertexHeader->PrimitiveTableOffset, outMapped.VertexHeader->PrimitiveCount, outMapped.VertexPrimitiveRecords, outError, "vertices table")) return false;
+        if (!MapChunkArray(outMapped.VerticesChunk, outMapped.VertexHeader->VertexDataOffset, outMapped.VertexHeader->VertexCount, outMapped.Vertices, outError, "vertex stream")) return false;
+
+        if (!MapChunkStruct(outMapped.IndicesChunk, 0, outMapped.IndexHeader, outError, "indices_lod")) return false;
+        if (!MapChunkArray(outMapped.IndicesChunk, outMapped.IndexHeader->LodRecordOffset, outMapped.IndexHeader->LodRecordCount, outMapped.IndexLodRecords, outError, "lod table")) return false;
+        if (!MapChunkArray(outMapped.IndicesChunk, outMapped.IndexHeader->IndexDataOffset, outMapped.IndexHeader->TotalIndexCount, outMapped.IndexData, outError, "index stream")) return false;
+
+        if (!MapChunkStruct(outMapped.MeshesChunk, 0, outMapped.MeshesHeader, outError, "meshes")) return false;
+        if (!MapChunkArray(outMapped.MeshesChunk, outMapped.MeshesHeader->MeshTableOffset, outMapped.MeshesHeader->MeshCount, outMapped.MeshRecords, outError, "mesh table")) return false;
+        if (!MapChunkArray(outMapped.MeshesChunk, outMapped.MeshesHeader->PrimitiveTableOffset, outMapped.MeshesHeader->PrimitiveCount, outMapped.PrimitiveRecords, outError, "primitive table")) return false;
+
+        if (!MapChunkArray(outMapped.NodesChunk, 0, outMapped.NodesChunk.Desc->ElementCount, outMapped.NodeRecords, outError, "node table")) return false;
+
+        if (!MapChunkStruct(outMapped.MaterialsChunk, 0, outMapped.MaterialsHeader, outError, "materials")) return false;
+        if (!MapChunkArray(outMapped.MaterialsChunk, outMapped.MaterialsHeader->MaterialTableOffset, outMapped.MaterialsHeader->MaterialCount, outMapped.MaterialRecords, outError, "material table")) return false;
+        if (!MapChunkArray(outMapped.MaterialsChunk, outMapped.MaterialsHeader->TextureRefTableOffset, outMapped.MaterialsHeader->TextureRefCount, outMapped.TextureRefRecords, outError, "texture ref table")) return false;
+
+        return true;
+    }
+
+    static bool ValidateCookedRuntimeBinary(const fs::path& cookedBinaryPath)
+    {
+        std::error_code ec;
+        const std::uint64_t fileSize = static_cast<std::uint64_t>(fs::file_size(cookedBinaryPath, ec));
+        if (ec || fileSize < sizeof(CookedModelHeader))
+        {
+            std::cerr << "[glTF] Cooked runtime model is missing or too small: " << cookedBinaryPath.string() << "\n";
+            return false;
+        }
+
+        std::ifstream input(cookedBinaryPath, std::ios::binary);
+        if (!input)
+        {
+            std::cerr << "[glTF] Failed to open cooked runtime model: " << cookedBinaryPath.string() << "\n";
+            return false;
+        }
+
+        CookedModelHeader header{};
+        input.read(reinterpret_cast<char*>(&header), static_cast<std::streamsize>(sizeof(CookedModelHeader)));
+        if (!input.good())
+        {
+            std::cerr << "[glTF] Failed to read cooked runtime model header: " << cookedBinaryPath.string() << "\n";
+            return false;
+        }
+
+        const std::uint32_t knownRequiredMask = GetDefaultRequiredChunkMask();
+        const bool hasUnknownRequiredFields = (header.RequiredChunkMask & ~knownRequiredMask) != 0;
+        if (!IsCookedModelVersionSupported(header.VersionMajor, header.VersionMinor, hasUnknownRequiredFields))
+        {
+            std::cerr << "[glTF] Unsupported cooked model version " << header.VersionMajor << "." << header.VersionMinor
+                      << " in " << cookedBinaryPath.string() << "\n";
+            return false;
+        }
+
+        if (header.ChunkCount > (std::numeric_limits<std::uint64_t>::max() / sizeof(CookedModelChunkDesc)))
+        {
+            std::cerr << "[glTF] Cooked model chunk table count overflows: " << cookedBinaryPath.string() << "\n";
+            return false;
+        }
+
+        const std::uint64_t chunkTableBytes = static_cast<std::uint64_t>(header.ChunkCount) * sizeof(CookedModelChunkDesc);
+        if (header.ChunkTableOffset > fileSize || chunkTableBytes > fileSize || header.ChunkTableOffset + chunkTableBytes > fileSize)
+        {
+            std::cerr << "[glTF] Cooked model chunk table is out of bounds: " << cookedBinaryPath.string() << "\n";
+            return false;
+        }
+
+        input.seekg(static_cast<std::streamoff>(header.ChunkTableOffset), std::ios::beg);
+        std::vector<CookedModelChunkDesc> chunks(static_cast<size_t>(header.ChunkCount));
+        if (!chunks.empty())
+        {
+            input.read(reinterpret_cast<char*>(chunks.data()), static_cast<std::streamsize>(chunkTableBytes));
+            if (!input.good())
+            {
+                std::cerr << "[glTF] Failed to read cooked model chunk table: " << cookedBinaryPath.string() << "\n";
+                return false;
+            }
+        }
+
+        std::string validationError;
+        if (!ValidateCookedModelLayout(header, chunks, fileSize, &validationError))
+        {
+            std::cerr << "[glTF] Invalid cooked runtime model layout (" << validationError << "): " << cookedBinaryPath.string() << "\n";
+            return false;
+        }
+
+        return true;
+    }
+
+    static bool ValidateCookedManifestMetadata(const fs::path& cookedManifestPath)
+    {
+        std::ifstream input(cookedManifestPath);
+        if (!input)
+        {
+            std::cerr << "[glTF] Failed to open cooked manifest: " << cookedManifestPath.string() << "\n";
+            return false;
+        }
+
+        nlohmann::json manifest;
+        try
+        {
+            input >> manifest;
+        }
+        catch (const nlohmann::json::exception& ex)
+        {
+            std::cerr << "[glTF] Failed to parse cooked manifest: " << ex.what() << "\n";
+            return false;
+        }
+
+        if (!manifest.contains("runtimeFormat") || !manifest["runtimeFormat"].is_object())
+        {
+            std::cerr << "[glTF] Cooked manifest missing runtimeFormat block: " << cookedManifestPath.string() << "\n";
+            return false;
+        }
+
+        const nlohmann::json& format = manifest["runtimeFormat"];
+        const std::uint16_t versionMajor = format.value("versionMajor", static_cast<std::uint16_t>(0));
+        const std::uint16_t versionMinor = format.value("versionMinor", static_cast<std::uint16_t>(0));
+        const bool hasUnknownRequiredFields = false;
+        if (!IsCookedModelVersionSupported(versionMajor, versionMinor, hasUnknownRequiredFields))
+        {
+            std::cerr << "[glTF] Unsupported cooked manifest version " << versionMajor << "." << versionMinor
+                      << " in " << cookedManifestPath.string() << "\n";
+            return false;
+        }
+
+        if (!manifest.contains("chunkSizes") || !manifest["chunkSizes"].is_object())
+        {
+            std::cerr << "[glTF] Cooked manifest missing chunkSizes block: " << cookedManifestPath.string() << "\n";
+            return false;
+        }
+
+        const nlohmann::json& chunkSizes = manifest["chunkSizes"];
+        constexpr std::array<const char*, 6> kRequiredChunkNames = {
+            "vertices",
+            "indicesLod",
+            "meshes",
+            "nodes",
+            "materials",
+            "strings"
+        };
+
+        for (const char* chunkName : kRequiredChunkNames)
+        {
+            if (!chunkSizes.contains(chunkName))
+            {
+                std::cerr << "[glTF] Cooked manifest missing required chunk entry '" << chunkName
+                          << "': " << cookedManifestPath.string() << "\n";
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    static AlphaMode ConvertCookedAlphaMode(std::uint32_t alphaMode)
+    {
+        switch (alphaMode)
+        {
+        case 1: return AlphaMode::Masked;
+        case 2: return AlphaMode::Blend;
+        default: return AlphaMode::Opaque;
+        }
+    }
+
+    static bool ResolveCookedTextureReferencePath(
+        const CookedModelMappedView& mapped,
+        std::uint32_t textureRefId,
+        std::string& outPath,
+        std::string& outError)
+    {
+        outPath.clear();
+        if (textureRefId == std::numeric_limits<std::uint32_t>::max())
+            return true;
+
+        if (textureRefId >= mapped.MaterialsHeader->TextureRefCount)
+        {
+            outError = "Cooked texture reference index is out of range";
+            return false;
+        }
+
+        const CookedTextureRefRecordDisk& textureRef = mapped.TextureRefRecords[textureRefId];
+        return ResolveCookedString(mapped, textureRef.PathStringOffset, outPath, outError);
+    }
+
+    static std::shared_ptr<Texture> LoadCookedDdsTexture(
+        const std::string& texturePath,
+        TextureLoader& textureLoader,
+        std::unordered_map<std::string, std::shared_ptr<Texture>>& textureCache,
+        std::string& outError)
+    {
+        outError.clear();
+        if (texturePath.empty())
+            return nullptr;
+
+        const auto cacheIt = textureCache.find(texturePath);
+        if (cacheIt != textureCache.end())
+            return cacheIt->second;
+
+        fs::path resolvedPath = fs::path(texturePath);
+        if (!resolvedPath.is_absolute())
+            resolvedPath = fs::path("res") / resolvedPath;
+
+        const std::string ext = resolvedPath.extension().string();
+        if (ext != ".dds" && ext != ".DDS")
+        {
+            outError = "Cooked texture reference is not a DDS file: " + resolvedPath.string();
+            return nullptr;
+        }
+
+        if (!fs::exists(resolvedPath))
+        {
+            outError = "Cooked DDS texture does not exist: " + resolvedPath.string();
+            return nullptr;
+        }
+
+        try
+        {
+            std::shared_ptr<Texture> texture(textureLoader.LoadDDS(resolvedPath.wstring()));
+            if (!texture)
+            {
+                outError = "Failed to create cooked DDS texture resource: " + resolvedPath.string();
+                return nullptr;
+            }
+
+            textureCache.emplace(texturePath, texture);
+            return texture;
+        }
+        catch (const std::exception& ex)
+        {
+            outError = "Failed to load cooked DDS texture: " + resolvedPath.string() + " (" + ex.what() + ")";
+            return nullptr;
+        }
+    }
+
+    static bool CopyCookedIndices(
+        const CookedModelMappedView& mapped,
+        const CookedIndexLodRecordDisk& lodRecord,
+        std::uint32_t primitiveVertexCount,
+        std::vector<UINT>& outIndices,
+        std::string& outError)
+    {
+        outIndices.clear();
+        if (primitiveVertexCount == 0)
+        {
+            outError = "Cooked primitive has zero vertices";
+            return false;
+        }
+
+        if (lodRecord.IndexCount == 0)
+        {
+            outError = "Cooked LOD record has zero indices";
+            return false;
+        }
+
+        if ((lodRecord.IndexCount % 3u) != 0u)
+        {
+            outError = "Cooked LOD record index count is not a triangle multiple";
+            return false;
+        }
+
+        if (lodRecord.IndexOffset > mapped.IndexHeader->TotalIndexCount)
+        {
+            outError = "LOD index offset is out of range";
+            return false;
+        }
+
+        if (lodRecord.IndexCount > mapped.IndexHeader->TotalIndexCount - lodRecord.IndexOffset)
+        {
+            outError = "LOD index range exceeds cooked index stream";
+            return false;
+        }
+
+        outIndices.resize(static_cast<std::size_t>(lodRecord.IndexCount));
+        std::vector<std::uint32_t> indices32(outIndices.size());
+        for (std::size_t i = 0; i < outIndices.size(); ++i)
+        {
+            const std::uint32_t idx = mapped.IndexData[lodRecord.IndexOffset + i];
+            indices32[i] = idx;
+            outIndices[i] = static_cast<UINT>(idx);
+        }
+
+        if (!ValidateIndicesInRange(indices32, primitiveVertexCount))
+        {
+            outError = "LOD index range validation failed against primitive vertex count";
+            outIndices.clear();
+            return false;
+        }
+
+        return true;
+    }
+
+    static std::shared_ptr<ModelAsset> BuildModelAssetFromCooked(
+        const std::string& modelId,
+        const CookedModelMappedView& mapped,
+        std::string& outError)
+    {
+        auto outModel = std::make_shared<ModelAsset>(modelId);
+
+        std::unordered_map<std::string, std::shared_ptr<Texture>> textureCache;
+        TextureLoader textureLoader;
+
+        const std::shared_ptr<Texture> defaultAlbedo = CreateSolidTexture(255, 0, 255, 255);
+        const std::shared_ptr<Texture> defaultNormal = CreateSolidTexture(128, 128, 255, 255);
+        const std::shared_ptr<Texture> defaultAO = CreateSolidTexture(255, 255, 255, 255);
+        const std::shared_ptr<Texture> defaultEmissive = CreateSolidTexture(0, 0, 0, 255);
+
+        for (std::uint32_t materialIndex = 0; materialIndex < mapped.MaterialsHeader->MaterialCount; ++materialIndex)
+        {
+            const CookedMaterialRecordDisk& materialRecord = mapped.MaterialRecords[materialIndex];
+
+            std::string materialName;
+            std::string stringError;
+            if (!ResolveCookedString(mapped, materialRecord.NameStringOffset, materialName, stringError) || materialName.empty())
+                materialName = "material_" + std::to_string(materialIndex);
+
+            auto pbrMaterial = std::make_shared<PBRMaterial>();
+            auto materialTemplate = std::make_shared<MaterialTemplate>();
+
+            pbrMaterial->SetAlbedo({
+                materialRecord.BaseColorFactor[0],
+                materialRecord.BaseColorFactor[1],
+                materialRecord.BaseColorFactor[2] });
+            pbrMaterial->SetBaseColorAlpha(materialRecord.BaseColorFactor[3]);
+            pbrMaterial->SetMetallic(materialRecord.Metallic);
+            pbrMaterial->SetRoughness(materialRecord.Roughness);
+            pbrMaterial->SetEmissive({
+                materialRecord.EmissiveFactor[0],
+                materialRecord.EmissiveFactor[1],
+                materialRecord.EmissiveFactor[2] });
+            pbrMaterial->SetAlphaMode(static_cast<int>(materialRecord.AlphaMode));
+            pbrMaterial->SetAlphaCutoff(materialRecord.AlphaCutoff);
+
+            const AlphaMode alphaMode = ConvertCookedAlphaMode(materialRecord.AlphaMode);
+            materialTemplate->SetBlendPolicy(alphaMode);
+            materialTemplate->SetPassTarget(alphaMode == AlphaMode::Blend ? PassTarget::Transparent : PassTarget::Geometry);
+
+            RasterizerPolicy rasterPolicy;
+            if (materialRecord.DoubleSided != 0)
+                rasterPolicy.CullMode = D3D12_CULL_MODE_NONE;
+            materialTemplate->SetRasterizerPolicy(rasterPolicy);
+
+            auto resolveTextureMap = [&](std::uint32_t textureRefId) -> std::shared_ptr<Texture>
+            {
+                std::string textureRefPath;
+                std::string textureError;
+                if (!ResolveCookedTextureReferencePath(mapped, textureRefId, textureRefPath, textureError))
+                {
+                    std::cerr << "[CookedModel] " << textureError << "\n";
+                    return nullptr;
+                }
+
+                if (textureRefPath.empty())
+                    return nullptr;
+
+                std::shared_ptr<Texture> loadedTexture = LoadCookedDdsTexture(textureRefPath, textureLoader, textureCache, textureError);
+                if (!loadedTexture)
+                    std::cerr << "[CookedModel] " << textureError << "\n";
+                return loadedTexture;
+            };
+
+            std::shared_ptr<Texture> albedoMap = resolveTextureMap(materialRecord.TextureRefIds[0]);
+            pbrMaterial->SetAlbedoMap(albedoMap ? albedoMap : defaultAlbedo, albedoMap != nullptr);
+
+            std::shared_ptr<Texture> normalMap = resolveTextureMap(materialRecord.TextureRefIds[1]);
+            pbrMaterial->SetNormalMap(normalMap ? normalMap : defaultNormal, normalMap != nullptr);
+
+            std::shared_ptr<Texture> metallicRoughnessMap = resolveTextureMap(materialRecord.TextureRefIds[2]);
+            if (metallicRoughnessMap)
+            {
+                pbrMaterial->SetMetallicMap(metallicRoughnessMap);
+                pbrMaterial->SetRoughnessMap(metallicRoughnessMap);
+            }
+            else
+            {
+                const float roughnessClamped = (std::max)(0.0f, (std::min)(1.0f, materialRecord.Roughness));
+                const float metallicClamped = (std::max)(0.0f, (std::min)(1.0f, materialRecord.Metallic));
+                const std::uint8_t roughnessByte = static_cast<std::uint8_t>(roughnessClamped * 255.0f + 0.5f);
+                const std::uint8_t metallicByte = static_cast<std::uint8_t>(metallicClamped * 255.0f + 0.5f);
+                std::shared_ptr<Texture> packedMaterialMap = CreateSolidTexture(0, roughnessByte, metallicByte, 255);
+                pbrMaterial->SetMetallicMap(packedMaterialMap);
+                pbrMaterial->SetRoughnessMap(packedMaterialMap);
+            }
+
+            std::shared_ptr<Texture> aoMap = resolveTextureMap(materialRecord.TextureRefIds[3]);
+            pbrMaterial->SetAOMap(aoMap ? aoMap : defaultAO, aoMap != nullptr);
+
+            std::shared_ptr<Texture> emissiveMap = resolveTextureMap(materialRecord.TextureRefIds[4]);
+            pbrMaterial->SetEmissiveMap(emissiveMap ? emissiveMap : defaultEmissive, emissiveMap != nullptr);
+
+            auto materialAsset = std::make_shared<MaterialAsset>(materialName, pbrMaterial);
+            materialAsset->SetTemplate(materialTemplate);
+            materialAsset->SetAlphaCutoff(materialRecord.AlphaCutoff);
+            materialAsset->SetDoubleSided(materialRecord.DoubleSided != 0);
+            materialAsset->SetAlphaMode(alphaMode);
+
+            outModel->AddMaterial(materialAsset);
+        }
+
+        std::size_t fallbackMaterialIndex = 0;
+        if (outModel->GetMaterialCount() == 0)
+        {
+            auto fallbackPbr = std::make_shared<PBRMaterial>();
+            fallbackPbr->SetAlbedo({ 1.0f, 0.0f, 1.0f });
+            auto fallbackAsset = std::make_shared<MaterialAsset>("default_material", fallbackPbr);
+            fallbackMaterialIndex = outModel->AddMaterial(fallbackAsset);
+        }
+
+        std::vector<const CookedVertexPrimitiveRecordDisk*> vertexRecordsByPrimitive(
+            static_cast<std::size_t>(mapped.MeshesHeader->PrimitiveCount), nullptr);
+
+        for (std::uint32_t i = 0; i < mapped.VertexHeader->PrimitiveCount; ++i)
+        {
+            const CookedVertexPrimitiveRecordDisk& vertexRecord = mapped.VertexPrimitiveRecords[i];
+            if (vertexRecord.PrimitiveIndex >= vertexRecordsByPrimitive.size())
+            {
+                outError = "Cooked vertex primitive mapping references an invalid primitive index";
+                return nullptr;
+            }
+
+            if (vertexRecordsByPrimitive[vertexRecord.PrimitiveIndex] != nullptr)
+            {
+                outError = "Cooked vertex primitive mapping contains duplicate primitive indices";
+                return nullptr;
+            }
+
+            vertexRecordsByPrimitive[vertexRecord.PrimitiveIndex] = &vertexRecord;
+        }
+
+        for (std::uint32_t meshIndex = 0; meshIndex < mapped.MeshesHeader->MeshCount; ++meshIndex)
+        {
+            const CookedMeshRecordDisk& meshRecord = mapped.MeshRecords[meshIndex];
+
+            std::string meshName;
+            std::string stringError;
+            if (!ResolveCookedString(mapped, meshRecord.NameStringOffset, meshName, stringError) || meshName.empty())
+                meshName = "mesh_" + std::to_string(meshIndex);
+
+            if (meshRecord.PrimitiveStart > mapped.MeshesHeader->PrimitiveCount ||
+                meshRecord.PrimitiveCount > mapped.MeshesHeader->PrimitiveCount - meshRecord.PrimitiveStart)
+            {
+                outError = "Cooked mesh primitive range is out of bounds";
+                return nullptr;
+            }
+
+            auto meshAsset = std::make_shared<MeshAsset>(meshName);
+
+            for (std::uint32_t localPrimitive = 0; localPrimitive < meshRecord.PrimitiveCount; ++localPrimitive)
+            {
+                const std::uint32_t globalPrimitiveIndex = meshRecord.PrimitiveStart + localPrimitive;
+                const CookedPrimitiveRecordDisk& primitiveRecord = mapped.PrimitiveRecords[globalPrimitiveIndex];
+
+                const CookedVertexPrimitiveRecordDisk* vertexRecord = vertexRecordsByPrimitive[globalPrimitiveIndex];
+                if (!vertexRecord)
+                {
+                    outError = "Cooked primitive is missing a vertex stream mapping";
+                    return nullptr;
+                }
+
+                if (vertexRecord->VertexOffset != primitiveRecord.VertexOffset ||
+                    vertexRecord->VertexCount != primitiveRecord.VertexCount)
+                {
+                    outError = "Cooked primitive vertex range mismatch between mesh and vertex chunks";
+                    return nullptr;
+                }
+
+                if (primitiveRecord.VertexOffset > mapped.VertexHeader->VertexCount ||
+                    primitiveRecord.VertexCount > mapped.VertexHeader->VertexCount - primitiveRecord.VertexOffset)
+                {
+                    outError = "Cooked primitive vertex range is out of bounds";
+                    return nullptr;
+                }
+                if (primitiveRecord.VertexCount == 0)
+                {
+                    outError = "Cooked primitive has zero vertices";
+                    return nullptr;
+                }
+
+                if (primitiveRecord.LodStart > mapped.IndexHeader->LodRecordCount ||
+                    primitiveRecord.LodCount > mapped.IndexHeader->LodRecordCount - primitiveRecord.LodStart)
+                {
+                    outError = "Cooked primitive LOD range is out of bounds";
+                    return nullptr;
+                }
+
+                std::vector<Vertex> vertices(primitiveRecord.VertexCount);
+                std::memcpy(
+                    vertices.data(),
+                    mapped.Vertices + primitiveRecord.VertexOffset,
+                    vertices.size() * sizeof(Vertex));
+
+                const CookedIndexLodRecordDisk* baseLod = nullptr;
+                std::vector<const CookedIndexLodRecordDisk*> extraLods;
+
+                for (std::uint32_t lodIndex = 0; lodIndex < primitiveRecord.LodCount; ++lodIndex)
+                {
+                    const CookedIndexLodRecordDisk& lodRecord = mapped.IndexLodRecords[primitiveRecord.LodStart + lodIndex];
+                    if (lodRecord.PrimitiveIndex != globalPrimitiveIndex)
+                    {
+                        outError = "Cooked LOD record primitive mapping mismatch";
+                        return nullptr;
+                    }
+
+                    if (lodRecord.LodLevel == 0 && !baseLod)
+                        baseLod = &lodRecord;
+                    else
+                        extraLods.push_back(&lodRecord);
+                }
+
+                if (!baseLod)
+                {
+                    outError = "Cooked primitive is missing LOD0 index data";
+                    return nullptr;
+                }
+
+                std::vector<UINT> baseIndices;
+                if (!CopyCookedIndices(mapped, *baseLod, primitiveRecord.VertexCount, baseIndices, outError))
+                    return nullptr;
+
+                std::size_t materialIndex = primitiveRecord.MaterialIndex;
+                if (materialIndex >= outModel->GetMaterialCount())
+                    materialIndex = fallbackMaterialIndex;
+
+                auto baseVertexBuffer = ResourceManager::GetInstance().CreateVertexBuffer(vertices);
+                if (!baseVertexBuffer)
+                {
+                    outError = "Failed to create GPU vertex buffer for cooked primitive";
+                    return nullptr;
+                }
+
+                auto baseIndexBuffer = ResourceManager::GetInstance().CreateIndexBuffer(baseIndices);
+                if (!baseIndexBuffer)
+                {
+                    outError = "Failed to create GPU index buffer for cooked primitive LOD0";
+                    return nullptr;
+                }
+
+                MeshPrimitive primitive(
+                    std::move(baseVertexBuffer),
+                    std::move(baseIndexBuffer),
+                    static_cast<UINT>(baseIndices.size()),
+                    0,
+                    0,
+                    static_cast<UINT>(materialIndex));
+                primitive.SetBounds({ primitiveRecord.Min, primitiveRecord.Max });
+
+                for (const CookedIndexLodRecordDisk* extraLod : extraLods)
+                {
+                    if (!extraLod || extraLod->LodLevel == 0)
+                        continue;
+
+                    std::vector<UINT> lodIndices;
+                    if (!CopyCookedIndices(mapped, *extraLod, primitiveRecord.VertexCount, lodIndices, outError))
+                        return nullptr;
+
+                    std::unique_ptr<IndexBuffer> lodIndexBuffer = ResourceManager::GetInstance().CreateIndexBuffer(lodIndices);
+                    if (!lodIndexBuffer)
+                    {
+                        outError = "Failed to create GPU index buffer for cooked LOD";
+                        return nullptr;
+                    }
+
+                    primitive.AddLODBuffer(std::move(lodIndexBuffer), static_cast<UINT>(lodIndices.size()), extraLod->Ratio, extraLod->Error);
+                }
+                primitive.SetActiveLOD(0);
+                meshAsset->AddPrimitive(std::move(primitive));
+            }
+            outModel->AddMesh(meshAsset);
+        }
+
+        const std::size_t nodeCount = mapped.NodesChunk.Desc ? mapped.NodesChunk.Desc->ElementCount : 0;
+        for (std::size_t nodeIndex = 0; nodeIndex < nodeCount; ++nodeIndex)
+        {
+            const CookedNodeRecordDisk& nodeRecord = mapped.NodeRecords[nodeIndex];
+
+            ModelNode node;
+            std::string nodeName;
+            std::string stringError;
+            if (ResolveCookedString(mapped, nodeRecord.NameStringOffset, nodeName, stringError) && !nodeName.empty())
+                node.Name = nodeName;
+            else
+                node.Name = "node_" + std::to_string(nodeIndex);
+
+            if (nodeRecord.ParentIndex >= 0 && static_cast<std::size_t>(nodeRecord.ParentIndex) < nodeCount)
+                node.ParentIndex = nodeRecord.ParentIndex;
+            else
+                node.ParentIndex = -1;
+
+            if (nodeRecord.MeshIndex >= 0 && static_cast<std::size_t>(nodeRecord.MeshIndex) < outModel->GetMeshCount())
+                node.MeshIndex = nodeRecord.MeshIndex;
+            else
+                node.MeshIndex = -1;
+
+            std::memcpy(&node.LocalTransform, nodeRecord.LocalTransform.data(), sizeof(node.LocalTransform));
+            outModel->AddNode(node);
+        }
+        return outModel;
+    }
+
+    std::shared_ptr<ModelAsset> ModelLoader::LoadCookedModel(const std::string& modelId)
+    {
+        if (modelId.empty())
+        {
+            std::cerr << "[CookedModel] Cannot load cooked model with an empty model id.\n";
+            return nullptr;
+        }
+
+        const fs::path cookedModelRoot = fs::path(ResourceManager::GetCookedModelPath(modelId));
+        const fs::path cookedBinaryPath = cookedModelRoot / "model.dxmd";
+        if (!fs::exists(cookedBinaryPath))
+        {
+            std::cerr << "[CookedModel] Cooked model binary is missing for model id '" << modelId
+                      << "' at " << cookedBinaryPath.string() << "\n";
+            return nullptr;
+        }
+
+        const fs::path cookedManifestPath = cookedModelRoot / "manifest.json";
+        if (fs::exists(cookedManifestPath) && !ValidateCookedManifestMetadata(cookedManifestPath))
+        {
+            std::cerr << "[CookedModel] Cooked manifest metadata validation failed for " << cookedManifestPath.string() << "\n";
+            return nullptr;
+        }
+
+        CookedModelMappedView mapped;
+        std::string mapError;
+        if (!MapCookedModelBinary(cookedBinaryPath, mapped, mapError))
+        {
+            std::cerr << "[CookedModel] Failed to map cooked model binary: " << mapError << "\n";
+            return nullptr;
+        }
+
+        std::string buildError;
+        std::shared_ptr<ModelAsset> cookedModel = BuildModelAssetFromCooked(modelId, mapped, buildError);
+        if (!cookedModel)
+        {
+            std::cerr << "[CookedModel] Failed to build runtime model from cooked chunks: " << buildError << "\n";
+            return nullptr;
+        }
+
+        ValidateAndLogCooked(modelId, mapped, *cookedModel);
+
+        return cookedModel;
+    }
+
     void ModelLoader::TryApplyCookedMeshLods(const std::string& modelName, ModelAsset& modelAsset)
     {
         const fs::path lodManifestPath = fs::path(ResourceManager::GetCookedModelLodsPath(modelName));
-        if (!fs::exists(lodManifestPath))
+        if (!fs::exists(lodManifestPath)) return;
+
+        const fs::path cookedManifestPath = lodManifestPath.parent_path() / "manifest.json";
+        if (fs::exists(cookedManifestPath) && !ValidateCookedManifestMetadata(cookedManifestPath))
         {
+            std::cerr << "[glTF] Skipping cooked LOD application due to invalid manifest metadata.\n";
+            return;
+        }
+
+        const fs::path cookedBinaryPath = lodManifestPath.parent_path() / "model.dxmd";
+        if (fs::exists(cookedBinaryPath) && !ValidateCookedRuntimeBinary(cookedBinaryPath))
+        {
+            std::cerr << "[glTF] Skipping cooked LOD application due to invalid runtime binary validation.\n";
             return;
         }
 
@@ -1118,6 +2254,22 @@ namespace DX12Engine
             MeshPrimitive* primitive = meshAsset->GetPrimitive(static_cast<size_t>(primRecord.primitiveIndex));
             if (!primitive || !primitive->HasGeometry()) continue;
 
+            if (!primRecord.skipped && primRecord.lods.empty())
+            {
+                std::cerr << "[glTF] Missing required LOD entries for mesh " << primRecord.meshIndex
+                          << " primitive " << primRecord.primitiveIndex << " in " << lodManifestPath.string() << "\n";
+                continue;
+            }
+
+            if (primRecord.vertexCount == 0 || primRecord.vertexCount > static_cast<std::uint64_t>(std::numeric_limits<UINT>::max()))
+            {
+                std::cerr << "[glTF] Invalid cooked vertexCount for mesh " << primRecord.meshIndex
+                          << " primitive " << primRecord.primitiveIndex << " in " << lodManifestPath.string() << "\n";
+                continue;
+            }
+
+            const UINT primitiveVertexCount = static_cast<UINT>(primRecord.vertexCount);
+
             primitive->ClearAdditionalLODs();
             for (const CookedLodLevelRecord& lodRecord : primRecord.lods)
             {
@@ -1128,9 +2280,37 @@ namespace DX12Engine
                     lodBinaryPath = "res" / lodBinaryPath;
 
                 std::vector<UINT> lodIndices;
-                if (!ReadCookedIndexBuffer(lodBinaryPath, lodIndices))
+                std::uint64_t lodFileBytes = 0;
+                if (!ReadCookedIndexBuffer(lodBinaryPath, lodIndices, lodFileBytes))
                 {
                     std::cerr << "[glTF] Failed to read cooked LOD indices: " << lodBinaryPath.string() << "\n";
+                    continue;
+                }
+
+                if (lodRecord.indexCount != 0 && lodRecord.indexCount != lodIndices.size())
+                {
+                    std::cerr << "[glTF] LOD index count mismatch for " << lodBinaryPath.string()
+                              << " (declared=" << lodRecord.indexCount << ", actual=" << lodIndices.size() << ")\n";
+                    continue;
+                }
+
+                const std::uint64_t expectedBytes = static_cast<std::uint64_t>(lodIndices.size()) * sizeof(UINT);
+                if (expectedBytes != lodFileBytes)
+                {
+                    std::cerr << "[glTF] LOD binary size validation failed for " << lodBinaryPath.string() << "\n";
+                    continue;
+                }
+
+                if (lodIndices.empty())
+                {
+                    std::cerr << "[glTF] Skipping empty cooked LOD index buffer for " << lodBinaryPath.string() << "\n";
+                    continue;
+                }
+
+                if (!ValidateIndicesInRange(lodIndices, primitiveVertexCount))
+                {
+                    std::cerr << "[glTF] LOD index range validation failed for " << lodBinaryPath.string()
+                              << " (vertexCount=" << primitiveVertexCount << ")\n";
                     continue;
                 }
 
@@ -1154,8 +2334,40 @@ namespace DX12Engine
     // Public entry point
     // -------------------------------------------------------------------------
 
+    void ModelLoader::SetCookedFallbackMode(CookedFallbackMode mode)
+    {
+        g_CookedFallbackMode = mode;
+    }
+
+    ModelLoader::CookedFallbackMode ModelLoader::GetCookedFallbackMode()
+    {
+        return g_CookedFallbackMode;
+    }
+
     std::shared_ptr<ModelAsset> ModelLoader::LoadGlb(const std::string& filename)
     {
+        const std::string modelId = DeriveModelIdFromPath(filename);
+        const bool allowGlbFallback = ShouldAllowGlbFallback(GetCookedFallbackMode());
+
+        if (!modelId.empty())
+        {
+            std::shared_ptr<ModelAsset> cookedModel = LoadCookedModel(modelId);
+            if (cookedModel)
+            {
+                std::cout << "[CookedModel] Loaded cooked model: " << modelId << "\n";
+                return cookedModel;
+            }
+
+            if (!allowGlbFallback)
+            {
+                std::cerr << "[CookedModel] Strict cooked loading is enabled and cooked load failed for model '"
+                          << modelId << "'. Aborting without glTF fallback.\n";
+                return nullptr;
+            }
+
+            std::cerr << "[CookedModel] Falling back to source glTF load for model '" << modelId << "'.\n";
+        }
+
         tinygltf::Model glbModel;
         tinygltf::TinyGLTF loader;
         std::string err;
@@ -1173,13 +2385,7 @@ namespace DX12Engine
         }
 
         // Derive model name from filename.
-        std::string modelName = filename;
-        size_t slash = modelName.find_last_of("/\\");
-        if (slash != std::string::npos)
-            modelName = modelName.substr(slash + 1);
-        size_t dot = modelName.rfind('.');
-        if (dot != std::string::npos)
-            modelName = modelName.substr(0, dot);
+        const std::string modelName = modelId.empty() ? DeriveModelIdFromPath(filename) : modelId;
 
         GltfImportContext ctx{ glbModel, std::make_shared<ModelAsset>(modelName) };
         ctx.nodeMap.assign(glbModel.nodes.size(), -1);

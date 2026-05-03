@@ -11,6 +11,8 @@ set(_patterns
     "*.hdr"
     "*.tif"
     "*.tiff"
+    "*.glb"
+    "*.GLB"
 )
 
 foreach(_pattern IN LISTS _patterns)

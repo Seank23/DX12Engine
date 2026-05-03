@@ -6,6 +6,7 @@ add_executable(AssetCooker ${ASSET_COOKER_SOURCES})
 target_link_libraries(AssetCooker PRIVATE DirectXTex meshoptimizer)
 target_compile_features(AssetCooker PRIVATE cxx_std_20)
 target_include_directories(AssetCooker PRIVATE
+    ${CMAKE_SOURCE_DIR}/src
     ${tinygltf_SOURCE_DIR}
     ${meshoptimizer_SOURCE_DIR}/src
 )

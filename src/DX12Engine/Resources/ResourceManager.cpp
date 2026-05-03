@@ -5,6 +5,8 @@
 #include "../Utils/Constants.h"
 #include "UploadResourceWrapper.h"
 #include <filesystem>
+#include <iostream>
+#include <limits>
 
 namespace DX12Engine
 {
@@ -60,6 +62,18 @@ namespace DX12Engine
 
 	std::unique_ptr<VertexBuffer> ResourceManager::CreateVertexBuffer(const std::vector<Vertex>& vertices)
 	{
+		if (vertices.empty())
+		{
+			std::cerr << "[ResourceManager] Refusing to create vertex buffer with zero vertices.\n";
+			return nullptr;
+		}
+
+		if (vertices.size() > (std::numeric_limits<UINT>::max)() / sizeof(Vertex))
+		{
+			std::cerr << "[ResourceManager] Vertex buffer is too large for 32-bit byte size.\n";
+			return nullptr;
+		}
+
 		const UINT vertexBufferSize = sizeof(Vertex) * vertices.size();
 
 		ID3D12Resource* vertexBufferResource = nullptr;
@@ -87,7 +101,7 @@ namespace DX12Engine
 		auto vertexBuffer = std::make_unique<VertexBuffer>(vertexBufferResource, D3D12_RESOURCE_STATE_COPY_DEST, sizeof(Vertex), vertexBufferSize);
 
 		D3D12_SUBRESOURCE_DATA vertexData = {};
-		vertexData.pData = &vertices[0];
+		vertexData.pData = vertices.data();
 		vertexData.RowPitch = vertexBufferSize;
 		vertexData.SlicePitch = vertexData.RowPitch;
 
@@ -104,6 +118,18 @@ namespace DX12Engine
 
 	std::unique_ptr<IndexBuffer> ResourceManager::CreateIndexBuffer(const std::vector<UINT>& indices)
 	{
+		if (indices.empty())
+		{
+			std::cerr << "[ResourceManager] Refusing to create index buffer with zero indices.\n";
+			return nullptr;
+		}
+
+		if (indices.size() > (std::numeric_limits<UINT>::max)() / sizeof(UINT))
+		{
+			std::cerr << "[ResourceManager] Index buffer is too large for 32-bit byte size.\n";
+			return nullptr;
+		}
+
 		const UINT indexBufferSize = sizeof(UINT) * indices.size();
 
 		ID3D12Resource* indexBufferResource = nullptr;
@@ -131,7 +157,7 @@ namespace DX12Engine
 		auto indexBuffer = std::make_unique<IndexBuffer>(indexBufferResource, D3D12_RESOURCE_STATE_COPY_DEST, DXGI_FORMAT_R32_UINT, indexBufferSize);
 
 		D3D12_SUBRESOURCE_DATA indexData = {};
-		indexData.pData = &indices[0];
+		indexData.pData = indices.data();
 		indexData.RowPitch = indexBufferSize;
 		indexData.SlicePitch = indexData.RowPitch;
 
