@@ -4,6 +4,7 @@
 namespace DX12Engine
 {
 	class ConstantBuffer;
+	class UISystem;
 
 	class UIRenderPass : public RenderPass
 	{
@@ -15,8 +16,12 @@ namespace DX12Engine
 		void Execute() override;
 		std::shared_ptr<RenderTexture> GetRenderTarget(ResourceSlot type) override;
 
+		void SetUISystem(UISystem* uiSystem) { m_UISystem = uiSystem; }
+
 	private:
 		void CreatePSO() override;
+		
+		UISystem* m_UISystem;
 	};
 }
 

@@ -13,6 +13,7 @@
 namespace DX12Engine
 {
 	class GameObject;
+	class UISystem;
 	struct ResolvedPrimitiveBinding;
 	struct RenderPipelineConfig;
 	enum class RenderPassType;
@@ -45,6 +46,7 @@ namespace DX12Engine
 		RenderPipeline CreateRenderPipeline(RenderPipelineConfig config);
 
 		void SetCurrentScene(Scene* scene) { m_CurrentScene = scene; }
+		void SetUISystem(UISystem* uiSystem) { m_UISystem = uiSystem; }
 
 		D3D12_VIEWPORT GetDefaultViewport();
 		D3D12_RECT GetDefaultScissorRect();
@@ -73,6 +75,8 @@ namespace DX12Engine
 
 		Microsoft::WRL::ComPtr<ID3D12RootSignature> m_RootSignature;
 		Microsoft::WRL::ComPtr<ID3D12PipelineState> m_PipelineState;
+
+		UISystem* m_UISystem;
 
 		RendererOptions m_Options;
 		std::unique_ptr<ConstantBuffer> m_PostProcessingCB;

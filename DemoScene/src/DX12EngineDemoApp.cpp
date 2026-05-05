@@ -6,12 +6,19 @@
 #include "ComplexDemoScene.h"
 #include "DX12Engine/Rendering/RenderPipelineConfig.h"
 #include "DX12Engine/Rendering/PipelineBuilder.h"
+#include "DX12Engine/UI/UIContext.h"
 
 namespace DX12EngineDemo
 {
 	DX12EngineDemoApp::DX12EngineDemoApp()
 		: Application()
 	{
+	}
+
+	DX12EngineDemoApp::~DX12EngineDemoApp()
+	{
+		if (m_UISystem)
+			m_UISystem->Shutdown();
 	}
 
 	void DX12EngineDemoApp::Init(std::shared_ptr<DX12Engine::RenderContext> renderContext, DirectX::XMFLOAT2 windowSize)
@@ -30,7 +37,18 @@ namespace DX12EngineDemo
 		m_Scene->Init();
 		m_Renderer->SetCurrentScene(m_Scene.get());
 
-		m_InputHandler = std::make_unique<DemoInputHandler>();
+		m_UISystem = std::make_shared<DX12Engine::UISystem>();
+		DX12Engine::UIConfig uiConfig;
+		uiConfig.EngineRenderContext = m_RenderContext.get();
+		uiConfig.WindowHandle = m_RenderContext->GetWindowHandle();
+		uiConfig.EnableRuntimeUI = true;
+		uiConfig.EnableDebugUI = true;
+		uiConfig.InitialWidth = static_cast<uint32_t>(windowSize.x);
+		uiConfig.InitialHeight = static_cast<uint32_t>(windowSize.y);
+		m_UISystem->Initialize(uiConfig);
+		m_Renderer->SetUISystem(m_UISystem.get());
+
+		m_InputHandler = std::make_unique<DemoInputHandler>(m_UISystem);
 		m_InputHandler->SetCamera(m_Scene->GetCamera());
 
 		auto shadowCastingLights = m_Scene->GetLightBuffer()->GetLightsByType({ DX12Engine::LightType::Spot });
@@ -124,6 +142,11 @@ namespace DX12EngineDemo
 		transparentConfig.ResourceBindings.push_back({ DX12Engine::InputResourceType::SceneColor, DX12Engine::PipelineResource::SceneColor, compositeType });
 		transparentConfig.Writes.push_back({ DX12Engine::PipelineResource::SceneColor });
 
+		DX12Engine::RenderPassConfig uiPassConfig;
+		uiPassConfig.Type = DX12Engine::RenderPassType::UI;
+		uiPassConfig.ResourceBindings.push_back({ DX12Engine::InputResourceType::SceneColor, DX12Engine::PipelineResource::SceneColor, compositeType });
+		uiPassConfig.Writes.push_back({ DX12Engine::PipelineResource::SceneColor });
+
 		DX12Engine::PipelineBuilder builder;
 		builder.AddPass(shadowMapConfig)
 			.AddPass(cubeShadowMapConfig)
@@ -132,22 +155,33 @@ namespace DX12EngineDemo
 			.AddPass(lightingConfig)
 			.AddPass(ssrConfig)
 			.AddPassIf(options.AA_Mode == DX12Engine::AntiAliasingMode::TAA, taaConfig)
-			.AddPass(transparentConfig);
+			.AddPass(transparentConfig)
+			.AddPass(uiPassConfig);
 
 		m_RenderPipeline = m_Renderer->CreateRenderPipeline(builder.Build());
 	}
 
 	void DX12EngineDemoApp::Update(float ts, float elapsed)
 	{
+		m_UISystem->BeginFrame({ ts, elapsed, 0, static_cast<uint32_t>(m_RenderContext->GetWindowSize().x), static_cast<uint32_t>(m_RenderContext->GetWindowSize().y) });
+
 		m_InputHandler->ProcessInput(ts);
 		m_PhysicsEngine->Update(ts, elapsed);
 		m_Scene->Update(ts, elapsed);
 		m_Scene->GetLightBuffer()->Update();
 		m_Renderer->ExecutePipeline(m_RenderPipeline, ts);
+
+		m_UISystem->EndFrame();
 	}
 
 	void DX12EngineDemoApp::HandleWindowEvent(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 	{
+		if (m_UISystem->IsInitialized())
+		{
+			if (m_UISystem->HandleWindowEvent(hwnd, uMsg, wParam, lParam))
+				return;
+		}
+
 		switch (uMsg)
 		{
 		case WM_SIZE:
@@ -171,7 +205,11 @@ namespace DX12EngineDemo
 	{
 		if (m_RenderContext)
 			m_RenderContext->SetWindowSize({ static_cast<int>(newSize.x), static_cast<int>(newSize.y) });
+
 		if (m_Scene)
 			m_Scene->OnResize(newSize);
+
+		if (m_UISystem->IsInitialized())
+			m_UISystem->OnResize(static_cast<uint32_t>(newSize.x), static_cast<uint32_t>(newSize.y));
 	}
 }

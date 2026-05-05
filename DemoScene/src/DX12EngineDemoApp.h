@@ -7,6 +7,7 @@
 #include "DX12Engine/Rendering/Renderer.h"
 #include "DX12Engine/Physics/PhysicsEngine.h"
 #include "DX12Engine/Entity/Scene.h"
+#include "DX12Engine/UI/UISystem.h"
 #include "Input/DemoInputHandler.h"
 
 namespace DX12EngineDemo
@@ -15,7 +16,7 @@ namespace DX12EngineDemo
 	{
 	public:
 		DX12EngineDemoApp();
-		~DX12EngineDemoApp() = default;
+		~DX12EngineDemoApp();
 
 		void Init(std::shared_ptr<DX12Engine::RenderContext> renderContext, DirectX::XMFLOAT2 windowSize) override;
 		void Update(float ts, float elapsed) override;
@@ -30,5 +31,6 @@ namespace DX12EngineDemo
 		DX12Engine::RenderPipeline m_RenderPipeline;
 
 		std::shared_ptr<DX12Engine::PhysicsEngine> m_PhysicsEngine;
+		std::shared_ptr<DX12Engine::UISystem> m_UISystem;
 	};
 }

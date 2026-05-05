@@ -476,7 +476,7 @@ namespace DX12Engine
 		DescriptorHeapHandle srvHandle = m_HeapManager->AllocatePersistentSRV();
 		m_Device->CreateShaderResourceView(depthMapResource, &srvDesc, srvHandle.GetCPUHandle());
 
-		auto renderTexture = std::make_unique<RenderTexture>(depthMapResource, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, dsvDescriptors, srvDesc, isCubeMap);
+		auto renderTexture = std::make_unique<RenderTexture>(depthMapResource, dsvFormat, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, dsvDescriptors, srvDesc, isCubeMap);
 		renderTexture->SetTransientDescriptor(srvHandle);
 		renderTexture->SetPersistentDescriptor(srvHandle);
 		return renderTexture;
@@ -530,7 +530,7 @@ namespace DX12Engine
 		DescriptorHeapHandle srvHandle = m_HeapManager->AllocatePersistentSRV();
 		m_Device->CreateShaderResourceView(renderTargetResource, &srvDesc, srvHandle.GetCPUHandle());
 
-		auto renderTexture = std::make_unique<RenderTexture>(renderTargetResource, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, rtvDescriptors, srvDesc, false, clearColor);
+		auto renderTexture = std::make_unique<RenderTexture>(renderTargetResource, format, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, rtvDescriptors, srvDesc, false, clearColor);
 		renderTexture->SetTransientDescriptor(srvHandle);
 		renderTexture->SetPersistentDescriptor(srvHandle);
 		return renderTexture;

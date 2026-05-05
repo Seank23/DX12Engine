@@ -3,11 +3,12 @@
 #include <cstdio>
 #include "InputController.h"
 #include "Camera.h"
+#include "../UI/UISystem.h"
 
 namespace DX12Engine
 {
-	InputHandler::InputHandler()
-		: m_Camera(nullptr)
+	InputHandler::InputHandler(std::shared_ptr<UISystem> uiSystem)
+		: m_Camera(nullptr), m_UISystem(uiSystem)
 	{
 		m_CommandMap = {
 			{ InputCommand::MoveForward,  'W'},
@@ -27,7 +28,7 @@ namespace DX12Engine
 
 	void InputHandler::ProcessInput(float deltaTime)
 	{
-		if (!m_Camera) return;
+		if (!m_Camera || m_UISystem->WantsKeyboardCapture()) return;
 		for (const auto& [command, key] : m_CommandMap)
 		{
 			if (InputController::IsKeyPressed(key))
@@ -39,6 +40,8 @@ namespace DX12Engine
 
 	void InputHandler::HandleMouseMovement(HWND hwnd, LPARAM lParam)
 	{
+		if (m_UISystem->WantsMouseCapture()) return;
+
 		int mouseX = GET_X_LPARAM(lParam);
 		int mouseY = GET_Y_LPARAM(lParam);
 

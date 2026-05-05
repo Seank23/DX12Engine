@@ -16,6 +16,7 @@
 #include "../Entity/RenderComponent.h"
 #include "../Asset/MeshPrimitive.h"
 #include "DrawItem.h"
+#include "../UI/UISystem.h"
 
 #include <array>
 #include <algorithm>
@@ -307,8 +308,9 @@ namespace DX12Engine
 						}
 						break;
 					}
-					case RenderPassType::ScreenSpaceReflection:
 					case RenderPassType::UI:
+						if (m_UISystem)
+							static_cast<UIRenderPass*>(renderPass)->SetUISystem(m_UISystem);
 						break;
 					}
 

@@ -3,6 +3,8 @@
 #include "../RenderContext.h"
 #include "../PipelineStateBuilder.h"
 #include "../RootSignatureBuilder.h"
+#include "../../UI/UISystem.h"
+#include "../../UI/UIContext.h"
 
 
 namespace DX12Engine
@@ -21,65 +23,97 @@ namespace DX12Engine
 	{
 		RenderPass::Init();
 
-		m_VertexShaderName = m_VertexShaderName.empty() ? "RenderTriangle_VS" : m_VertexShaderName;
-
 		DirectX::XMINT2 renderSize = m_RenderContext.GetRenderSize();
-		m_RenderTargets.emplace_back(ResourceManager::GetInstance().CreateRenderTargetTexture(renderSize, DXGI_FORMAT_R8G8B8A8_UNORM));
-		ResourceManager::GetInstance().UpdateSRVDescriptors(reinterpret_cast<std::vector<GPUResource*> const&>(m_RenderTargets));
+		DXGI_FORMAT targetFormat = DXGI_FORMAT_R8G8B8A8_UNORM;
+		if (!m_InputResources.empty())
+		{
+			if (RenderTexture* sceneSource = dynamic_cast<RenderTexture*>(m_InputResources[0].get()))
+				targetFormat = sceneSource->GetFormat();
+		}
+		m_RenderTargets.emplace_back(ResourceManager::GetInstance().CreateRenderTargetTexture(renderSize, targetFormat));
 
-		m_Viewport = { 0.0f, 0.0f, (float)renderSize.x, (float)renderSize.y, -1.0f, 1.0f };
+		m_Viewport = { 0.0f, 0.0f, (float)renderSize.x, (float)renderSize.y, 0.0f, 1.0f };
 		m_ScissorRect = { 0, 0, (LONG)renderSize.x, (LONG)renderSize.y };
-
-		CreatePSO();
 	}
 
 	void UIRenderPass::Execute()
 	{
 		RenderPass::Execute();
-		RenderTexture* renderTarget = m_RenderTargets[0].get();
+		if (m_RenderTargets.empty())
+			return;
 
-		m_CommandList.SetPipelineState(m_PipelineState.Get());
-		m_CommandList.SetGraphicsRootSignature(m_RootSignature.Get());
+		RenderTexture* renderTarget = m_RenderTargets[0].get();
+		RenderTexture* sceneSource = nullptr;
+		if (!m_InputResources.empty())
+			sceneSource = dynamic_cast<RenderTexture*>(m_InputResources[0].get());
 
 		m_CommandList.RSSetViewports(1, &m_Viewport);
 		m_CommandList.RSSetScissorRects(1, &m_ScissorRect);
 
-		auto barrier = CD3DX12_RESOURCE_BARRIER::Transition(
+		std::vector<D3D12_RESOURCE_BARRIER> barriers;
+		bool copiedSceneColor = false;
+		if (sceneSource && sceneSource->GetResource()->GetDesc().Format == renderTarget->GetResource()->GetDesc().Format)
+		{
+			barriers.push_back(CD3DX12_RESOURCE_BARRIER::Transition(
+				sceneSource->GetResource(),
+				sceneSource->GetUsageState(),
+				D3D12_RESOURCE_STATE_COPY_SOURCE));
+			sceneSource->SetUsageState(D3D12_RESOURCE_STATE_COPY_SOURCE);
+			barriers.push_back(CD3DX12_RESOURCE_BARRIER::Transition(
+				renderTarget->GetResource(),
+				renderTarget->GetUsageState(),
+				D3D12_RESOURCE_STATE_COPY_DEST));
+			renderTarget->SetUsageState(D3D12_RESOURCE_STATE_COPY_DEST);
+			m_CommandList.ResourceBarrier(static_cast<UINT>(barriers.size()), barriers.data());
+			m_CommandList.CopyResource(renderTarget->GetResource(), sceneSource->GetResource());
+			copiedSceneColor = true;
+
+			barriers.clear();
+			barriers.push_back(CD3DX12_RESOURCE_BARRIER::Transition(
+				sceneSource->GetResource(),
+				sceneSource->GetUsageState(),
+				D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE));
+			sceneSource->SetUsageState(D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+		}
+
+		barriers.push_back(CD3DX12_RESOURCE_BARRIER::Transition(
 			renderTarget->GetResource(),
 			renderTarget->GetUsageState(),
-			D3D12_RESOURCE_STATE_RENDER_TARGET
-		);
-		m_CommandList.ResourceBarrier(1, &barrier);
+			D3D12_RESOURCE_STATE_RENDER_TARGET));
 		renderTarget->SetUsageState(D3D12_RESOURCE_STATE_RENDER_TARGET);
+		m_CommandList.ResourceBarrier(static_cast<UINT>(barriers.size()), barriers.data());
 
 		D3D12_CPU_DESCRIPTOR_HANDLE rtvHandle = renderTarget->GetTextureDescriptor().GetCPUHandle();
 		m_CommandList.OMSetRenderTargets(1, &rtvHandle, FALSE, nullptr);
 
-		const float clearColor[] = { 0.0f, 0.0f, 0.0f, 1.0f };
-		m_CommandList.ClearRenderTargetView(rtvHandle, clearColor, 0, nullptr);
+		if (!copiedSceneColor)
+		{
+			DirectX::XMFLOAT4 clear = renderTarget->GetClearColor();
+			const float clearColor[] = { clear.x, clear.y, clear.z, clear.w };
+			m_CommandList.ClearRenderTargetView(rtvHandle, clearColor, 0, nullptr);
+		}
 
 		auto srvHeap = m_RenderContext.GetHeapManager().GetRenderPassHeap().GetHeap();
 		m_CommandList.SetDescriptorHeaps(1, &srvHeap);
 
-		m_CommandList.SetGraphicsRootConstantBufferView(0, m_RenderContext.GetScreenDataBuffer().GetGPUAddress());
-		int startIndex = 1;
-		for (ConstantBuffer* cb : m_ExternalCBs)
-			m_CommandList.SetGraphicsRootConstantBufferView(startIndex++, cb->GetGPUAddress());
-		for (const auto& [type, handle] : m_InputResourceBlockHandles)
-		{
-			m_CommandList.SetGraphicsRootDescriptorTable(startIndex++, handle.GetGPUHandle());
-		}
+		UIRenderContext uiContext{};
+		uiContext.CommandList = &m_CommandList;
+		uiContext.Device = m_RenderContext.GetDevice().Get();
+		uiContext.RenderTargetView = rtvHandle;
+		uiContext.RenderTargetFormat = renderTarget->GetFormat();
+		uiContext.Viewport = m_Viewport;
+		uiContext.ScissorRect = m_ScissorRect;
+		if (m_UISystem)
+			m_UISystem->Render(uiContext);
 
-		m_CommandList.IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-		m_CommandList.DrawInstanced(3, 1, 0, 0);
-
-		barrier = CD3DX12_RESOURCE_BARRIER::Transition(
+		barriers.clear();
+		barriers.push_back(CD3DX12_RESOURCE_BARRIER::Transition(
 			renderTarget->GetResource(),
 			renderTarget->GetUsageState(),
 			D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE
-		);
-		m_CommandList.ResourceBarrier(1, &barrier);
+		));
 		renderTarget->SetUsageState(D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+		m_CommandList.ResourceBarrier(static_cast<UINT>(barriers.size()), barriers.data());
 
 		m_QueueManager.GetGraphicsQueue().ExecuteCommandList();
 	}
@@ -97,28 +131,5 @@ namespace DX12Engine
 
 	void UIRenderPass::CreatePSO()
 	{
-		PipelineStateBuilder pipelineStateBuilder;
-		RootSignatureBuilder rootSignatureBuilder;
-
-		CD3DX12_DEPTH_STENCIL_DESC depthStencilDesc(D3D12_DEFAULT);
-		depthStencilDesc.DepthEnable = FALSE;
-		depthStencilDesc.StencilEnable = FALSE;
-
-		pipelineStateBuilder = pipelineStateBuilder.SetBlendState(CD3DX12_BLEND_DESC(D3D12_DEFAULT))
-			.SetRasterizerState(CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT))
-			.SetPrimitiveTopologyType(D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE)
-			.SetDepthStencilState(depthStencilDesc)
-			.SetRenderTargets({ DXGI_FORMAT_R8G8B8A8_UNORM })
-			.SetSampleDesc(UINT_MAX, 1, 0)
-			.SetVertexShader(ResourceManager::GetInstance().GetShader(m_VertexShaderName))
-			.SetPixelShader(ResourceManager::GetInstance().GetShader(m_PixelShaderName));
-
-		rootSignatureBuilder = rootSignatureBuilder.AddConstantBuffer(0).AddConstantBuffer(1)
-			.AddDescriptorTables(m_DescriptorTableConfigs)
-			.AddSampler(0, D3D12_FILTER_ANISOTROPIC);
-
-		m_RootSignature = ResourceManager::GetInstance().CreateRootSignature(rootSignatureBuilder.Build());
-		pipelineStateBuilder = pipelineStateBuilder.SetRootSignature(m_RootSignature.Get());
-		m_PipelineState = ResourceManager::GetInstance().CreatePipelineState(pipelineStateBuilder.Build());
 	}
 }

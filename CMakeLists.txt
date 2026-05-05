@@ -53,6 +53,60 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(nlohmann_json)
 
+# FreeType (required by RmlUi)
+set(FT_DISABLE_BROTLI ON CACHE BOOL "Disable FreeType Brotli" FORCE)
+set(FT_DISABLE_BZIP2 ON CACHE BOOL "Disable FreeType bzip2" FORCE)
+set(FT_DISABLE_HARFBUZZ ON CACHE BOOL "Disable FreeType HarfBuzz" FORCE)
+set(FT_DISABLE_PNG ON CACHE BOOL "Disable FreeType PNG" FORCE)
+set(FT_DISABLE_ZLIB ON CACHE BOOL "Disable FreeType zlib" FORCE)
+FetchContent_Declare(
+  freetype
+  GIT_REPOSITORY https://github.com/freetype/freetype.git
+  GIT_TAG        master
+)
+FetchContent_MakeAvailable(freetype)
+if(TARGET freetype AND NOT TARGET Freetype::Freetype)
+  add_library(Freetype::Freetype ALIAS freetype)
+endif()
+
+# RmlUi
+set(RMLUI_SAMPLES OFF CACHE BOOL "Disable RmlUi samples" FORCE)
+set(RMLUI_TESTS OFF CACHE BOOL "Disable RmlUi tests" FORCE)
+FetchContent_Declare(
+  RmlUi
+  GIT_REPOSITORY https://github.com/mikke89/RmlUi.git
+  GIT_TAG        master
+)
+FetchContent_MakeAvailable(RmlUi)
+
+# Dear ImGui
+FetchContent_Declare(
+  imgui
+  GIT_REPOSITORY https://github.com/ocornut/imgui.git
+  GIT_TAG        docking
+)
+FetchContent_GetProperties(imgui)
+if(NOT imgui_POPULATED)
+  FetchContent_Populate(imgui)
+endif()
+
+add_library(imgui STATIC
+  ${imgui_SOURCE_DIR}/imgui.cpp
+  ${imgui_SOURCE_DIR}/imgui_draw.cpp
+  ${imgui_SOURCE_DIR}/imgui_tables.cpp
+  ${imgui_SOURCE_DIR}/imgui_widgets.cpp
+  ${imgui_SOURCE_DIR}/backends/imgui_impl_dx12.cpp
+  ${imgui_SOURCE_DIR}/backends/imgui_impl_win32.cpp
+)
+target_include_directories(imgui PUBLIC
+  ${imgui_SOURCE_DIR}
+  ${imgui_SOURCE_DIR}/backends
+)
+target_link_libraries(imgui PUBLIC
+  D3D12.lib
+  dxgi.lib
+)
+
 file(GLOB_RECURSE ENGINE_SOURCES CONFIGURE_DEPENDS
     src/*.cpp
     src/*.h
@@ -92,6 +146,7 @@ endif()
 target_link_libraries(DX12Engine PUBLIC
     DirectXTex
     tinyobjloader
+    imgui
     nlohmann_json::nlohmann_json
     D3D12.lib
     d3d12.lib
@@ -101,6 +156,18 @@ target_link_libraries(DX12Engine PUBLIC
     dxcompiler.lib
 	Microsoft::DirectX-Headers
 )
+
+if(TARGET RmlUi::RmlCore)
+    target_link_libraries(DX12Engine PUBLIC RmlUi::RmlCore)
+elseif(TARGET RmlCore)
+    target_link_libraries(DX12Engine PUBLIC RmlCore)
+endif()
+
+if(TARGET RmlUi::RmlDebugger)
+    target_link_libraries(DX12Engine PUBLIC RmlUi::RmlDebugger)
+elseif(TARGET RmlDebugger)
+    target_link_libraries(DX12Engine PUBLIC RmlDebugger)
+endif()
 
 # Include headers
 target_include_directories(DX12Engine PRIVATE
