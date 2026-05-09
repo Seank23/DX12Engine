@@ -1,5 +1,6 @@
 #include "UISystem.h"
 #include "UIContext.h"
+#include "Runtime/RmlUIBackend.h"
 
 namespace DX12Engine
 {
@@ -12,13 +13,12 @@ namespace DX12Engine
 		m_DebugUiEnabled = config.EnableDebugUI;
 		if (m_RuntimeUiEnabled)
 		{
-			// Initialize runtime UI backend (e.g., ImGui)
-			// m_Backends.push_back(std::make_unique<ImGuiBackend>());
-			// if (!m_Backends.back()->Initialize(config))
-			// {
-			// 	m_Backends.pop_back();
-			// 	return false;
-			// }
+			m_Backends.push_back(std::make_unique<RmlUIBackend>());
+			if (!m_Backends.back()->Initialize(config))
+			{
+				m_Backends.pop_back();
+				return false;
+			}
 		}
 		if (m_DebugUiEnabled)
 		{
@@ -52,15 +52,20 @@ namespace DX12Engine
 
 	bool UISystem::HandleWindowEvent(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 	{
+		bool consumed = false;
 		for (BackendType type : BackendEventHandlingOrder)
 		{
 			for (auto& backend : m_Backends)
 			{
 				if (backend->GetType() == type && backend->IsEnabled())
-					return backend->HandleWindowEvent(hwnd, msg, wParam, lParam);
+				{
+					consumed = backend->HandleWindowEvent(hwnd, msg, wParam, lParam) || consumed;
+					if (consumed)
+						return true;
+				}
 			}
 		}
-		return false;
+		return consumed;
 	}
 
 	void UISystem::Render(const UIRenderContext& context)
@@ -70,7 +75,7 @@ namespace DX12Engine
 			for (auto& backend : m_Backends)
 			{
 				if (backend->GetType() == type && backend->IsEnabled())
-					return backend->Render(context);
+					backend->Render(context);
 			}
 		}
 	}
@@ -111,5 +116,73 @@ namespace DX12Engine
 	{
 		if (!this) return false;
 		return m_Initialized;
+	}
+
+	bool UISystem::ShowRuntimeDocument(const std::string& documentPath)
+	{
+		if (!m_Initialized)
+			return false;
+
+		for (const auto& backend : m_Backends)
+		{
+			if (backend->GetType() != BackendType::Runtime || !backend->IsEnabled())
+				continue;
+
+			if (RmlUIBackend* rmlBackend = dynamic_cast<RmlUIBackend*>(backend.get()))
+				return rmlBackend->ShowDocument(documentPath);
+		}
+
+		return false;
+	}
+
+	bool UISystem::HideRuntimeDocument(const std::string& documentPathOrId)
+	{
+		if (!m_Initialized)
+			return false;
+
+		for (const auto& backend : m_Backends)
+		{
+			if (backend->GetType() != BackendType::Runtime || !backend->IsEnabled())
+				continue;
+
+			if (RmlUIBackend* rmlBackend = dynamic_cast<RmlUIBackend*>(backend.get()))
+				return rmlBackend->HideDocument(documentPathOrId);
+		}
+
+		return false;
+	}
+
+	Rml::ElementDocument* UISystem::GetRuntimeDocument(const std::string& documentPathOrId) const
+	{
+		if (!m_Initialized)
+			return nullptr;
+
+		for (const auto& backend : m_Backends)
+		{
+			if (backend->GetType() != BackendType::Runtime || !backend->IsEnabled())
+				continue;
+
+			if (const RmlUIBackend* rmlBackend = dynamic_cast<const RmlUIBackend*>(backend.get()))
+				return rmlBackend->GetDocument(documentPathOrId);
+		}
+
+		return nullptr;
+	}
+
+	bool UISystem::DispatchRuntimeEvent(const std::string& documentPathOrId, const std::string& eventName)
+	{
+		if (!m_Initialized)
+			return false;
+
+		for (const auto& backend : m_Backends)
+		{
+			if (backend->GetType() != BackendType::Runtime || !backend->IsEnabled())
+				continue;
+
+			if (RmlUIBackend* rmlBackend = dynamic_cast<RmlUIBackend*>(backend.get()))
+				return rmlBackend->DispatchEvent(documentPathOrId, eventName);
+		}
+
+		return false;
 	}
 }

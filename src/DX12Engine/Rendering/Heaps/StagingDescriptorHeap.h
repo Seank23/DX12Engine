@@ -3,6 +3,8 @@
 #include "DescriptorHeap.h"
 #include "DescriptorHeapHandle.h"
 
+#include <vector>
+
 namespace DX12Engine
 {
 	class StagingDescriptorHeap : public DescriptorHeap
@@ -12,12 +14,15 @@ namespace DX12Engine
 		~StagingDescriptorHeap() final;
 
 		DescriptorHeapHandle AllocatePersistentHandle();
+		void ReleasePersistentHandle(const DescriptorHeapHandle& handle);
 
 		virtual DescriptorHeapStats GetStats() const;
 
 	private:
 		UINT m_CurrentDescriptorIndex;
+		UINT m_ActivePersistentCount;
 		UINT m_AllocationFailures;
+		std::vector<UINT> m_FreeDescriptorIndices;
 	};
 }
 

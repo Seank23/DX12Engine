@@ -157,16 +157,26 @@ target_link_libraries(DX12Engine PUBLIC
 	Microsoft::DirectX-Headers
 )
 
-if(TARGET RmlUi::RmlCore)
-    target_link_libraries(DX12Engine PUBLIC RmlUi::RmlCore)
+if(TARGET RmlUi::Core)
+  target_link_libraries(DX12Engine PUBLIC RmlUi::Core)
+elseif(TARGET RmlUi::RmlCore)
+  target_link_libraries(DX12Engine PUBLIC RmlUi::RmlCore)
 elseif(TARGET RmlCore)
-    target_link_libraries(DX12Engine PUBLIC RmlCore)
+  target_link_libraries(DX12Engine PUBLIC RmlCore)
+elseif(TARGET rmlui_core)
+  target_link_libraries(DX12Engine PUBLIC rmlui_core)
+elseif(TARGET RmlUi::RmlUi)
+  target_link_libraries(DX12Engine PUBLIC RmlUi::RmlUi)
 endif()
 
-if(TARGET RmlUi::RmlDebugger)
-    target_link_libraries(DX12Engine PUBLIC RmlUi::RmlDebugger)
+if(TARGET RmlUi::Debugger)
+  target_link_libraries(DX12Engine PUBLIC RmlUi::Debugger)
+elseif(TARGET RmlUi::RmlDebugger)
+  target_link_libraries(DX12Engine PUBLIC RmlUi::RmlDebugger)
 elseif(TARGET RmlDebugger)
     target_link_libraries(DX12Engine PUBLIC RmlDebugger)
+elseif(TARGET rmlui_debugger)
+  target_link_libraries(DX12Engine PUBLIC rmlui_debugger)
 endif()
 
 # Include headers

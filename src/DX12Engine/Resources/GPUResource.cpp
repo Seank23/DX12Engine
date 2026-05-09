@@ -1,4 +1,5 @@
 #include "GPUResource.h"
+#include "ResourceManager.h"
 
 namespace DX12Engine
 {
@@ -49,7 +50,20 @@ namespace DX12Engine
 
 	GPUResource::~GPUResource()
 	{
-		m_Resource->Release();
+		if (m_PersistentDescriptor && m_PersistentDescriptor->IsValid())
+		{
+			if (DescriptorHeapManager* heapManager = ResourceManager::TryGetHeapManager())
+				heapManager->ReleasePersistentSRV(*m_PersistentDescriptor);
+			m_PersistentDescriptor.reset();
+		}
+
+		m_TransientDescriptor.reset();
+
+		if (m_Resource)
+		{
+			m_Resource->Release();
+			m_Resource = nullptr;
+		}
 	}
 }
 

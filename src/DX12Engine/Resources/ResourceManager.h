@@ -42,6 +42,7 @@ namespace DX12Engine
 
 	public:
 		Material* GetDefaultMaterial() const { return m_DefaultMaterial.get(); }
+		static DescriptorHeapManager* TryGetHeapManager();
 
 		std::unique_ptr<VertexBuffer> CreateVertexBuffer(const std::vector<Vertex>& vertices);
 		std::unique_ptr<IndexBuffer> CreateIndexBuffer(const std::vector<UINT>& indices);

@@ -40,7 +40,8 @@ namespace DX12Engine
 
 	void InputHandler::HandleMouseMovement(HWND hwnd, LPARAM lParam)
 	{
-		if (m_UISystem->WantsMouseCapture()) return;
+		const bool isPanning = InputController::IsKeyPressed(VK_RBUTTON);
+		if (m_UISystem->WantsMouseCapture() && !isPanning) return;
 
 		int mouseX = GET_X_LPARAM(lParam);
 		int mouseY = GET_Y_LPARAM(lParam);

@@ -41,6 +41,14 @@ namespace DX12Engine
 		return *s_Instance;
 	}
 
+	DescriptorHeapManager* ResourceManager::TryGetHeapManager()
+	{
+		if (!s_Instance)
+			return nullptr;
+
+		return s_Instance->m_HeapManager;
+	}
+
 	void ResourceManager::Shutdown()
 	{
 		delete s_Instance;

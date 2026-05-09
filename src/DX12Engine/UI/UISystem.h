@@ -4,6 +4,12 @@
 #include <vector>
 #include <memory>
 #include <cstdint>
+#include <string>
+
+namespace Rml
+{
+	class ElementDocument;
+}
 
 namespace DX12Engine
 {
@@ -35,11 +41,16 @@ namespace DX12Engine
 		bool WantsMouseCapture() const;
 		bool IsInitialized() const;
 
+		bool ShowRuntimeDocument(const std::string& documentPath);
+		bool HideRuntimeDocument(const std::string& documentPathOrId);
+		Rml::ElementDocument* GetRuntimeDocument(const std::string& documentPathOrId) const;
+		bool DispatchRuntimeEvent(const std::string& documentPathOrId, const std::string& eventName);
+
 	private:
 		std::vector<std::unique_ptr<IUIBackend>> m_Backends;
 		UIInputState m_InputState;
 		bool m_Initialized = false;
-		bool m_RuntimeUiEnabled;
-		bool m_DebugUiEnabled;
+		bool m_RuntimeUiEnabled = false;
+		bool m_DebugUiEnabled = false;
 	};
 }

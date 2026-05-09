@@ -4,7 +4,7 @@
 
 namespace DX12Engine
 {
-	// Capacity constants — increase these when adding more assets.
+	// Capacity constants ï¿½ increase these when adding more assets.
 	static constexpr UINT SRV_PERSISTENT_CAPACITY      = 1024;
 	static constexpr UINT SRV_TRANSIENT_CAPACITY_FRAME = 512;
 	static constexpr UINT DSV_CAPACITY                 = 128;
@@ -26,6 +26,9 @@ namespace DX12Engine
 		DescriptorHeapHandle AllocatePersistentSRV() { return m_StagingHeap->AllocatePersistentHandle(); }
 		DescriptorHeapHandle AllocatePersistentDSV() { return m_DepthStencilHeap->AllocatePersistentHandle(); }
 		DescriptorHeapHandle AllocatePersistentRTV() { return m_RenderTargetHeap->AllocatePersistentHandle(); }
+		void ReleasePersistentSRV(const DescriptorHeapHandle& handle) { m_StagingHeap->ReleasePersistentHandle(handle); }
+		void ReleasePersistentDSV(const DescriptorHeapHandle& handle) { m_DepthStencilHeap->ReleasePersistentHandle(handle); }
+		void ReleasePersistentRTV(const DescriptorHeapHandle& handle) { m_RenderTargetHeap->ReleasePersistentHandle(handle); }
 
 		// Transient allocation: valid only within the current frame.
 		DescriptorHeapHandle AllocateTransientSRVBlock(UINT count) { return m_RenderPassHeap->AllocateHandleBlock(count); }

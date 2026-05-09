@@ -176,9 +176,14 @@ namespace DX12EngineDemo
 
 	void DX12EngineDemoApp::HandleWindowEvent(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 	{
+		bool uiConsumed = false;
 		if (m_UISystem->IsInitialized())
 		{
-			if (m_UISystem->HandleWindowEvent(hwnd, uMsg, wParam, lParam))
+			uiConsumed = m_UISystem->HandleWindowEvent(hwnd, uMsg, wParam, lParam);
+			if (uiConsumed &&
+				uMsg != WM_MOUSEMOVE &&
+				uMsg != WM_RBUTTONDOWN &&
+				uMsg != WM_RBUTTONUP)
 				return;
 		}
 

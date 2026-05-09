@@ -1,0 +1,18 @@
+<rml>
+<head>
+    <title>DX12Engine HUD</title>
+    <link type='text/rcss' href='styles/hud.rcss'/>
+</head>
+<body>
+    <div id='hud-root'>
+        <div id='panel_topleft' class='panel top-left'>
+            <p class='title'>DX12Engine Runtime UI</p>
+            <p id='hud-fps' class='value'>FPS: --</p>
+        </div>
+
+        <div id='panel_topright' class='panel top-right'>
+            <button id='btn-menu' class='cta'>Menu</button>
+        </div>
+    </div>
+</body>
+</rml>
