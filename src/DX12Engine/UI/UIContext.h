@@ -1,11 +1,15 @@
 #pragma once
 #include <wtypes.h>
 #include <cstdint>
+#include <functional>
+
 #include "d3dx12.h"
+#include "DirectXMath.h"
 
 namespace DX12Engine
 {
 	class RenderContext;
+	struct RendererOptions;
 
 	struct UIConfig
 	{
@@ -27,6 +31,15 @@ namespace DX12Engine
 		DXGI_FORMAT RenderTargetFormat;
 	};
 
+	struct UIDebugSnapshot
+	{
+		float FrameTimeMs;
+		float FPS;
+		DirectX::XMFLOAT3 CameraPosition;
+		RendererOptions* RendererOptions = nullptr;
+		std::function<void(DX12Engine::RendererOptions*)> ApplyRendererOptions;
+	};
+
 	struct UIFrameContext
 	{
 		float DeltaSeconds = 0.0f;
@@ -34,5 +47,6 @@ namespace DX12Engine
 		uint64_t FrameIndex = 0;
 		uint32_t ScreenWidth = 0;
 		uint32_t ScreenHeight = 0;
+		UIDebugSnapshot DebugSnapshot;
 	};
 }

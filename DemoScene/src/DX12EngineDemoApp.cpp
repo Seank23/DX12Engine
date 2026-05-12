@@ -163,7 +163,9 @@ namespace DX12EngineDemo
 
 	void DX12EngineDemoApp::Update(float ts, float elapsed)
 	{
-		m_UISystem->BeginFrame({ ts, elapsed, 0, static_cast<uint32_t>(m_RenderContext->GetWindowSize().x), static_cast<uint32_t>(m_RenderContext->GetWindowSize().y) });
+		auto screenSize = m_RenderContext->GetWindowSize();
+		auto frameContext = DX12Engine::UIFrameContext{ elapsed, ts, 0, static_cast<uint32_t>(screenSize.x), static_cast<uint32_t>(screenSize.y), BuildDebugSnapshot(ts, elapsed) };
+		m_UISystem->BeginFrame(frameContext);
 
 		m_InputHandler->ProcessInput(ts);
 		m_PhysicsEngine->Update(ts, elapsed);
@@ -206,6 +208,11 @@ namespace DX12EngineDemo
 		}
 	}
 
+	void DX12EngineDemoApp::ApplyRendererOptions(DX12Engine::RendererOptions* options)
+	{
+		m_Renderer->SetOptions(*options);
+	}
+
 	void DX12EngineDemoApp::OnResize(DirectX::XMFLOAT2 newSize)
 	{
 		if (m_RenderContext)
@@ -216,5 +223,16 @@ namespace DX12EngineDemo
 
 		if (m_UISystem->IsInitialized())
 			m_UISystem->OnResize(static_cast<uint32_t>(newSize.x), static_cast<uint32_t>(newSize.y));
+	}
+
+	DX12Engine::UIDebugSnapshot DX12EngineDemoApp::BuildDebugSnapshot(float ts, float elapsed)
+	{
+		DX12Engine::UIDebugSnapshot snapshot;
+		snapshot.FrameTimeMs = ts * 1000;
+		snapshot.FPS = 1.0f / ts;
+		snapshot.CameraPosition = m_Scene->GetCamera()->GetPosition();
+		snapshot.RendererOptions = &m_Renderer->GetOptions();
+		snapshot.ApplyRendererOptions = [this](DX12Engine::RendererOptions* options) { ApplyRendererOptions(options); };
+		return snapshot;
 	}
 }

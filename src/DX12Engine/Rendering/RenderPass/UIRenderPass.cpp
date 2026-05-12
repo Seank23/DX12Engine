@@ -24,7 +24,7 @@ namespace DX12Engine
 		RenderPass::Init();
 
 		DirectX::XMINT2 renderSize = m_RenderContext.GetRenderSize();
-		DXGI_FORMAT targetFormat = DXGI_FORMAT_R8G8B8A8_UNORM;
+		DXGI_FORMAT targetFormat = DXGI_FORMAT_R16G16B16A16_FLOAT;
 		if (!m_InputResources.empty())
 		{
 			if (RenderTexture* sceneSource = dynamic_cast<RenderTexture*>(m_InputResources[0].get()))

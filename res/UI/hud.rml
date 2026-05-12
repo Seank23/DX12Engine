@@ -7,7 +7,6 @@
     <div id='hud-root'>
         <div id='panel_topleft' class='panel top-left'>
             <p class='title'>DX12Engine Runtime UI</p>
-            <p id='hud-fps' class='value'>FPS: --</p>
         </div>
 
         <div id='panel_topright' class='panel top-right'>

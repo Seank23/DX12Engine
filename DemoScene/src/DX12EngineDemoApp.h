@@ -8,6 +8,7 @@
 #include "DX12Engine/Physics/PhysicsEngine.h"
 #include "DX12Engine/Entity/Scene.h"
 #include "DX12Engine/UI/UISystem.h"
+#include "DX12Engine/UI/UIContext.h"
 #include "Input/DemoInputHandler.h"
 
 namespace DX12EngineDemo
@@ -22,8 +23,11 @@ namespace DX12EngineDemo
 		void Update(float ts, float elapsed) override;
 		void HandleWindowEvent(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) override;
 
+		void ApplyRendererOptions(DX12Engine::RendererOptions* options);
+
 	private:
 		void OnResize(DirectX::XMFLOAT2 newSize);
+		DX12Engine::UIDebugSnapshot BuildDebugSnapshot(float ts, float elasped);
 
 		std::unique_ptr<DemoInputHandler> m_InputHandler;
 		std::unique_ptr<DX12Engine::Scene> m_Scene;

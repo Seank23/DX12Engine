@@ -6,6 +6,21 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 include(FetchContent)
 
+# Debug UI feature gate
+# Defaults:
+# - Single-config generators: ON for Debug, OFF for Release/other.
+# - Multi-config generators: ON (per-config compile/link rules still compile ImGui out for Release).
+set(DX12ENGINE_IMGUI_DEBUG_UI_DEFAULT OFF)
+if(CMAKE_CONFIGURATION_TYPES)
+  set(DX12ENGINE_IMGUI_DEBUG_UI_DEFAULT ON)
+elseif(CMAKE_BUILD_TYPE)
+  string(TOUPPER "${CMAKE_BUILD_TYPE}" _DX12ENGINE_BUILD_TYPE_UPPER)
+  if(_DX12ENGINE_BUILD_TYPE_UPPER STREQUAL "DEBUG")
+    set(DX12ENGINE_IMGUI_DEBUG_UI_DEFAULT ON)
+  endif()
+endif()
+option(DX12ENGINE_ENABLE_IMGUI_DEBUG_UI "Enable Dear ImGui debug UI backend integration" ${DX12ENGINE_IMGUI_DEBUG_UI_DEFAULT})
+
 # DirectX-Headers
 FetchContent_Declare(
   DirectX-Headers
@@ -80,32 +95,41 @@ FetchContent_Declare(
 FetchContent_MakeAvailable(RmlUi)
 
 # Dear ImGui
-FetchContent_Declare(
-  imgui
-  GIT_REPOSITORY https://github.com/ocornut/imgui.git
-  GIT_TAG        docking
-)
-FetchContent_GetProperties(imgui)
-if(NOT imgui_POPULATED)
-  FetchContent_Populate(imgui)
-endif()
+if(DX12ENGINE_ENABLE_IMGUI_DEBUG_UI)
+  FetchContent_Declare(
+    imgui
+    GIT_REPOSITORY https://github.com/ocornut/imgui.git
+    GIT_TAG        docking
+  )
+  FetchContent_GetProperties(imgui)
+  if(NOT imgui_POPULATED)
+    FetchContent_Populate(imgui)
+  endif()
 
-add_library(imgui STATIC
-  ${imgui_SOURCE_DIR}/imgui.cpp
-  ${imgui_SOURCE_DIR}/imgui_draw.cpp
-  ${imgui_SOURCE_DIR}/imgui_tables.cpp
-  ${imgui_SOURCE_DIR}/imgui_widgets.cpp
-  ${imgui_SOURCE_DIR}/backends/imgui_impl_dx12.cpp
-  ${imgui_SOURCE_DIR}/backends/imgui_impl_win32.cpp
-)
-target_include_directories(imgui PUBLIC
-  ${imgui_SOURCE_DIR}
-  ${imgui_SOURCE_DIR}/backends
-)
-target_link_libraries(imgui PUBLIC
-  D3D12.lib
-  dxgi.lib
-)
+  add_library(imgui STATIC EXCLUDE_FROM_ALL
+    ${imgui_SOURCE_DIR}/imgui.cpp
+    ${imgui_SOURCE_DIR}/imgui_draw.cpp
+    ${imgui_SOURCE_DIR}/imgui_tables.cpp
+    ${imgui_SOURCE_DIR}/imgui_widgets.cpp
+    ${imgui_SOURCE_DIR}/backends/imgui_impl_dx12.cpp
+    ${imgui_SOURCE_DIR}/backends/imgui_impl_win32.cpp
+  )
+  target_include_directories(imgui PUBLIC
+    ${imgui_SOURCE_DIR}
+    ${imgui_SOURCE_DIR}/backends
+  )
+  target_link_libraries(imgui PUBLIC
+    D3D12.lib
+    dxgi.lib
+  )
+  if(CMAKE_CONFIGURATION_TYPES)
+    set_target_properties(imgui PROPERTIES
+      EXCLUDE_FROM_DEFAULT_BUILD_RELEASE TRUE
+      EXCLUDE_FROM_DEFAULT_BUILD_RELWITHDEBINFO TRUE
+      EXCLUDE_FROM_DEFAULT_BUILD_MINSIZEREL TRUE
+    )
+  endif()
+endif()
 
 file(GLOB_RECURSE ENGINE_SOURCES CONFIGURE_DEPENDS
     src/*.cpp
@@ -114,8 +138,18 @@ file(GLOB_RECURSE ENGINE_SOURCES CONFIGURE_DEPENDS
     src/*.hlsli
 )
 
+# ImGui debug backend is compiled only when enabled and only for Debug config.
+list(FILTER ENGINE_SOURCES EXCLUDE REGEX "src[/\\\\]DX12Engine[/\\\\]UI[/\\\\]Debug[/\\\\]ImGuiDebugBackend\\.(h|cpp)$")
+
 # Your executable
 add_library(DX12Engine STATIC ${ENGINE_SOURCES})
+
+if(DX12ENGINE_ENABLE_IMGUI_DEBUG_UI)
+  target_sources(DX12Engine PRIVATE
+    $<$<CONFIG:Debug>:${CMAKE_SOURCE_DIR}/src/DX12Engine/UI/Debug/ImGuiDebugBackend.h>
+    $<$<CONFIG:Debug>:${CMAKE_SOURCE_DIR}/src/DX12Engine/UI/Debug/ImGuiDebugBackend.cpp>
+  )
+endif()
 
 add_subdirectory(DemoScene)
 add_subdirectory(tools/AssetCooker)
@@ -146,7 +180,6 @@ endif()
 target_link_libraries(DX12Engine PUBLIC
     DirectXTex
     tinyobjloader
-    imgui
     nlohmann_json::nlohmann_json
     D3D12.lib
     d3d12.lib
@@ -156,6 +189,19 @@ target_link_libraries(DX12Engine PUBLIC
     dxcompiler.lib
 	Microsoft::DirectX-Headers
 )
+
+if(DX12ENGINE_ENABLE_IMGUI_DEBUG_UI)
+  target_link_libraries(DX12Engine PUBLIC $<$<CONFIG:Debug>:imgui>)
+endif()
+
+if(DX12ENGINE_ENABLE_IMGUI_DEBUG_UI)
+  target_compile_definitions(DX12Engine PUBLIC
+    $<$<CONFIG:Debug>:DX12ENGINE_ENABLE_IMGUI_DEBUG_UI=1>
+    $<$<NOT:$<CONFIG:Debug>>:DX12ENGINE_ENABLE_IMGUI_DEBUG_UI=0>
+  )
+else()
+  target_compile_definitions(DX12Engine PUBLIC DX12ENGINE_ENABLE_IMGUI_DEBUG_UI=0)
+endif()
 
 if(TARGET RmlUi::Core)
   target_link_libraries(DX12Engine PUBLIC RmlUi::Core)

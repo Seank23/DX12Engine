@@ -1,6 +1,9 @@
 #include "UISystem.h"
 #include "UIContext.h"
-#include "Runtime/RmlUIBackend.h"
+#include "RuntimeBackend/RmlUIBackend.h"
+#if DX12ENGINE_ENABLE_IMGUI_DEBUG_UI
+#include "DebugBackend/ImGuiDebugBackend.h"
+#endif
 
 namespace DX12Engine
 {
@@ -22,13 +25,16 @@ namespace DX12Engine
 		}
 		if (m_DebugUiEnabled)
 		{
-			// Initialize debug UI backend (e.g., ImGui with debug tools)
-			// m_Backends.push_back(std::make_unique<ImGuiDebugBackend>());
-			// if (!m_Backends.back()->Initialize(config))
-			// {
-			// 	m_Backends.pop_back();
-			// 	return false;
-			// }
+#if DX12ENGINE_ENABLE_IMGUI_DEBUG_UI
+			m_Backends.push_back(std::make_unique<ImGuiDebugBackend>());
+			if (!m_Backends.back()->Initialize(config))
+			{
+				m_Backends.pop_back();
+				return false;
+			}
+#else
+			m_DebugUiEnabled = false;
+#endif
 		}
 		m_Initialized = true;
 		return true;
