@@ -205,6 +205,8 @@ namespace DX12Engine
 
 	void Renderer::ExecutePipeline(RenderPipeline pipeline, float frameTime)
 	{
+		if (m_RenderContext->IsPendingResize())
+			OnResize(pipeline);
 		m_RenderContext->GetHeapManager().BeginFrame(m_FrameIndex++);
 		#ifdef _DEBUG
 		ResourceManager::GetInstance().ReloadChangedShaders();
@@ -560,9 +562,6 @@ namespace DX12Engine
 		auto rtvHandle = m_RenderContext->GetRTVHandle();
 		m_CommandList->OMSetRenderTargets(1, &rtvHandle, FALSE, nullptr);
 
-		const float clearColor[] = { 0.0f, 0.2f, 0.4f, 1.0f };
-		m_CommandList->ClearRenderTargetView(rtvHandle, clearColor, 0, nullptr);
-
 		auto srvHeap = m_RenderHeap.GetHeap();
 		m_CommandList->SetDescriptorHeaps(1, &srvHeap);
 
@@ -618,7 +617,7 @@ namespace DX12Engine
 			m_Options.TAA.DisocclusionDepthThreshold != options.TAA.DisocclusionDepthThreshold;
 
 		m_Options = options;
-		m_RenderContext->SetRenderScale(m_Options.RenderScale);
+		m_RenderContext->UpdateRenderScale(m_Options.RenderScale);
 		if (aaModeChanged || taaSettingsChanged || renderScaleChanged)
 		{
 			m_RequestTAAHistoryReset = true;
@@ -632,5 +631,23 @@ namespace DX12Engine
 		data.EnableGammaCorrection = m_Options.EnableGammaCorrection ? 1 : 0;
 		data.EnableFXAA = m_Options.AA_Mode == AntiAliasingMode::FXAA ? 1 : 0;
 		m_PostProcessingCB->Update(&data, sizeof(PostProcessingData));
+	}
+
+	void Renderer::OnResize(RenderPipeline pipeline)
+	{
+		auto pendingWindowSize = m_RenderContext->GetPendingWindowSize();
+		if (pendingWindowSize.x <= 0 || pendingWindowSize.y <= 0)
+			return;
+		m_RequestTAAHistoryReset = true;
+		m_RenderContext->OnResize();
+
+		DirectX::XMINT2 pendingRenderSize = m_RenderContext->GetRenderSize();
+		std::unordered_map<GPUResource*, std::shared_ptr<GPUResource>> resizeRemap;
+		for (RenderPass* pass : pipeline.RenderPasses)
+		{
+			pass->RemapInputResources(resizeRemap);
+			pass->OnResize(pendingRenderSize);
+			pass->AppendResizeRemap(resizeRemap);
+		}
 	}
 }

@@ -24,10 +24,14 @@ namespace DX12Engine
 		~RenderPass() = default;
 		virtual void Init();
 		virtual void Execute();
+		virtual void OnResize(DirectX::XMINT2 newRenderSize);
 		virtual std::shared_ptr<RenderTexture> GetRenderTarget(ResourceSlot type) = 0;
+
 		RenderPassType GetType() const { return m_Type; }
 
 		void RebuildTransientDescriptors();
+		void RemapInputResources(const std::unordered_map<GPUResource*, std::shared_ptr<GPUResource>>& resourceMap);
+		void AppendResizeRemap(std::unordered_map<GPUResource*, std::shared_ptr<GPUResource>>& resourceMap) const;
 
 		void AddInputResources(std::vector<std::shared_ptr<GPUResource>> resources)
 		{
@@ -74,6 +78,7 @@ namespace DX12Engine
 
 		Camera* m_Camera;
 		std::vector<ConstantBuffer*> m_ExternalCBs;
+		std::unordered_map<GPUResource*, std::shared_ptr<GPUResource>> m_LastResizeRemap;
 
 		uint64_t m_LocalShaderGeneration = 0;
 	};

@@ -19,8 +19,8 @@ namespace DX12Engine
 
 	void DebugRenderPass::Init()
 	{
-		DirectX::XMINT2 renderSize = m_RenderContext.GetRenderSize();
-		m_RenderTargets.emplace_back(ResourceManager::GetInstance().CreateRenderTargetTexture(DirectX::XMINT2(renderSize.x, renderSize.y), DXGI_FORMAT_R8G8B8A8_UNORM));
+		DirectX::XMINT3 renderSize{m_RenderContext.GetRenderSize().x, m_RenderContext.GetRenderSize().y, 1};
+		m_RenderTargets.emplace_back(ResourceManager::GetInstance().CreateRenderTargetTexture(RenderTextureConfig{ renderSize, DXGI_FORMAT_R8G8B8A8_UNORM }));
 
 		ResourceManager::GetInstance().UpdateSRVDescriptors(EngineUtils::VectorSharedPtrToPtrs(m_InputResources));
 		ResourceManager::GetInstance().UpdateSRVDescriptors(reinterpret_cast<std::vector<GPUResource*> const&>(m_RenderTargets));

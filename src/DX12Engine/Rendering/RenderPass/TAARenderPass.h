@@ -12,8 +12,10 @@ namespace DX12Engine
 	public:
 		TAARenderPass(RenderContext& context);
 		~TAARenderPass();
+
 		void Init() override;
 		void Execute() override;
+		void OnResize(DirectX::XMINT2 newRenderSize) override;
 		std::shared_ptr<RenderTexture> GetRenderTarget(ResourceSlot type) override;
 
 		void SetJitterStates(const DirectX::XMFLOAT2& jitter, const DirectX::XMFLOAT2& prevJitter) { m_Jitter = jitter; m_PrevJitter = prevJitter; }

@@ -104,6 +104,8 @@ namespace DX12Engine
 		D3D12_RECT m_DefaultScissor = {};
 		D3D12_CPU_DESCRIPTOR_HANDLE m_CurrentRTV = {};
 		DXGI_FORMAT m_CurrentRenderTargetFormat = DXGI_FORMAT_UNKNOWN;
+		float m_LogicalWidth = 0.0f;
+		float m_LogicalHeight = 0.0f;
 
 		Microsoft::WRL::ComPtr<ID3D12RootSignature> m_RootSignature;
 		Microsoft::WRL::ComPtr<ID3D12PipelineState> m_PipelineState;

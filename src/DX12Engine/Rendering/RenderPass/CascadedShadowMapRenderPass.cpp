@@ -36,11 +36,9 @@ namespace DX12Engine
 		RenderPass::Init();
 		m_Settings.CascadeCount = (std::clamp)(m_Settings.CascadeCount, 1, MAX_CSM_CASCADES);
 
+		DirectX::XMINT3 renderSize{ m_Settings.ShadowMapSize, m_Settings.ShadowMapSize, m_Settings.CascadeCount };
 		m_RenderTargets.emplace_back(ResourceManager::GetInstance().CreateDepthMap(
-			DirectX::XMINT3(m_Settings.ShadowMapSize, m_Settings.ShadowMapSize, m_Settings.CascadeCount),
-			DXGI_FORMAT_D32_FLOAT,
-			DXGI_FORMAT_R32_FLOAT,
-			false));
+			RenderTextureConfig{ renderSize, DXGI_FORMAT_R32_FLOAT, DXGI_FORMAT_D32_FLOAT, 1, {0.0f, 0.0f, 0.0f, 1.0f}, false, false }));
 
 		m_CascadedShadowCB = ResourceManager::GetInstance().CreateConstantBuffer(sizeof(CascadedShadowData));
 

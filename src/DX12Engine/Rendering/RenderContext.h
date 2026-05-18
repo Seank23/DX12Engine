@@ -31,8 +31,8 @@ namespace DX12Engine
 		DescriptorHeapManager&						GetHeapManager() const { return *m_HeapManager; }
 		GPUUploader&								GetUploader() const { return *m_Uploader; }
 
-		void						SetWindowSize(DirectX::XMINT2 windowSize);
-		void						SetRenderScale(float renderScale);
+		void						UpdateWindowSize(DirectX::XMINT2 windowSize);
+		void						UpdateRenderScale(float renderScale);
 		CD3DX12_RESOURCE_BARRIER	TransitionRenderTarget(bool forward) const { return m_RenderWindow->TransitionRenderTarget(forward); }
 		bool						ProcessWindowMessages() const { return m_RenderWindow->ProcessWindowMessages(); }
 		void						PresentFrame() const { m_RenderWindow->PresentFrame(); }
@@ -40,10 +40,13 @@ namespace DX12Engine
 		void UpdateScreenData(Camera* camera, const DirectX::XMFLOAT2& jitter, const DirectX::XMFLOAT2& prevJitter, const DirectX::XMMATRIX* projectionOverride = nullptr);
 		ConstantBuffer& GetScreenDataBuffer() const { return *m_ScreenDataCB; }
 		ScreenData GetScreenData() const { return m_ScreenData; }
+		bool IsPendingResize() const { return m_PendingResize; }
+
+		void OnResize();
+		DirectX::XMINT2 GetPendingWindowSize() const { return m_PendingWindowSize; }
 
 	private:
 		void InitDevice(HWND hwnd);
-		void UpdateRenderSize();
 
 		std::unique_ptr<RenderWindow> m_RenderWindow;
 		Microsoft::WRL::ComPtr<ID3D12Device> m_Device;
@@ -52,7 +55,9 @@ namespace DX12Engine
 		std::unique_ptr<GPUUploader> m_Uploader;
 
 		DirectX::XMINT2 m_WindowSize;
+		DirectX::XMINT2 m_PendingWindowSize;
 		DirectX::XMINT2 m_RenderSize;
+		bool m_PendingResize = false;
 		float m_RenderScale = 1.0f;
 
 		ScreenData m_ScreenData;

@@ -50,8 +50,8 @@ namespace DX12Engine
 		std::unique_ptr<Texture> CreateTexture(DirectX::ScratchImage* imageData);
 		std::unique_ptr<Texture> CreateCubeMap(DirectX::ScratchImage* imageData);
 		std::unique_ptr<Texture> CreateDefaultCubeMap();
-		std::unique_ptr<RenderTexture> CreateDepthMap(DirectX::XMINT3 dimensions, DXGI_FORMAT dsvFormat, DXGI_FORMAT srvFormat, bool isCubeMap = false);
-		std::unique_ptr<RenderTexture> CreateRenderTargetTexture(DirectX::XMINT2 dimensions, DXGI_FORMAT format, UINT mipLevels = 1, DirectX::XMFLOAT4 clearColor = { 0.0f, 0.0f, 0.0f, 1.0f });
+		std::unique_ptr<RenderTexture> CreateDepthMap(RenderTextureConfig config);
+		std::unique_ptr<RenderTexture> CreateRenderTargetTexture(RenderTextureConfig config);
 
 		// Returns the base DescriptorHeapHandle of the allocated transient block so
 		// callers can compute per-block GPU handles via offset arithmetic instead of

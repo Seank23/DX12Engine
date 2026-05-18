@@ -61,6 +61,7 @@ namespace DX12Engine
 		DirectX::XMMATRIX UpdateFrameJitter(DirectX::XMMATRIX projectionMatrix, DirectX::XMINT2 screenSize);
 		static float Halton(uint32_t index, uint32_t base);
 		void UpdatePostProcessingCB();
+		void OnResize(RenderPipeline pipeline);
 
 		std::shared_ptr<RenderContext> m_RenderContext;
 		CommandQueueManager& m_QueueManager;

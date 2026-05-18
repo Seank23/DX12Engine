@@ -23,14 +23,14 @@ namespace DX12Engine
 	{
 		RenderPass::Init();
 
-		DirectX::XMINT2 renderSize = m_RenderContext.GetRenderSize();
+		DirectX::XMINT3 renderSize{m_RenderContext.GetRenderSize().x, m_RenderContext.GetRenderSize().y, 1};
 		DXGI_FORMAT targetFormat = DXGI_FORMAT_R16G16B16A16_FLOAT;
 		if (!m_InputResources.empty())
 		{
 			if (RenderTexture* sceneSource = dynamic_cast<RenderTexture*>(m_InputResources[0].get()))
 				targetFormat = sceneSource->GetFormat();
 		}
-		m_RenderTargets.emplace_back(ResourceManager::GetInstance().CreateRenderTargetTexture(renderSize, targetFormat));
+		m_RenderTargets.emplace_back(ResourceManager::GetInstance().CreateRenderTargetTexture(RenderTextureConfig{ renderSize, targetFormat }));
 
 		m_Viewport = { 0.0f, 0.0f, (float)renderSize.x, (float)renderSize.y, 0.0f, 1.0f };
 		m_ScissorRect = { 0, 0, (LONG)renderSize.x, (LONG)renderSize.y };
@@ -87,11 +87,7 @@ namespace DX12Engine
 		m_CommandList.OMSetRenderTargets(1, &rtvHandle, FALSE, nullptr);
 
 		if (!copiedSceneColor)
-		{
-			DirectX::XMFLOAT4 clear = renderTarget->GetClearColor();
-			const float clearColor[] = { clear.x, clear.y, clear.z, clear.w };
-			m_CommandList.ClearRenderTargetView(rtvHandle, clearColor, 0, nullptr);
-		}
+			m_CommandList.ClearRenderTargetView(rtvHandle, renderTarget->GetClearColorArray(), 0, nullptr);
 
 		auto srvHeap = m_RenderContext.GetHeapManager().GetRenderPassHeap().GetHeap();
 		m_CommandList.SetDescriptorHeaps(1, &srvHeap);
@@ -103,6 +99,9 @@ namespace DX12Engine
 		uiContext.RenderTargetFormat = renderTarget->GetFormat();
 		uiContext.Viewport = m_Viewport;
 		uiContext.ScissorRect = m_ScissorRect;
+		DirectX::XMINT2 windowSize = m_RenderContext.GetWindowSize();
+		uiContext.LogicalWidth = static_cast<uint32_t>(windowSize.x);
+		uiContext.LogicalHeight = static_cast<uint32_t>(windowSize.y);
 		if (m_UISystem)
 			m_UISystem->Render(uiContext);
 

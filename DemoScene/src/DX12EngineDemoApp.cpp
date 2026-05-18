@@ -216,13 +216,13 @@ namespace DX12EngineDemo
 	void DX12EngineDemoApp::OnResize(DirectX::XMFLOAT2 newSize)
 	{
 		if (m_RenderContext)
-			m_RenderContext->SetWindowSize({ static_cast<int>(newSize.x), static_cast<int>(newSize.y) });
+			m_RenderContext->UpdateWindowSize({ static_cast<int>(newSize.x), static_cast<int>(newSize.y) });
 
 		if (m_Scene)
 			m_Scene->OnResize(newSize);
 
 		if (m_UISystem->IsInitialized())
-			m_UISystem->OnResize(static_cast<uint32_t>(newSize.x), static_cast<uint32_t>(newSize.y));
+			m_UISystem->UpdateWindowSize(static_cast<uint32_t>(newSize.x), static_cast<uint32_t>(newSize.y));
 	}
 
 	DX12Engine::UIDebugSnapshot DX12EngineDemoApp::BuildDebugSnapshot(float ts, float elapsed)

@@ -36,8 +36,8 @@ namespace DX12Engine
 		m_VertexShaderName = m_VertexShaderName.empty() ? "RenderTriangle_VS" : m_VertexShaderName;
 		m_PixelShaderName = m_PixelShaderName.empty() ? "PBRLightingDeferred_PS" : m_PixelShaderName;
 
-		DirectX::XMINT2 renderSize = m_RenderContext.GetRenderSize();
-		m_RenderTargets.emplace_back(ResourceManager::GetInstance().CreateRenderTargetTexture(renderSize, DXGI_FORMAT_R16G16B16A16_FLOAT));
+		DirectX::XMINT3 renderSize{m_RenderContext.GetRenderSize().x, m_RenderContext.GetRenderSize().y, 1};
+		m_RenderTargets.emplace_back(ResourceManager::GetInstance().CreateRenderTargetTexture(RenderTextureConfig{ renderSize, DXGI_FORMAT_R16G16B16A16_FLOAT }));
 
 		m_Viewport = { 0.0f, 0.0f, (float)renderSize.x, (float)renderSize.y, -1.0f, 1.0f };
 		m_ScissorRect = { 0, 0, (LONG)renderSize.x, (LONG)renderSize.y };
@@ -75,8 +75,7 @@ namespace DX12Engine
 		D3D12_CPU_DESCRIPTOR_HANDLE rtvHandle = renderTarget->GetTextureDescriptor().GetCPUHandle();
 		m_CommandList.OMSetRenderTargets(1, &rtvHandle, FALSE, nullptr);
 
-		const float clearColor[] = { 0.0f, 0.0f, 0.0f, 1.0f };
-		m_CommandList.ClearRenderTargetView(rtvHandle, clearColor, 0, nullptr);
+		m_CommandList.ClearRenderTargetView(rtvHandle, renderTarget->GetClearColorArray(), 0, nullptr);
 
 		auto srvHeap = m_RenderContext.GetHeapManager().GetRenderPassHeap().GetHeap();
 		m_CommandList.SetDescriptorHeaps(1, &srvHeap);

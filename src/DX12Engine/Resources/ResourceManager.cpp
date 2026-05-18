@@ -412,26 +412,26 @@ namespace DX12Engine
 		return texture;
 	}
 
-	std::unique_ptr<RenderTexture> ResourceManager::CreateDepthMap(DirectX::XMINT3 dimensions, DXGI_FORMAT dsvFormat, DXGI_FORMAT srvFormat, bool isCubeMap)
+	std::unique_ptr<RenderTexture> ResourceManager::CreateDepthMap(RenderTextureConfig config)
 	{
-		int arraySize = dimensions.z;
-		bool isSingleMap = arraySize == 1 && !isCubeMap;
-		if (isCubeMap)
+		int arraySize = config.Dimensions.z;
+		bool isSingleMap = arraySize == 1 && !config.IsCubeMap;
+		if (config.IsCubeMap)
 			arraySize = 6;
 
 		D3D12_RESOURCE_DESC depthMapDesc = {};
 		depthMapDesc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
-		depthMapDesc.Width = dimensions.x;
-		depthMapDesc.Height = dimensions.y;
+		depthMapDesc.Width = config.Dimensions.x;
+		depthMapDesc.Height = config.Dimensions.y;
 		depthMapDesc.DepthOrArraySize = arraySize;
 		depthMapDesc.MipLevels = 1;
-		depthMapDesc.Format = dsvFormat;
+		depthMapDesc.Format = config.DSVFormat;
 		depthMapDesc.SampleDesc.Count = 1;
 		depthMapDesc.SampleDesc.Quality = 0;
 		depthMapDesc.Flags = D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL;
 
 		D3D12_CLEAR_VALUE depthOptimizedClearValue = {};
-		depthOptimizedClearValue.Format = dsvFormat;
+		depthOptimizedClearValue.Format = config.DSVFormat;
 		depthOptimizedClearValue.DepthStencil.Depth = 1.0f;
 		depthOptimizedClearValue.DepthStencil.Stencil = 0;
 
@@ -449,7 +449,7 @@ namespace DX12Engine
 		if (isSingleMap)
 		{
 			D3D12_DEPTH_STENCIL_VIEW_DESC dsvDesc = {};
-			dsvDesc.Format = dsvFormat;
+			dsvDesc.Format = config.DSVFormat;
 			dsvDesc.ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2D;
 			dsvDesc.Flags = D3D12_DSV_FLAG_NONE;
 
@@ -462,7 +462,7 @@ namespace DX12Engine
 			for (int i = 0; i < arraySize; i++)
 			{
 				D3D12_DEPTH_STENCIL_VIEW_DESC dsvDesc = {};
-				dsvDesc.Format = dsvFormat;
+				dsvDesc.Format = config.DSVFormat;
 				dsvDesc.ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2DARRAY;
 				dsvDesc.Texture2DArray.FirstArraySlice = i;
 				dsvDesc.Texture2DArray.ArraySize = 1;
@@ -476,40 +476,39 @@ namespace DX12Engine
 
 		D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
 		srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-		srvDesc.Format = srvFormat;
-		srvDesc.ViewDimension = isCubeMap ? D3D12_SRV_DIMENSION_TEXTURECUBE : isSingleMap ? D3D12_SRV_DIMENSION_TEXTURE2D : D3D12_SRV_DIMENSION_TEXTURE2DARRAY;
+		srvDesc.Format = config.Format;
+		srvDesc.ViewDimension = config.IsCubeMap ? D3D12_SRV_DIMENSION_TEXTURECUBE : isSingleMap ? D3D12_SRV_DIMENSION_TEXTURE2D : D3D12_SRV_DIMENSION_TEXTURE2DARRAY;
 		srvDesc.Texture2D.MipLevels = 1;
 		if (!isSingleMap) srvDesc.Texture2DArray.ArraySize = arraySize;
 
 		DescriptorHeapHandle srvHandle = m_HeapManager->AllocatePersistentSRV();
 		m_Device->CreateShaderResourceView(depthMapResource, &srvDesc, srvHandle.GetCPUHandle());
 
-		auto renderTexture = std::make_unique<RenderTexture>(depthMapResource, dsvFormat, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, dsvDescriptors, srvDesc, isCubeMap);
+		auto renderTexture = std::make_unique<RenderTexture>(depthMapResource, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, dsvDescriptors, srvDesc, config, true);
 		renderTexture->SetTransientDescriptor(srvHandle);
 		renderTexture->SetPersistentDescriptor(srvHandle);
 		return renderTexture;
 	}
 
-	std::unique_ptr<RenderTexture> ResourceManager::CreateRenderTargetTexture(DirectX::XMINT2 dimensions, DXGI_FORMAT format, UINT mipLevels, DirectX::XMFLOAT4 clearColor)
+	std::unique_ptr<RenderTexture> ResourceManager::CreateRenderTargetTexture(RenderTextureConfig config)
 	{
 		D3D12_RESOURCE_DESC textureDesc = {};
 		textureDesc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
-		textureDesc.Width = dimensions.x;
-		textureDesc.Height = dimensions.y;
+		textureDesc.Width = config.Dimensions.x;
+		textureDesc.Height = config.Dimensions.y;
 		textureDesc.DepthOrArraySize = 1;
-		textureDesc.MipLevels = mipLevels;
-		textureDesc.Format = format;
+		textureDesc.MipLevels = config.MipLevels;
+		textureDesc.Format = config.Format;
 		textureDesc.SampleDesc.Count = 1;
 		textureDesc.SampleDesc.Quality = 0;
 		textureDesc.Flags = D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET;
 
 		D3D12_CLEAR_VALUE clearValue = {};
-		clearValue.Format = format;
-		clearValue.Color[0] = clearColor.x;
-		clearValue.Color[1] = clearColor.y;
-		clearValue.Color[2] = clearColor.z;
-		clearValue.Color[3] = clearColor.w;
-
+		clearValue.Format = config.Format;
+		clearValue.Color[0] = config.ClearColor.x;
+		clearValue.Color[1] = config.ClearColor.y;
+		clearValue.Color[2] = config.ClearColor.z;
+		clearValue.Color[3] = config.ClearColor.w;
 		ID3D12Resource* renderTargetResource = nullptr;
 		auto heapProps = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);
 		m_Device->CreateCommittedResource(
@@ -522,7 +521,7 @@ namespace DX12Engine
 
 		std::vector<DescriptorHeapHandle> rtvDescriptors;
 		D3D12_RENDER_TARGET_VIEW_DESC rtvDesc = {};
-		rtvDesc.Format = format;
+		rtvDesc.Format = config.Format;
 		rtvDesc.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2D;
 
 		DescriptorHeapHandle rtvHandle = m_HeapManager->AllocatePersistentRTV();
@@ -531,14 +530,14 @@ namespace DX12Engine
 
 		D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
 		srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-		srvDesc.Format = format;
+		srvDesc.Format = config.Format;
 		srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
-		srvDesc.Texture2D.MipLevels = mipLevels;
+		srvDesc.Texture2D.MipLevels = config.MipLevels;
 
 		DescriptorHeapHandle srvHandle = m_HeapManager->AllocatePersistentSRV();
 		m_Device->CreateShaderResourceView(renderTargetResource, &srvDesc, srvHandle.GetCPUHandle());
 
-		auto renderTexture = std::make_unique<RenderTexture>(renderTargetResource, format, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, rtvDescriptors, srvDesc, false, clearColor);
+		auto renderTexture = std::make_unique<RenderTexture>(renderTargetResource, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, rtvDescriptors, srvDesc, config);
 		renderTexture->SetTransientDescriptor(srvHandle);
 		renderTexture->SetPersistentDescriptor(srvHandle);
 		return renderTexture;

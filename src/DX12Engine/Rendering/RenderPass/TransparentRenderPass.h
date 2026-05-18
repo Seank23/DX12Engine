@@ -16,8 +16,8 @@ namespace DX12Engine
 		void Init() override;
 		void Execute() override;
 		std::shared_ptr<RenderTexture> GetRenderTarget(ResourceSlot type) override;
-		void SetLightBuffer(LightBuffer* lightBuffer) { m_LightBuffer = lightBuffer; }
 
+		void SetLightBuffer(LightBuffer* lightBuffer) { m_LightBuffer = lightBuffer; }
 		void SetDrawItems(const std::vector<DrawItem>& drawItems) { m_DrawItems = drawItems; }
 
 	private:

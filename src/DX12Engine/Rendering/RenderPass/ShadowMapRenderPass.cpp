@@ -27,18 +27,12 @@ namespace DX12Engine
 		if (m_ShadowMapCount == 0)
 		{
 			m_RenderTargets.emplace_back(ResourceManager::GetInstance().CreateDepthMap(
-				DirectX::XMINT3(SHADOW_MAP_SIZE, SHADOW_MAP_SIZE, 1),
-				DXGI_FORMAT_D32_FLOAT,
-				DXGI_FORMAT_R32_FLOAT,
-				m_IsCubeMap));
+				RenderTextureConfig{ DirectX::XMINT3(SHADOW_MAP_SIZE, SHADOW_MAP_SIZE, 1), DXGI_FORMAT_R32_FLOAT, DXGI_FORMAT_D32_FLOAT, 1, { 0.0f, 0.0f, 0.0f, 1.0f }, m_IsCubeMap, false }));
 			return;
 		}
 
 		m_RenderTargets.emplace_back(ResourceManager::GetInstance().CreateDepthMap(
-			DirectX::XMINT3(SHADOW_MAP_SIZE, SHADOW_MAP_SIZE, m_ShadowMapCount),
-			DXGI_FORMAT_D32_FLOAT,
-			DXGI_FORMAT_R32_FLOAT,
-			m_IsCubeMap));
+			RenderTextureConfig{ DirectX::XMINT3(SHADOW_MAP_SIZE, SHADOW_MAP_SIZE, m_ShadowMapCount), DXGI_FORMAT_R32_FLOAT, DXGI_FORMAT_D32_FLOAT, 1, { 0.0f, 0.0f, 0.0f, 1.0f }, m_IsCubeMap, false }));
 
 		CreatePSO();
 	}

@@ -35,7 +35,7 @@ namespace DX12Engine
 		void Render(const UIRenderContext& context);
 		void EndFrame();
 
-		void OnResize(uint32_t width, uint32_t height);
+		void UpdateWindowSize(uint32_t width, uint32_t height);
 
 		bool WantsKeyboardCapture() const;
 		bool WantsMouseCapture() const;
@@ -47,10 +47,16 @@ namespace DX12Engine
 		bool DispatchRuntimeEvent(const std::string& documentPathOrId, const std::string& eventName);
 
 	private:
+		void OnResize(uint32_t width, uint32_t height);
+
 		std::vector<std::unique_ptr<IUIBackend>> m_Backends;
 		UIInputState m_InputState;
 		bool m_Initialized = false;
 		bool m_RuntimeUiEnabled = false;
 		bool m_DebugUiEnabled = false;
+
+		uint32_t m_PendingWidth = 0;
+		uint32_t m_PendingHeight = 0;
+		bool m_PendingResize = false;
 	};
 }

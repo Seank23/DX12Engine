@@ -3,6 +3,7 @@
 #include "./PipelineStateCache.h"
 #include "./RootSignatureCache.h"
 #include "../Input/Camera.h"
+#include "../Utils/EngineUtils.h"
 
 #include <algorithm>
 #include <cmath>
@@ -56,23 +57,48 @@ namespace DX12Engine
 		}
 	}
 
-	void RenderContext::SetWindowSize(DirectX::XMINT2 windowSize)
+	void RenderContext::UpdateWindowSize(DirectX::XMINT2 windowSize)
 	{
-		m_WindowSize = windowSize;
-		UpdateRenderSize();
+		m_PendingWindowSize = windowSize;
+		m_PendingResize = true;
 	}
 
-	void RenderContext::SetRenderScale(float renderScale)
+	void RenderContext::UpdateRenderScale(float renderScale)
 	{
-		m_RenderScale = (std::max)(0.5f, renderScale);
-		UpdateRenderSize();
+		if (renderScale == m_RenderScale || renderScale < 0.5f)
+			return;
+		m_RenderScale = renderScale;
+		m_PendingWindowSize = m_WindowSize;
+		m_PendingResize = true;
 	}
 
-	void RenderContext::UpdateRenderSize()
+	void RenderContext::OnResize()
 	{
+		m_QueueManager->WaitForAllIdle();
+		auto commandQueue = m_QueueManager->GetGraphicsQueue().GetCommandQueue().Get();
+		// Ensure all prior queue work (including present-related work) has completed
+		// before releasing old back buffers and resizing the swap chain.
+		Microsoft::WRL::ComPtr<ID3D12Fence> resizeFence;
+		EngineUtils::ThrowIfFailed(m_Device->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&resizeFence)));
+		const UINT64 resizeFenceValue = 1;
+		HANDLE resizeFenceEvent = CreateEvent(nullptr, FALSE, FALSE, nullptr);
+		EngineUtils::Assert(resizeFenceEvent != nullptr);
+		EngineUtils::ThrowIfFailed(commandQueue->Signal(resizeFence.Get(), resizeFenceValue));
+		if (resizeFence->GetCompletedValue() < resizeFenceValue)
+		{
+			EngineUtils::ThrowIfFailed(resizeFence->SetEventOnCompletion(resizeFenceValue, resizeFenceEvent));
+			WaitForSingleObject(resizeFenceEvent, INFINITE);
+		}
+		CloseHandle(resizeFenceEvent);
+
+
+		m_WindowSize = m_PendingWindowSize;
+		m_RenderWindow->OnResize(m_WindowSize, m_Device.Get());
+
 		m_RenderSize.x = (std::max)(1, static_cast<int>(std::lround(static_cast<double>(m_WindowSize.x) * m_RenderScale)));
 		m_RenderSize.y = (std::max)(1, static_cast<int>(std::lround(static_cast<double>(m_WindowSize.y) * m_RenderScale)));
 		m_ScreenData.ScreenSize = DirectX::XMFLOAT2(static_cast<float>(m_RenderSize.x), static_cast<float>(m_RenderSize.y));
+		m_PendingResize = false;
 	}
 
 	void RenderContext::UpdateScreenData(Camera* camera, const DirectX::XMFLOAT2& jitter, const DirectX::XMFLOAT2& prevJitter, const DirectX::XMMATRIX* projectionOverride)

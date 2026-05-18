@@ -42,12 +42,13 @@ namespace DX12Engine
 
 	void TAARenderPass::Init()
 	{
-		DirectX::XMINT2 renderSize = m_RenderContext.GetRenderSize();
+		DirectX::XMINT3 renderSize{m_RenderContext.GetRenderSize().x, m_RenderContext.GetRenderSize().y, 1};
 
 		const bool hasReactiveMask = m_ResourceBlocks.find(InputResourceType::ReactiveMask) != m_ResourceBlocks.end();
 		if (!hasReactiveMask)
 		{
-			m_FallbackReactiveMask = ResourceManager::GetInstance().CreateRenderTargetTexture(renderSize, DXGI_FORMAT_R8_UNORM, 1, { 0.0f, 0.0f, 0.0f, 0.0f });
+			m_FallbackReactiveMask = ResourceManager::GetInstance().CreateRenderTargetTexture(
+				RenderTextureConfig{ renderSize, DXGI_FORMAT_R8_UNORM, DXGI_FORMAT_UNKNOWN, 1, { 0.0f, 0.0f, 0.0f, 0.0f } });
 			AddInputResources({ std::shared_ptr<GPUResource>(m_FallbackReactiveMask.get(), [](GPUResource*) {}) });
 			AddResourceBlock(InputResourceType::ReactiveMask, 1);
 			m_UsingFallbackReactiveMask = true;
@@ -58,10 +59,10 @@ namespace DX12Engine
 		m_VertexShaderName = m_VertexShaderName.empty() ? "RenderTriangle_VS" : m_VertexShaderName;
 		m_PixelShaderName = m_PixelShaderName.empty() ? "TAAPass_PS" : m_PixelShaderName;
 
-		m_RenderTargets.emplace_back(ResourceManager::GetInstance().CreateRenderTargetTexture(renderSize, DXGI_FORMAT_R16G16B16A16_FLOAT));
+		m_RenderTargets.emplace_back(ResourceManager::GetInstance().CreateRenderTargetTexture(RenderTextureConfig{ renderSize, DXGI_FORMAT_R16G16B16A16_FLOAT }));
 
-		m_HistoryBuffers[0] = ResourceManager::GetInstance().CreateRenderTargetTexture(renderSize, DXGI_FORMAT_R16G16B16A16_FLOAT);
-		m_HistoryBuffers[1] = ResourceManager::GetInstance().CreateRenderTargetTexture(renderSize, DXGI_FORMAT_R16G16B16A16_FLOAT);
+		m_HistoryBuffers[0] = ResourceManager::GetInstance().CreateRenderTargetTexture(RenderTextureConfig{ renderSize, DXGI_FORMAT_R16G16B16A16_FLOAT });
+		m_HistoryBuffers[1] = ResourceManager::GetInstance().CreateRenderTargetTexture(RenderTextureConfig{ renderSize, DXGI_FORMAT_R16G16B16A16_FLOAT });
 
 		m_TemporalCB = ResourceManager::GetInstance().CreateConstantBuffer(sizeof(TAATemporalData));
 		m_TemporalData.FrameIndex = 0;
@@ -181,9 +182,8 @@ namespace DX12Engine
 		};
 		m_CommandList.OMSetRenderTargets(2, rtvHandles, FALSE, nullptr);
 
-		const float clearColor[] = { 0.0f, 0.0f, 0.0f, 1.0f };
-		m_CommandList.ClearRenderTargetView(rtvHandles[0], clearColor, 0, nullptr);
-		m_CommandList.ClearRenderTargetView(rtvHandles[1], clearColor, 0, nullptr);
+		m_CommandList.ClearRenderTargetView(rtvHandles[0], renderTarget->GetClearColorArray(), 0, nullptr);
+		m_CommandList.ClearRenderTargetView(rtvHandles[1], historyWrite->GetClearColorArray(), 0, nullptr);
 
 		auto srvHeap = m_RenderContext.GetHeapManager().GetRenderPassHeap().GetHeap();
 		m_CommandList.SetDescriptorHeaps(1, &srvHeap);
@@ -237,6 +237,16 @@ namespace DX12Engine
 		default:
 			return nullptr;
 		}
+	}
+
+	void TAARenderPass::OnResize(DirectX::XMINT2 newRenderSize)
+	{
+		RenderPass::OnResize(newRenderSize);
+
+		m_HistoryBuffers[0] = ResourceManager::GetInstance().CreateRenderTargetTexture(
+			RenderTextureConfig{ DirectX::XMINT3(newRenderSize.x, newRenderSize.y, 1), DXGI_FORMAT_R16G16B16A16_FLOAT });
+		m_HistoryBuffers[1] = ResourceManager::GetInstance().CreateRenderTargetTexture(
+			RenderTextureConfig{ DirectX::XMINT3(newRenderSize.x, newRenderSize.y, 1), DXGI_FORMAT_R16G16B16A16_FLOAT });
 	}
 
 	void TAARenderPass::TransitionHistoryBuffer(D3D12_RESOURCE_STATES from, D3D12_RESOURCE_STATES to)

@@ -25,15 +25,15 @@ namespace DX12Engine
 		m_VertexShaderName = m_VertexShaderName.empty() ? "Geometry_VS" : m_VertexShaderName;
 		m_PixelShaderName = m_PixelShaderName.empty() ? "Geometry_PS" : m_PixelShaderName;
 
-        DirectX::XMINT2 renderSize = m_RenderContext.GetRenderSize();
-        m_RenderTargets.emplace_back(ResourceManager::GetInstance().CreateRenderTargetTexture(renderSize, DXGI_FORMAT_R8G8B8A8_UNORM, 1 , { 1.0f, 1.0f, 1.0f, 1.0f })); // Albedo
-        m_RenderTargets.emplace_back(ResourceManager::GetInstance().CreateRenderTargetTexture(renderSize, DXGI_FORMAT_R16G16B16A16_FLOAT)); // World Normal
-        m_RenderTargets.emplace_back(ResourceManager::GetInstance().CreateRenderTargetTexture(renderSize, DXGI_FORMAT_R16G16B16A16_FLOAT)); // Object Normal
-        m_RenderTargets.emplace_back(ResourceManager::GetInstance().CreateRenderTargetTexture(renderSize, DXGI_FORMAT_R16G16B16A16_FLOAT)); // Metallic, Roughness, AO
-        m_RenderTargets.emplace_back(ResourceManager::GetInstance().CreateRenderTargetTexture(renderSize, DXGI_FORMAT_R16G16B16A16_FLOAT)); // Position
-        m_RenderTargets.emplace_back(ResourceManager::GetInstance().CreateRenderTargetTexture(renderSize, DXGI_FORMAT_R16G16B16A16_FLOAT)); // Emissive
-        m_RenderTargets.emplace_back(ResourceManager::GetInstance().CreateRenderTargetTexture(renderSize, DXGI_FORMAT_R16G16_FLOAT)); // Velocity
-        m_RenderTargets.emplace_back(ResourceManager::GetInstance().CreateDepthMap(DirectX::XMINT3(renderSize.x, renderSize.y, 1), DXGI_FORMAT_D32_FLOAT, DXGI_FORMAT_R32_FLOAT, false)); // Depth
+        DirectX::XMINT3 renderSize{m_RenderContext.GetRenderSize().x, m_RenderContext.GetRenderSize().y, 1};
+        m_RenderTargets.emplace_back(ResourceManager::GetInstance().CreateRenderTargetTexture(RenderTextureConfig{ renderSize, DXGI_FORMAT_R8G8B8A8_UNORM })); // Albedo
+        m_RenderTargets.emplace_back(ResourceManager::GetInstance().CreateRenderTargetTexture(RenderTextureConfig{ renderSize, DXGI_FORMAT_R16G16B16A16_FLOAT })); // World Normal
+        m_RenderTargets.emplace_back(ResourceManager::GetInstance().CreateRenderTargetTexture(RenderTextureConfig{ renderSize, DXGI_FORMAT_R16G16B16A16_FLOAT })); // Object Normal
+        m_RenderTargets.emplace_back(ResourceManager::GetInstance().CreateRenderTargetTexture(RenderTextureConfig{ renderSize, DXGI_FORMAT_R16G16B16A16_FLOAT })); // Metallic, Roughness, AO
+        m_RenderTargets.emplace_back(ResourceManager::GetInstance().CreateRenderTargetTexture(RenderTextureConfig{ renderSize, DXGI_FORMAT_R16G16B16A16_FLOAT })); // Position
+        m_RenderTargets.emplace_back(ResourceManager::GetInstance().CreateRenderTargetTexture(RenderTextureConfig{ renderSize, DXGI_FORMAT_R16G16B16A16_FLOAT })); // Emissive
+        m_RenderTargets.emplace_back(ResourceManager::GetInstance().CreateRenderTargetTexture(RenderTextureConfig{ renderSize, DXGI_FORMAT_R16G16_FLOAT })); // Velocity
+        m_RenderTargets.emplace_back(ResourceManager::GetInstance().CreateDepthMap(RenderTextureConfig{ renderSize, DXGI_FORMAT_R32_FLOAT, DXGI_FORMAT_D32_FLOAT })); // Depth
 
         m_Viewport = { 0.0f, 0.0f, (float)renderSize.x, (float)renderSize.y, 0.0f, 1.0f };
         m_ScissorRect = { 0, 0, (LONG)renderSize.x, (LONG)renderSize.y };
@@ -72,12 +72,10 @@ namespace DX12Engine
 
 		auto dsvHandle = m_RenderTargets[7]->GetTextureDescriptor().GetCPUHandle();
 		m_CommandList.OMSetRenderTargets(7, rtvHandles, false, &dsvHandle);
+
         for (int i = 0; i < 7; i++)
-        {
-			DirectX::XMFLOAT4 rtClearColor = m_RenderTargets[i]->GetClearColor();
-            const float clearColor[] = { rtClearColor.x, rtClearColor.y, rtClearColor.z, rtClearColor.w };
-            m_CommandList.ClearRenderTargetView(rtvHandles[i], clearColor, 0, nullptr);
-        }
+            m_CommandList.ClearRenderTargetView(rtvHandles[i], m_RenderTargets[i]->GetClearColorArray(), 0, nullptr);
+
 		m_CommandList.ClearDepthStencilView(dsvHandle, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
 
         m_CommandList.IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);

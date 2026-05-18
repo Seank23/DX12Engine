@@ -51,6 +51,12 @@ namespace DX12Engine
 
 	void UISystem::BeginFrame(const UIFrameContext& context)
 	{
+		if (m_PendingResize && m_PendingHeight > 0 && m_PendingWidth > 0)
+		{
+			OnResize(m_PendingWidth, m_PendingHeight);
+			m_PendingResize = false;
+		}
+
 		for (auto& backend : m_Backends)
 			if (backend->IsEnabled())
 				backend->BeginFrame(context);
@@ -91,6 +97,13 @@ namespace DX12Engine
 		for (auto& backend : m_Backends)
 			if (backend->IsEnabled())
 				backend->EndFrame();
+	}
+
+	void UISystem::UpdateWindowSize(uint32_t width, uint32_t height)
+	{
+		m_PendingWidth = width;
+		m_PendingHeight = height;
+		m_PendingResize = true;
 	}
 
 	void UISystem::OnResize(uint32_t width, uint32_t height)

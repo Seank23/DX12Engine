@@ -15,6 +15,7 @@ namespace DX12Engine
 		void Init() override;
 		void Execute() override;
 		std::shared_ptr<RenderTexture> GetRenderTarget(ResourceSlot type) override;
+		void OnResize(DirectX::XMINT2 newRenderSize) override;
 
 	private:
 		void CreatePSO() override;

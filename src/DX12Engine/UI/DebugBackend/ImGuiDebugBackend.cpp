@@ -83,11 +83,11 @@ namespace DX12Engine
 			}
 			else if constexpr (std::is_same_v<T, int>)
 			{
-				ImGui::DragInt(name, &value, 1.0f);
+				ImGui::InputInt(name, &value, 1.0f);
 			}
 			else if constexpr (std::is_same_v<T, float>)
 			{
-				ImGui::DragFloat(name, &value, 0.01f);
+				ImGui::InputFloat(name, &value, 0.01f);
 			}
 			else if constexpr (std::is_same_v<T, AntiAliasingMode>)
 			{
@@ -371,8 +371,25 @@ namespace DX12Engine
 		if (!m_FrameStarted) return;
 
 		ImGui::Render();
+		ImDrawData* drawData = ImGui::GetDrawData();
+		if (!drawData)
+			return;
+
+		const float logicalWidth = context.LogicalWidth > 0 ? static_cast<float>(context.LogicalWidth) : drawData->DisplaySize.x;
+		const float logicalHeight = context.LogicalHeight > 0 ? static_cast<float>(context.LogicalHeight) : drawData->DisplaySize.y;
+		if (logicalWidth > 0.0f && logicalHeight > 0.0f)
+			drawData->DisplaySize = ImVec2(logicalWidth, logicalHeight);
+
+		float framebufferScaleX = 1.0f;
+		float framebufferScaleY = 1.0f;
+		if (logicalWidth > 0.0f)
+			framebufferScaleX = context.Viewport.Width / logicalWidth;
+		if (logicalHeight > 0.0f)
+			framebufferScaleY = context.Viewport.Height / logicalHeight;
+		drawData->FramebufferScale = ImVec2(framebufferScaleX, framebufferScaleY);
+
 		context.CommandList->SetDescriptorHeaps(1, m_ImGuiSrvHeap.GetAddressOf());
-		ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), context.CommandList);
+		ImGui_ImplDX12_RenderDrawData(drawData, context.CommandList);
 	}
 
 	void ImGuiDebugBackend::EndFrame()

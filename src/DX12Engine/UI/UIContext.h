@@ -29,6 +29,8 @@ namespace DX12Engine
 		D3D12_VIEWPORT Viewport;
 		D3D12_RECT ScissorRect;
 		DXGI_FORMAT RenderTargetFormat;
+		uint32_t LogicalWidth = 0;
+		uint32_t LogicalHeight = 0;
 	};
 
 	struct UIDebugSnapshot

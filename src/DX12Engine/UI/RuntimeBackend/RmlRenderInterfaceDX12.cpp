@@ -129,6 +129,8 @@ namespace DX12Engine
 		m_CommandList = nullptr;
 		m_Device = nullptr;
 		m_RenderContext = nullptr;
+		m_LogicalWidth = 0.0f;
+		m_LogicalHeight = 0.0f;
 		m_TransientVertexBufferSize = 0;
 		m_TransientIndexBufferSize = 0;
 		m_TransientVertexOffset = 0;
@@ -152,6 +154,8 @@ namespace DX12Engine
 		m_DefaultScissor = context.ScissorRect;
 		m_CurrentRTV = context.RenderTargetView;
 		m_CurrentRenderTargetFormat = context.RenderTargetFormat;
+		m_LogicalWidth = context.LogicalWidth > 0 ? static_cast<float>(context.LogicalWidth) : m_CurrentViewport.Width;
+		m_LogicalHeight = context.LogicalHeight > 0 ? static_cast<float>(context.LogicalHeight) : m_CurrentViewport.Height;
 		ResetTransientBufferOffsets();
 		m_ConstantBufferOffset = 0;
 		m_FrameTextureTableCache.clear();
@@ -553,8 +557,8 @@ namespace DX12Engine
 		if (m_ConstantBufferOffset + kAlignedConstantSize > m_ConstantBufferSize)
 			return;
 
-		const float width = (std::max)(1.0f, m_CurrentViewport.Width);
-		const float height = (std::max)(1.0f, m_CurrentViewport.Height);
+		const float width = (std::max)(1.0f, m_LogicalWidth);
+		const float height = (std::max)(1.0f, m_LogicalHeight);
 		const Rml::Matrix4f projection = Rml::Matrix4f::ProjectOrtho(0.0f, width, height, 0.0f, -10000.0f, 10000.0f);
 		const Rml::Matrix4f combined = m_HasTransform ? (projection * m_CurrentTransform) : projection;
 
@@ -621,10 +625,18 @@ namespace DX12Engine
 		D3D12_RECT scissorRect = m_DefaultScissor;
 		if (m_ScissorEnabled)
 		{
-			scissorRect.left = (std::max)(m_DefaultScissor.left, static_cast<LONG>(m_ScissorRegion.Left()));
-			scissorRect.top = (std::max)(m_DefaultScissor.top, static_cast<LONG>(m_ScissorRegion.Top()));
-			scissorRect.right = (std::min)(m_DefaultScissor.right, static_cast<LONG>(m_ScissorRegion.Right()));
-			scissorRect.bottom = (std::min)(m_DefaultScissor.bottom, static_cast<LONG>(m_ScissorRegion.Bottom()));
+			const float scaleX = m_LogicalWidth > 0.0f ? m_CurrentViewport.Width / m_LogicalWidth : 1.0f;
+			const float scaleY = m_LogicalHeight > 0.0f ? m_CurrentViewport.Height / m_LogicalHeight : 1.0f;
+
+			const LONG logicalLeft = static_cast<LONG>(std::floor(static_cast<float>(m_ScissorRegion.Left()) * scaleX));
+			const LONG logicalTop = static_cast<LONG>(std::floor(static_cast<float>(m_ScissorRegion.Top()) * scaleY));
+			const LONG logicalRight = static_cast<LONG>(std::ceil(static_cast<float>(m_ScissorRegion.Right()) * scaleX));
+			const LONG logicalBottom = static_cast<LONG>(std::ceil(static_cast<float>(m_ScissorRegion.Bottom()) * scaleY));
+
+			scissorRect.left = (std::max)(m_DefaultScissor.left, logicalLeft);
+			scissorRect.top = (std::max)(m_DefaultScissor.top, logicalTop);
+			scissorRect.right = (std::min)(m_DefaultScissor.right, logicalRight);
+			scissorRect.bottom = (std::min)(m_DefaultScissor.bottom, logicalBottom);
 			if (scissorRect.right < scissorRect.left)
 				scissorRect.right = scissorRect.left;
 			if (scissorRect.bottom < scissorRect.top)

@@ -78,4 +78,56 @@ namespace DX12Engine
 		RebuildTransientDescriptors();
 		m_QueueManager.GetGraphicsQueue().ResetCommandAllocatorAndList();
 	}
+
+	void RenderPass::RemapInputResources(const std::unordered_map<GPUResource*, std::shared_ptr<GPUResource>>& resourceMap)
+	{
+		if (resourceMap.empty())
+			return;
+
+		for (std::shared_ptr<GPUResource>& inputResource : m_InputResources)
+		{
+			auto remappedResource = resourceMap.find(inputResource.get());
+			if (remappedResource != resourceMap.end())
+				inputResource = remappedResource->second;
+		}
+	}
+
+	void RenderPass::AppendResizeRemap(std::unordered_map<GPUResource*, std::shared_ptr<GPUResource>>& resourceMap) const
+	{
+		for (const auto& [oldResource, newResource] : m_LastResizeRemap)
+			resourceMap[oldResource] = newResource;
+	}
+
+	void RenderPass::OnResize(DirectX::XMINT2 newRenderSize)
+	{
+		std::vector<std::shared_ptr<RenderTexture>> newRenderTargets(m_RenderTargets.size());
+		m_LastResizeRemap.clear();
+
+		for (int i = 0; i < m_RenderTargets.size(); i++)
+		{
+			RenderTextureConfig config = m_RenderTargets[i]->GetConfig();
+			if (!config.ShouldResize || config.Format == DXGI_FORMAT_UNKNOWN)
+			{
+				newRenderTargets[i] = m_RenderTargets[i];
+			}
+			else
+			{
+				config.Dimensions = DirectX::XMINT3(newRenderSize.x, newRenderSize.y, config.Dimensions.z);
+
+				if (m_RenderTargets[i]->IsDepth())
+					newRenderTargets[i] = ResourceManager::GetInstance().CreateDepthMap(config);
+				else
+					newRenderTargets[i] = ResourceManager::GetInstance().CreateRenderTargetTexture(config);
+			}
+			m_LastResizeRemap[m_RenderTargets[i].get()] = std::static_pointer_cast<GPUResource>(newRenderTargets[i]);
+		}
+
+		RemapInputResources(m_LastResizeRemap);
+		m_RenderTargets = std::move(newRenderTargets);
+
+		m_Viewport.Width = (float)newRenderSize.x;
+		m_Viewport.Height = (float)newRenderSize.y;
+		m_ScissorRect.right = (LONG)newRenderSize.x;
+		m_ScissorRect.bottom = (LONG)newRenderSize.y;
+	}
 }
