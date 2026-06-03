@@ -54,5 +54,6 @@ namespace DX12Engine
 		TAASettings TAA;
 		CSMSettings CSM;
 		bool EnableGammaCorrection = true;
+		bool EnableFrustumCulling = true;
 	};
 }

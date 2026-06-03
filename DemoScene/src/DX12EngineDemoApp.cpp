@@ -230,6 +230,7 @@ namespace DX12EngineDemo
 		DX12Engine::UIDebugSnapshot snapshot;
 		snapshot.FrameTimeMs = ts * 1000;
 		snapshot.FPS = 1.0f / ts;
+		snapshot.DrawnPrimitiveCount = m_Renderer->GetLastDrawnPrimitiveCount();
 		snapshot.CameraPosition = m_Scene->GetCamera()->GetPosition();
 		snapshot.RendererOptions = &m_Renderer->GetOptions();
 		snapshot.ApplyRendererOptions = [this](DX12Engine::RendererOptions* options) { ApplyRendererOptions(options); };

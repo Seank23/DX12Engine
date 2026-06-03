@@ -1,7 +1,6 @@
 #pragma once
 #include "DirectXMath.h"
-#include <unordered_map>
-#include <string>
+#include <DirectXCollision.h>
 #include "InputController.h"
 
 namespace DX12Engine
@@ -32,6 +31,9 @@ namespace DX12Engine
 		void SetPosition(DirectX::XMFLOAT3 position);
 		void SetRotation(float pitch, float yaw);
 
+		void SetFrustum(const DirectX::BoundingFrustum& frustum) { m_Frustum = frustum; }
+		DirectX::BoundingFrustum& GetFrustum() { return m_Frustum; }
+
 	private:
 		void UpdateProjectionMatrix();
 		void UpdateViewMatrix();
@@ -51,6 +53,8 @@ namespace DX12Engine
 
 		DirectX::XMMATRIX m_ViewMatrix;
 		DirectX::XMMATRIX m_ProjectionMatrix;
+
+		DirectX::BoundingFrustum m_Frustum;
 	};
 }
 

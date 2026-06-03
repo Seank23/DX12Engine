@@ -37,6 +37,7 @@ namespace DX12Engine
 	{
 		float FrameTimeMs;
 		float FPS;
+		uint32_t DrawnPrimitiveCount;
 		DirectX::XMFLOAT3 CameraPosition;
 		RendererOptions* RendererOptions = nullptr;
 		std::function<void(DX12Engine::RendererOptions*)> ApplyRendererOptions;

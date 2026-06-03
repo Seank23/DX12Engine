@@ -2,6 +2,7 @@
 #include "../Rendering/Buffers/IndexBuffer.h"
 #include "../Rendering/Buffers/VertexBuffer.h"
 #include <DirectXMath.h>
+#include <DirectXCollision.h>
 #include <algorithm>
 #include <cstdint>
 #include <memory>
@@ -185,8 +186,36 @@ namespace DX12Engine
         void SetMaterialIndex(UINT materialIndex) { m_MaterialIndex = materialIndex; }
         UINT GetMaterialIndex() const { return m_MaterialIndex; }
 
-        void SetBounds(const MeshBounds& bounds) { m_Bounds = bounds; }
+        void SetBounds(const MeshBounds& bounds) 
+        { 
+            m_Bounds = bounds;
+			DirectX::XMFLOAT3 center = {
+				(bounds.Min.x + bounds.Max.x) * 0.5f,
+				(bounds.Min.y + bounds.Max.y) * 0.5f,
+				(bounds.Min.z + bounds.Max.z) * 0.5f
+			};
+			DirectX::XMFLOAT3 extents = {
+				(bounds.Max.x - bounds.Min.x) * 0.5f,
+				(bounds.Max.y - bounds.Min.y) * 0.5f,
+				(bounds.Max.z - bounds.Min.z) * 0.5f
+			};
+			m_BoundingBox = DirectX::BoundingBox(center, extents);
+        }
         const MeshBounds& GetBounds() const { return m_Bounds; }
+        const DirectX::BoundingBox& GetBoundingBox() const { return m_BoundingBox; }
+
+        void ComputeOrientedBoundingBox(const DirectX::XMMATRIX& modelMatrix)
+        {
+            if (m_Bounds.Min.x == m_Bounds.Max.x && m_Bounds.Min.y == m_Bounds.Max.y && m_Bounds.Min.z == m_Bounds.Max.z)
+            {
+                m_OrientedBoundingBox = DirectX::BoundingOrientedBox(DirectX::XMFLOAT3(0, 0, 0), DirectX::XMFLOAT3(0, 0, 0), DirectX::XMFLOAT4(0, 0, 0, 1));
+                return;
+            }
+            DirectX::BoundingOrientedBox localOrientedBox;
+            DirectX::BoundingOrientedBox::CreateFromBoundingBox(localOrientedBox, m_BoundingBox);
+            localOrientedBox.Transform(m_OrientedBoundingBox, modelMatrix);
+        }
+		const DirectX::BoundingOrientedBox& GetOrientedBoundingBox() const { return m_OrientedBoundingBox; }
 
         bool HasGeometry() const
         {
@@ -212,6 +241,8 @@ namespace DX12Engine
         INT m_BaseVertex = 0;
         UINT m_MaterialIndex = 0;
         MeshBounds m_Bounds;
+		DirectX::BoundingBox m_BoundingBox;
+		DirectX::BoundingOrientedBox m_OrientedBoundingBox;
         UINT m_ActiveLODLevel = 0;
     };
 }

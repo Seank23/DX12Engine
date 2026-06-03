@@ -16,7 +16,7 @@
 #include "../Entity/RenderComponent.h"
 #include "../Asset/MeshPrimitive.h"
 #include "DrawItem.h"
-#include "../UI/UISystem.h"
+#include "Utils/FrustumCulling.h"
 
 #include <array>
 #include <algorithm>
@@ -373,9 +373,13 @@ namespace DX12Engine
 		Camera* sceneCamera = m_CurrentScene->GetCamera();
 		LightBuffer* lightBuffer = m_CurrentScene->GetLightBuffer();
 
+		DirectX::XMMATRIX cameraView = sceneCamera->GetViewMatrix();
+		DirectX::XMMATRIX cameraProj = sceneCamera->GetProjectionMatrix();
+		sceneCamera->SetFrustum(FrustumCulling::BuildFrustum(cameraProj, cameraView));
+
 		if (m_Options.AA_Mode == AntiAliasingMode::TAA)
 		{
-			m_JitteredProjection = UpdateFrameJitter(sceneCamera ? sceneCamera->GetProjectionMatrix() : DirectX::XMMatrixIdentity(), m_RenderContext->GetRenderSize());
+			m_JitteredProjection = UpdateFrameJitter(sceneCamera ? cameraProj : DirectX::XMMatrixIdentity(), m_RenderContext->GetRenderSize());
 			float jitterScale = (1.0f / frameTime) / 120.0f; // scale jitter based on frame time to maintain stability across varying frame rates
 			m_Jitter.x *= jitterScale;
 			m_Jitter.y *= jitterScale;
@@ -383,6 +387,7 @@ namespace DX12Engine
 
 		std::vector<DrawItem> geometryPassDrawItems;
 		std::vector<DrawItem> transparentPassDrawItems;
+		std::vector<DrawItem> shadowPassDrawItems;
 		std::unordered_set<const ResolvedPrimitiveBinding*> liveBindings;
 		for (auto& comp : renderComponents)
 		{
@@ -395,28 +400,28 @@ namespace DX12Engine
 
 				MaterialTemplate* tmpl = binding.MaterialAsset ? binding.MaterialAsset->GetTemplate() : nullptr;
 				Material* material = binding.MaterialAsset ? binding.MaterialAsset->GetMaterial() : nullptr;
-				if (!material || !binding.PrimitiveConstantBuffer)
+				if (!material || !binding.PrimitiveConstantBuffer || !binding.Primitive)
 					continue;
 
 				DirectX::XMMATRIX nodeWorldTransform = DirectX::XMLoadFloat4x4(&binding.NodeWorldTransform);
 				DirectX::XMMATRIX modelMatrix = nodeWorldTransform * comp->GetModelMatrix();
+
+				binding.Primitive->ComputeOrientedBoundingBox(modelMatrix);
+
 				UINT selectedLodLevel = 0;
-				if (binding.Primitive)
-				{
-					const auto currentLodIt = m_BindingActiveLods.find(&binding);
-					const UINT currentLod = currentLodIt == m_BindingActiveLods.end() ? 0 : currentLodIt->second;
-					const float screenMetric = ComputePrimitiveScreenMetric(binding.Primitive, modelMatrix, sceneCamera);
-					selectedLodLevel = SelectLodLevelWithHysteresis(binding.Primitive->GetLODCount(), screenMetric, currentLod);
-					if (!binding.Primitive->SetActiveLOD(selectedLodLevel))
-						binding.Primitive->SetActiveLOD(0);
+				const auto currentLodIt = m_BindingActiveLods.find(&binding);
+				const UINT currentLod = currentLodIt == m_BindingActiveLods.end() ? 0 : currentLodIt->second;
+				const float screenMetric = ComputePrimitiveScreenMetric(binding.Primitive, modelMatrix, sceneCamera);
+				selectedLodLevel = SelectLodLevelWithHysteresis(binding.Primitive->GetLODCount(), screenMetric, currentLod);
+				if (!binding.Primitive->SetActiveLOD(selectedLodLevel))
+					binding.Primitive->SetActiveLOD(0);
 
-					selectedLodLevel = binding.Primitive->GetActiveLODLevel();
-					m_BindingActiveLods[&binding] = selectedLodLevel;
-				}
+				selectedLodLevel = binding.Primitive->GetActiveLODLevel();
+				m_BindingActiveLods[&binding] = selectedLodLevel;
 
-				DirectX::XMMATRIX unjitteredProjectionMatrix = sceneCamera->GetProjectionMatrix();
+				DirectX::XMMATRIX unjitteredProjectionMatrix = cameraProj;
 				DirectX::XMMATRIX projectionMatrix = (m_Options.AA_Mode == AntiAliasingMode::TAA) ? m_JitteredProjection : unjitteredProjectionMatrix;
-				comp->UpdateConstantBufferData(binding, modelMatrix, sceneCamera->GetViewMatrix(), projectionMatrix, unjitteredProjectionMatrix, sceneCamera->GetPosition());
+				comp->UpdateConstantBufferData(binding, modelMatrix, cameraView, projectionMatrix, unjitteredProjectionMatrix, sceneCamera->GetPosition());
 
 				auto currentShaderGeneration = ResourceManager::GetInstance().GetShaderGeneration();
 				bool reloadPSO = m_LocalShaderGeneration != currentShaderGeneration;
@@ -442,11 +447,6 @@ namespace DX12Engine
 
 				if (item.IndexCount == 0) continue;
 
-				if (item.BlendMode == AlphaMode::Blend)
-					transparentPassDrawItems.push_back(item);
-				else
-					geometryPassDrawItems.push_back(item);
-
 				for (int i = 0; i < 5; i++)
 				{
 					Texture* texture = material->GetTexture(static_cast<TextureType>(i));
@@ -456,6 +456,20 @@ namespace DX12Engine
 					auto insertResult = queuedTextures.insert(texture);
 					if (insertResult.second)
 						texturesToUpload.push_back(texture);
+				}
+
+				shadowPassDrawItems.push_back(item);
+
+				if (!m_Options.EnableFrustumCulling || sceneCamera->GetFrustum().Intersects(binding.Primitive->GetOrientedBoundingBox()))
+				{
+					if (item.BlendMode == AlphaMode::Blend)
+						transparentPassDrawItems.push_back(item);
+					else
+						geometryPassDrawItems.push_back(item);
+				}
+				else
+				{
+					binding.HasValidPrevUnjitteredMVP = false;
 				}
 			}
 		}
@@ -475,8 +489,16 @@ namespace DX12Engine
 		std::sort(geometryPassDrawItems.begin(), geometryPassDrawItems.end(), [](const DrawItem& a, const DrawItem& b)
 		{
 			if (a.PipelineKey != b.PipelineKey) return a.PipelineKey < b.PipelineKey;
-			if (a.MaterialKey  != b.MaterialKey)  return a.MaterialKey  < b.MaterialKey;
-			if (a.MeshKey      != b.MeshKey)      return a.MeshKey      < b.MeshKey;
+			if (a.MaterialKey != b.MaterialKey) return a.MaterialKey < b.MaterialKey;
+			if (a.MeshKey != b.MeshKey) return a.MeshKey < b.MeshKey;
+			return a.CBVAddress < b.CBVAddress;
+		});
+
+		std::sort(shadowPassDrawItems.begin(), shadowPassDrawItems.end(), [](const DrawItem& a, const DrawItem& b)
+		{
+			if (a.PipelineKey != b.PipelineKey) return a.PipelineKey < b.PipelineKey;
+			if (a.MaterialKey != b.MaterialKey) return a.MaterialKey < b.MaterialKey;
+			if (a.MeshKey != b.MeshKey) return a.MeshKey < b.MeshKey;
 			return a.CBVAddress < b.CBVAddress;
 		});
 
@@ -497,6 +519,8 @@ namespace DX12Engine
 			return distSqA > distSqB; // back-to-front
 		});
 
+		m_DrawnPrimitiveCount = static_cast<uint32_t>(geometryPassDrawItems.size() + transparentPassDrawItems.size());
+
 		for (auto& renderPass : pipeline.RenderPasses)
 		{
 			renderPass->SetRenderObjects(renderComponents);
@@ -508,12 +532,12 @@ namespace DX12Engine
 				break;
 			case RenderPassType::ShadowMap:
 			case RenderPassType::CubeShadowMap:
-				static_cast<ShadowMapRenderPass*>(renderPass)->SetDrawItems(geometryPassDrawItems);
+				static_cast<ShadowMapRenderPass*>(renderPass)->SetDrawItems(shadowPassDrawItems);
 				break;
 			case RenderPassType::CascadedShadowMap:
 			{
 				CascadedShadowMapRenderPass* csmPass = static_cast<CascadedShadowMapRenderPass*>(renderPass);
-				csmPass->SetDrawItems(geometryPassDrawItems);
+				csmPass->SetDrawItems(shadowPassDrawItems);
 				csmPass->SetSettings(m_Options.CSM);
 				break;
 			}

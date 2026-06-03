@@ -54,6 +54,8 @@ namespace DX12Engine
 		void SetOptions(RendererOptions options);
 		RendererOptions& GetOptions() { return m_Options; }
 
+		uint32_t GetLastDrawnPrimitiveCount() const { return m_DrawnPrimitiveCount; }
+
 	private:
 		void SetSceneData(RenderPipeline pipeline, float frameTime);
 		void PresentFrame(RenderTexture* finalRenderTarget);
@@ -87,6 +89,8 @@ namespace DX12Engine
 
 		uint64_t m_LocalShaderGeneration = 0;
 		std::unordered_map<const ResolvedPrimitiveBinding*, UINT> m_BindingActiveLods;
+
+		uint32_t m_DrawnPrimitiveCount = 0;
 	};
 }
 

@@ -139,7 +139,8 @@ namespace DX12Engine
 			#define RENDERER_SCALAR_FIELDS(X) \
 				X(float, RenderScale) \
 				X(AntiAliasingMode, AA_Mode) \
-				X(bool, EnableGammaCorrection)
+				X(bool, EnableGammaCorrection) \
+				X(bool, EnableFrustumCulling)
 
 			#define RENDERER_NESTED_FIELDS(X) \
 				X(TAA, DrawTAASettings) \
@@ -430,6 +431,7 @@ namespace DX12Engine
 		UIDebugSnapshot snapshot = m_FrameContext->DebugSnapshot;
 		ImGui::Text(std::format("FPS: {0:.2f}", snapshot.FPS).c_str());
 		ImGui::Text(std::format("Frame time: {0:.2f}ms", snapshot.FrameTimeMs).c_str());
+		ImGui::Text(std::format("Drawn primitives: {0}", snapshot.DrawnPrimitiveCount).c_str());
 		auto cameraPos = snapshot.CameraPosition;
 		ImGui::Text(std::format("Camera Pos: x: {0:.2f}, y: {1:.2f}, z: {2:.2f}", cameraPos.x, cameraPos.y, cameraPos.z).c_str());
 
