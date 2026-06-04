@@ -13,7 +13,7 @@
 #include "../Rendering/Buffers/VertexBuffer.h"
 #include "../Rendering/Buffers/IndexBuffer.h"
 #include "../Rendering/Buffers/ConstantBuffer.h"
-#include "../Resources/Mesh.h"
+#include "../Asset/Vertex.h"
 #include "../Resources/Texture.h"
 #include "../Resources/RenderTexture.h"
 #include "../Rendering/Heaps/DescriptorHeapManager.h"
@@ -22,6 +22,7 @@
 #include "../Rendering/PipelineStateCache.h"
 #include "../Rendering/RootSignatureCache.h"
 #include "../IO/TextureLoader.h"
+#include "Materials/PBRMaterial.h"
 
 namespace DX12Engine
 {
@@ -40,15 +41,22 @@ namespace DX12Engine
 		~ResourceManager();
 
 	public:
+		Material* GetDefaultMaterial() const { return m_DefaultMaterial.get(); }
+		static DescriptorHeapManager* TryGetHeapManager();
+
 		std::unique_ptr<VertexBuffer> CreateVertexBuffer(const std::vector<Vertex>& vertices);
 		std::unique_ptr<IndexBuffer> CreateIndexBuffer(const std::vector<UINT>& indices);
 		std::unique_ptr<ConstantBuffer> CreateConstantBuffer(const UINT bufferSize);
-		std::unique_ptr<Texture> CreateTexture(const DirectX::ScratchImage* imageData);
-		std::unique_ptr<Texture> CreateCubeMap(const DirectX::ScratchImage* imageData);
-		std::unique_ptr<RenderTexture> CreateDepthMap(DirectX::XMINT3 dimensions, DXGI_FORMAT dsvFormat, DXGI_FORMAT srvFormat, bool isCubeMap = false);
-		std::unique_ptr<RenderTexture> CreateRenderTargetTexture(DirectX::XMINT2 dimensions, DXGI_FORMAT format, UINT mipLevels = 1, DirectX::XMFLOAT4 clearColor = { 0.0f, 0.0f, 0.0f, 1.0f });
+		std::unique_ptr<Texture> CreateTexture(DirectX::ScratchImage* imageData);
+		std::unique_ptr<Texture> CreateCubeMap(DirectX::ScratchImage* imageData);
+		std::unique_ptr<Texture> CreateDefaultCubeMap();
+		std::unique_ptr<RenderTexture> CreateDepthMap(RenderTextureConfig config);
+		std::unique_ptr<RenderTexture> CreateRenderTargetTexture(RenderTextureConfig config);
 
-		void UpdateSRVDescriptors(std::vector<GPUResource*> resources);
+		// Returns the base DescriptorHeapHandle of the allocated transient block so
+		// callers can compute per-block GPU handles via offset arithmetic instead of
+		// reading back from individual resource descriptors (which other passes clobber).
+		DescriptorHeapHandle UpdateSRVDescriptors(std::vector<GPUResource*> resources);
 
 		Microsoft::WRL::ComPtr<ID3D12PipelineState> CreatePipelineState(const D3D12_GRAPHICS_PIPELINE_STATE_DESC& desc);
 		Microsoft::WRL::ComPtr<ID3D12RootSignature> CreateRootSignature(const D3D12_ROOT_SIGNATURE_DESC& desc);
@@ -59,6 +67,13 @@ namespace DX12Engine
 		static std::wstring GetMaterialPath(std::string path) { return L"res/Materials/" + std::wstring(path.begin(), path.end()); }
 		static std::string GetModelPath(std::string path) { return "res/Models/" + path; }
 		static std::string GetShaderPath(std::string path) { return "res/Shaders/" + path; }
+		static std::string GetShaderFolder() { return "res/Shaders/"; }
+		static std::string GetCookedModelPath(std::string assetName) { return "res/Models/" + assetName; }
+		static std::string GetCookedModelLodsPath(const std::string& modelName) { return GetCookedModelPath(modelName) + "/lods.json"; }
+		static std::string GetCookedModelLodsFolder(const std::string& modelName) { return GetCookedModelPath(modelName) + "/LODs"; }
+
+		bool ReloadChangedShaders();
+		uint64_t GetShaderGeneration() const { return m_ShaderGeneration; }
 
 	private:
 		Microsoft::WRL::ComPtr<ID3D12Device> m_Device;
@@ -67,6 +82,9 @@ namespace DX12Engine
 		std::unique_ptr<PipelineStateCache> m_PipelineStateCache;
 		std::unique_ptr<RootSignatureCache> m_RootSignatureCache;
 		std::unordered_map<std::string, std::unique_ptr<Shader>> m_Shaders;
+		std::unique_ptr<PBRMaterial> m_DefaultMaterial;
+
+		uint64_t m_ShaderGeneration = 0; // Incremented each time a shader is reloaded so dependent PSOs can be invalidated
 	};
 }
 

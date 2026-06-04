@@ -59,7 +59,42 @@ namespace DX12Engine
 			HashCombine(seed, desc.Flags);
 			for (UINT i = 0; i < desc.NumParameters; ++i)
 			{
-				HashCombine(seed, desc.pParameters[i].ParameterType);
+				const auto& param = desc.pParameters[i];
+				HashCombine(seed, param.ParameterType);
+				HashCombine(seed, param.ShaderVisibility);
+				if (param.ParameterType == D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE)
+				{
+					HashCombine(seed, param.DescriptorTable.NumDescriptorRanges);
+					for (UINT r = 0; r < param.DescriptorTable.NumDescriptorRanges; ++r)
+					{
+						const auto& range = param.DescriptorTable.pDescriptorRanges[r];
+						HashCombine(seed, range.RangeType);
+						HashCombine(seed, range.NumDescriptors);
+						HashCombine(seed, range.BaseShaderRegister);
+						HashCombine(seed, range.RegisterSpace);
+					}
+				}
+				else if (param.ParameterType == D3D12_ROOT_PARAMETER_TYPE_CBV ||
+				         param.ParameterType == D3D12_ROOT_PARAMETER_TYPE_SRV ||
+				         param.ParameterType == D3D12_ROOT_PARAMETER_TYPE_UAV)
+				{
+					HashCombine(seed, param.Descriptor.ShaderRegister);
+					HashCombine(seed, param.Descriptor.RegisterSpace);
+				}
+				else if (param.ParameterType == D3D12_ROOT_PARAMETER_TYPE_32BIT_CONSTANTS)
+				{
+					HashCombine(seed, param.Constants.ShaderRegister);
+					HashCombine(seed, param.Constants.RegisterSpace);
+					HashCombine(seed, param.Constants.Num32BitValues);
+				}
+			}
+			for (UINT i = 0; i < desc.NumStaticSamplers; ++i)
+			{
+				const auto& s = desc.pStaticSamplers[i];
+				HashCombine(seed, s.ShaderRegister);
+				HashCombine(seed, s.RegisterSpace);
+				HashCombine(seed, s.Filter);
+				HashCombine(seed, s.ComparisonFunc);
 			}
 			return seed;
 		}

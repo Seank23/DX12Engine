@@ -29,15 +29,23 @@ namespace DX12Engine
         UpdateViewProjMatrix();
     }
 
+    void Light::SetRange(float range)
+    {
+        m_LightData.Range = range;
+        UpdateViewProjMatrix();
+	}
+
     float Light::GetFarPlane()
     {
         switch (GetType())
         {
         case LightType::Directional:
-            return 20.0f;
+            return 50.0f;
         case LightType::Point:
-            return 20.0f;
+            return m_LightData.Range;
         case LightType::Spot:
+            return 50.0f;
+        default:
             return 50.0f;
         }
     }
@@ -49,13 +57,14 @@ namespace DX12Engine
         DirectX::XMMATRIX lightView;
         DirectX::XMMATRIX lightProj;
         DirectX::XMFLOAT3 centre(0.0f, 0.0f, 0.0f);
+        m_LightData.Padding.x = GetFarPlane();
         switch (m_LightData.Type)
         {
         case (int)LightType::Directional:
             lightDir = DirectX::XMVector3Normalize(DirectX::XMLoadFloat3(&m_LightData.Direction));
-            lightPos = DirectX::XMVectorSubtract(DirectX::XMLoadFloat3(&centre), DirectX::XMVectorScale(lightDir, 10.0f));
+            lightPos = DirectX::XMVectorSubtract(DirectX::XMLoadFloat3(&centre), DirectX::XMVectorScale(lightDir, 20.0f));
             lightView = DirectX::XMMatrixLookAtLH(lightPos, DirectX::XMLoadFloat3(&centre), UpDirection);
-            lightProj = DirectX::XMMatrixOrthographicLH(15.0f, 15.0f, 1.0f, GetFarPlane());
+            lightProj = DirectX::XMMatrixOrthographicLH(20.0f, 20.0f, 0.1f, GetFarPlane());
             m_LightData.ViewProjMatrix = DirectX::XMMatrixMultiply(lightView, lightProj);
             break;
         case (int)LightType::Spot:

@@ -1,29 +1,32 @@
-cbuffer ConstantBuffer : register(b0)
+cbuffer ObjectData : register(b0)
 {
     float4x4 ModelMatrix;
     float4x4 NormalMatrix;
     float4x4 ViewMatrix;
     float4x4 ProjectionMatrix;
     float4x4 MVPMatrix;
-    float4x4 InvViewMatrix;
-    float4x4 InvProjectionMatrix;
     float3 CameraPosition;
+    float Padding;
+    float4x4 PrevMVPMatrix;
+    float4x4 UnjitteredMVPMatrix;
 };
 
 struct VSInput
 {
     float3 position : POSITION;
-    float3 normal : NORMAL;
+    float3 normal   : NORMAL;
     float2 texCoord : TEXCOORD;
-    float3 tangent : TANGENT;
+    float4 tangent  : TANGENT; // xyz = tangent, w = handedness sign
 };
 
 struct VSOutput
 {
-    float4 position : SV_POSITION;
-    float3 worldPos : TEXCOORD0;
-    float3 normal : TEXCOORD1;
-    float2 uv : TEXCOORD2;
+    float4 currentPosition : SV_POSITION;
+    float4 currentClip : TEXCOORD0;
+    float4 prevClip : TEXCOORD1;
+    float3 worldPos : TEXCOORD2;
+    float3 normal : TEXCOORD3;
+    float2 uv : TEXCOORD4;
     float3 tangent : TANGENT;
     float3 bitangent : BITANGENT;
 };
@@ -32,12 +35,17 @@ VSOutput main(VSInput input)
 {
     VSOutput output;
     float4 worldPosition = mul(ModelMatrix, float4(input.position, 1.0f));
-    output.position = mul(MVPMatrix, float4(input.position, 1.0f));
+    float4 rasterClip = mul(MVPMatrix, float4(input.position, 1.0f));
+    float4 currentClip = mul(UnjitteredMVPMatrix, float4(input.position, 1.0f));
+    output.currentPosition = rasterClip;
+    output.currentClip = currentClip;
+    output.prevClip = mul(PrevMVPMatrix, float4(input.position, 1.0f));
     output.worldPos = worldPosition.xyz;
-    output.normal = normalize(mul(NormalMatrix, float4(input.normal, 0.0f)).xyz);
-    output.uv = input.texCoord;
-    float4 tangent = normalize(mul(ModelMatrix, float4(input.tangent, 1.0)));
-    output.tangent = tangent.xyz / tangent.w;
-    output.bitangent = cross(output.tangent, output.normal);
+    output.normal   = normalize(mul(NormalMatrix, float4(input.normal, 0.0f)).xyz);
+    output.uv       = input.texCoord;
+    float3 t        = normalize(mul((float3x3) ModelMatrix, input.tangent.xyz));
+    output.tangent   = t;
+    // Reconstruct bitangent with handedness sign so mirrored UVs flip correctly.
+    output.bitangent = cross(output.normal, t) * input.tangent.w;
     return output;
 }

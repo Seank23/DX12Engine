@@ -1,6 +1,11 @@
 #include <stdexcept>
 #include <string>
-#include <comdef.h>
+#include <sstream>
+#include <iomanip>
+#include <vector>
+#include <cmath>
+#define NOMINMAX
+#include <windows.h>
 #include <DirectXMath.h>
 
 namespace DX12Engine
@@ -8,13 +13,42 @@ namespace DX12Engine
 	class EngineUtils
 	{
 	public:
+		static std::string FormatHRESULT(HRESULT hr)
+		{
+			std::ostringstream oss;
+			oss << "HRESULT 0x" << std::hex << std::uppercase << static_cast<unsigned long>(hr);
+
+			LPSTR messageBuffer = nullptr;
+			DWORD messageLength = FormatMessageA(
+				FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,
+				nullptr,
+				static_cast<DWORD>(hr),
+				MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
+				reinterpret_cast<LPSTR>(&messageBuffer),
+				0,
+				nullptr);
+
+			if (messageLength > 0 && messageBuffer)
+			{
+				while (messageLength > 0 && (messageBuffer[messageLength - 1] == '\r' || messageBuffer[messageLength - 1] == '\n'))
+					messageLength--;
+
+				oss << ": " << std::string(messageBuffer, messageLength);
+				LocalFree(messageBuffer);
+			}
+			else if (messageBuffer)
+			{
+				LocalFree(messageBuffer);
+			}
+
+			return oss.str();
+		}
+
 		static void ThrowIfFailed(HRESULT hr)
 		{
 			if (FAILED(hr))
 			{
-				_com_error err(hr);
-				std::string errMsg = err.ErrorMessage();
-				throw std::runtime_error(std::string(errMsg.begin(), errMsg.end()));
+				throw std::runtime_error(FormatHRESULT(hr));
 			}
 		}
 

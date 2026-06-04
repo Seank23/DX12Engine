@@ -19,23 +19,25 @@ namespace DX12Engine
 
 	void DebugRenderPass::Init()
 	{
-		DirectX::XMINT2 windowSize = m_RenderContext.GetWindowSize();
-		m_RenderTargets.emplace_back(ResourceManager::GetInstance().CreateRenderTargetTexture(DirectX::XMINT2(windowSize.x, windowSize.y), DXGI_FORMAT_R8G8B8A8_UNORM));
+		DirectX::XMINT3 renderSize{m_RenderContext.GetRenderSize().x, m_RenderContext.GetRenderSize().y, 1};
+		m_RenderTargets.emplace_back(ResourceManager::GetInstance().CreateRenderTargetTexture(RenderTextureConfig{ renderSize, DXGI_FORMAT_R8G8B8A8_UNORM }));
 
 		ResourceManager::GetInstance().UpdateSRVDescriptors(EngineUtils::VectorSharedPtrToPtrs(m_InputResources));
 		ResourceManager::GetInstance().UpdateSRVDescriptors(reinterpret_cast<std::vector<GPUResource*> const&>(m_RenderTargets));
 		AddDescriptorTableConfig({ (UINT)m_InputResources.size(), D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 0 });
 
-		m_Viewport = { 0.0f, 0.0f, (float)windowSize.x, (float)windowSize.y, -1.0f, 1.0f };
-		m_ScissorRect = { 0, 0, (LONG)windowSize.x, (LONG)windowSize.y };
+		m_Viewport = { 0.0f, 0.0f, (float)renderSize.x, (float)renderSize.y, -1.0f, 1.0f };
+		m_ScissorRect = { 0, 0, (LONG)renderSize.x, (LONG)renderSize.y };
+
+		CreatePSO();
 	}
 
 	void DebugRenderPass::Execute()
 	{
 		RenderTexture* renderTarget = m_RenderTargets[0].get();
 
-		if (!m_RenderContext.GetUploader().UploadAllPending()) // Upload any pending resources
-			m_QueueManager.GetGraphicsQueue().ResetCommandAllocatorAndList();
+		m_RenderContext.GetUploader().UploadAllPending(); // Upload any pending resources
+		m_QueueManager.GetGraphicsQueue().ResetCommandAllocatorAndList();
 
 		m_CommandList.SetPipelineState(m_PipelineState.Get());
 		m_CommandList.SetGraphicsRootSignature(m_RootSignature.Get());
@@ -61,11 +63,11 @@ namespace DX12Engine
 		m_CommandList.SetDescriptorHeaps(1, &srvHeap);
 
 		int startIndex = 0;
-		for (int i = 0; i < m_DescriptorTableConfigs.size(); i++)
+		/*for (int i = 0; i < m_DescriptorTableConfigs.size(); i++)
 		{
 			int resourceIndex = m_DescriptorTableConfigs[i].BaseShaderRegister;
-			m_CommandList.SetGraphicsRootDescriptorTable(startIndex + i, m_InputResources[resourceIndex]->GetDescriptor()->GetGPUHandle());
-		}
+			m_CommandList.SetGraphicsRootDescriptorTable(startIndex + i, m_InputResources[resourceIndex]->GetTransientDescriptor()->GetGPUHandle());
+		}*/
 
 		m_CommandList.IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 		m_CommandList.DrawInstanced(3, 1, 0, 0);
@@ -78,16 +80,15 @@ namespace DX12Engine
 		m_CommandList.ResourceBarrier(1, &barrier);
 		renderTarget->SetUsageState(D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
 
-		UINT fenceVal = m_QueueManager.GetGraphicsQueue().ExecuteCommandList();
-		m_QueueManager.WaitForFenceCPUBlocking(fenceVal);
+		m_QueueManager.GetGraphicsQueue().ExecuteCommandList();
 	}
 
-	RenderTexture* DebugRenderPass::GetRenderTarget(RenderTargetType type)
+	std::shared_ptr<RenderTexture> DebugRenderPass::GetRenderTarget(ResourceSlot type)
 	{
 		return nullptr;
 	}
 
-	void DebugRenderPass::CreateDebugPassPSO()
+	void DebugRenderPass::CreatePSO()
 	{
 	}
 }

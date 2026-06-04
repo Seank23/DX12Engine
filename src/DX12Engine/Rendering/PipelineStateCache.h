@@ -35,6 +35,8 @@ namespace DX12Engine
             return pso;
         }
 
+		void ClearCache() { m_Cache.clear(); }
+
     private:
         std::unordered_map<size_t, Microsoft::WRL::ComPtr<ID3D12PipelineState>> m_Cache;
         ID3D12Device* m_Device;

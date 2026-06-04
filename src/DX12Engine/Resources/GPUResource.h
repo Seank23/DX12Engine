@@ -21,8 +21,16 @@ namespace DX12Engine
 		void SetIsReady(bool isReady) { m_IsReady = isReady; }
 
 		ID3D12Resource* GetResource() const { return m_Resource; }
-		DescriptorHeapHandle* GetDescriptor() const { return m_Descriptor.get(); }
-		void SetDescriptor(DescriptorHeapHandle& descriptor) { m_Descriptor = std::make_unique<DescriptorHeapHandle>(descriptor); }
+
+		// Transient per-frame descriptor: updated by UpdateSRVDescriptors each frame.
+		// Holds a shader-visible GPU handle valid only for the current frame.
+		DescriptorHeapHandle* GetTransientDescriptor() const { return m_TransientDescriptor.get(); }
+		void SetTransientDescriptor(DescriptorHeapHandle& descriptor) { m_TransientDescriptor = std::make_unique<DescriptorHeapHandle>(descriptor); }
+
+		// Persistent descriptor: set once at resource creation, never overwritten.
+		// Lives in the non-shader-visible staging heap; used as CopyDescriptorsSimple source.
+		DescriptorHeapHandle* GetPersistentDescriptor() const { return m_PersistentDescriptor.get(); }
+		void SetPersistentDescriptor(DescriptorHeapHandle& descriptor) { m_PersistentDescriptor = std::make_unique<DescriptorHeapHandle>(descriptor); }
 
 		D3D12_SHADER_RESOURCE_VIEW_DESC GetSRVDesc() const { return m_SRVDesc; }
 
@@ -30,9 +38,11 @@ namespace DX12Engine
 		ID3D12Resource* m_Resource;
 		D3D12_GPU_VIRTUAL_ADDRESS m_GPUAddress;
 		D3D12_RESOURCE_STATES m_UsageState;
-		std::unique_ptr<DescriptorHeapHandle> m_Descriptor;
+		std::unique_ptr<DescriptorHeapHandle> m_TransientDescriptor;
+		std::unique_ptr<DescriptorHeapHandle> m_PersistentDescriptor;
 		D3D12_SHADER_RESOURCE_VIEW_DESC m_SRVDesc;
 		bool m_IsReady;
 	};
 }
+
 

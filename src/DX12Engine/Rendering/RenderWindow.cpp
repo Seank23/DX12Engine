@@ -1,5 +1,6 @@
 #include "RenderWindow.h"
 #include "../Resources/ResourceManager.h"
+#include "../Utils/EngineUtils.h"
 
 LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 {
@@ -98,10 +99,7 @@ namespace DX12Engine
 	void RenderWindow::CreateDepthStencilBuffer()
 	{
 		m_DepthBuffer = ResourceManager::GetInstance().CreateDepthMap(
-			DirectX::XMINT3(m_WindowSize.x, m_WindowSize.y, 1),
-			DXGI_FORMAT_D24_UNORM_S8_UINT,
-			DXGI_FORMAT_R24_UNORM_X8_TYPELESS,
-			false
+			RenderTextureConfig{ DirectX::XMINT3(m_WindowSize.x, m_WindowSize.y, 1), DXGI_FORMAT_R24_UNORM_X8_TYPELESS, DXGI_FORMAT_D24_UNORM_S8_UINT }
 		);
 	}
 
@@ -145,5 +143,24 @@ namespace DX12Engine
 			}
 		}
 		return true;
+	}
+
+	void RenderWindow::OnResize(DirectX::XMINT2 newSize, ID3D12Device* device)
+	{
+		if (!m_SwapChain || !device)
+			return;
+
+		if (newSize.x <= 0 || newSize.y <= 0)
+			return;
+
+		m_WindowSize = newSize;
+		for (auto& rt : m_RenderTargets)
+			rt.Reset();
+		m_DepthBuffer.reset();
+
+		EngineUtils::ThrowIfFailed(m_SwapChain->ResizeBuffers(0, newSize.x, newSize.y, DXGI_FORMAT_R8G8B8A8_UNORM, 0));
+		m_FrameIndex = m_SwapChain->GetCurrentBackBufferIndex();
+		CreateRTVHeap(device);
+		CreateDepthStencilBuffer();
 	}
 }

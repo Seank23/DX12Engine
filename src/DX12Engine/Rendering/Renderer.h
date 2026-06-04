@@ -6,13 +6,18 @@
 #include "../Entity/Scene.h"
 #include "RenderPipelineConfig.h"
 #include "RenderPass/RenderPass.h"
+#include "RendererOptions.h"
+#include <cstdint>
+#include <unordered_map>
 
 namespace DX12Engine
 {
 	class GameObject;
+	class UISystem;
+	struct ResolvedPrimitiveBinding;
 	struct RenderPipelineConfig;
 	enum class RenderPassType;
-	enum class RenderTargetType;
+	enum class ResourceSlot;
 
 	struct RenderPipeline
 	{
@@ -35,20 +40,30 @@ namespace DX12Engine
 		~Renderer();
 
 		bool PollWindow();
-		void ExecutePipeline(RenderPipeline pipeline);
+		void ExecutePipeline(RenderPipeline pipeline, float frameTime);
 
-		std::unique_ptr<std::vector<RenderTargetType>> GetTargets(std::vector<RenderTargetType> targets);
+		std::unique_ptr<std::vector<ResourceSlot>> GetTargets(std::vector<ResourceSlot> targets);
 		RenderPipeline CreateRenderPipeline(RenderPipelineConfig config);
 
 		void SetCurrentScene(Scene* scene) { m_CurrentScene = scene; }
+		void SetUISystem(UISystem* uiSystem) { m_UISystem = uiSystem; }
 
 		D3D12_VIEWPORT GetDefaultViewport();
 		D3D12_RECT GetDefaultScissorRect();
 
+		void SetOptions(RendererOptions options);
+		RendererOptions& GetOptions() { return m_Options; }
+
+		uint32_t GetLastDrawnPrimitiveCount() const { return m_DrawnPrimitiveCount; }
+
 	private:
-		void SetSceneData(RenderPipeline pipeline);
+		void SetSceneData(RenderPipeline pipeline, float frameTime);
 		void PresentFrame(RenderTexture* finalRenderTarget);
 		std::unique_ptr<RenderPass> CreateRenderPass(RenderPassType type, int count);
+		DirectX::XMMATRIX UpdateFrameJitter(DirectX::XMMATRIX projectionMatrix, DirectX::XMINT2 screenSize);
+		static float Halton(uint32_t index, uint32_t base);
+		void UpdatePostProcessingCB();
+		void OnResize(RenderPipeline pipeline);
 
 		std::shared_ptr<RenderContext> m_RenderContext;
 		CommandQueueManager& m_QueueManager;
@@ -56,9 +71,26 @@ namespace DX12Engine
 		RenderPassDescriptorHeap& m_RenderHeap;
 
 		Scene* m_CurrentScene;
+		UINT m_FrameIndex = 0;
+		uint64_t m_JitterFrameIndex = 0;
+		DirectX::XMFLOAT2 m_Jitter = { 0.0f, 0.0f };
+		DirectX::XMFLOAT2 m_PrevJitter = { 0.0f, 0.0f };
 
 		Microsoft::WRL::ComPtr<ID3D12RootSignature> m_RootSignature;
 		Microsoft::WRL::ComPtr<ID3D12PipelineState> m_PipelineState;
+
+		UISystem* m_UISystem;
+
+		RendererOptions m_Options;
+		std::unique_ptr<ConstantBuffer> m_PostProcessingCB;
+
+		DirectX::XMMATRIX m_JitteredProjection;
+		bool m_RequestTAAHistoryReset = true;
+
+		uint64_t m_LocalShaderGeneration = 0;
+		std::unordered_map<const ResolvedPrimitiveBinding*, UINT> m_BindingActiveLods;
+
+		uint32_t m_DrawnPrimitiveCount = 0;
 	};
 }
 

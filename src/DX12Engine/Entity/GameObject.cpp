@@ -25,13 +25,6 @@ namespace DX12Engine
 		}
 	}
 
-	void GameObject::SetMesh(std::shared_ptr<Mesh> mesh)
-	{
-		m_Mesh = mesh;
-		for (const auto& component : m_Components)
-			component->OnMeshChanged(m_Mesh.get());
-	}
-
 	void GameObject::Move(DirectX::XMVECTOR movement)
 	{
 		m_Position = DirectX::XMVectorAdd(m_Position, movement);
@@ -69,6 +62,31 @@ namespace DX12Engine
 
 	void GameObject::UpdateModelMatrix()
 	{
-		m_ModelMatrix = DirectX::XMMatrixRotationQuaternion(m_Rotation) * DirectX::XMMatrixTranslationFromVector(m_Position) * DirectX::XMMatrixScalingFromVector(m_Scale);
+		m_ModelMatrix = DirectX::XMMatrixScalingFromVector(m_Scale) * DirectX::XMMatrixRotationQuaternion(m_Rotation) * DirectX::XMMatrixTranslationFromVector(m_Position);
+	}
+
+	void GameObject::RegisterColliderListener(IColliderListener* listener)
+	{
+		if (!listener)
+			return;
+
+		auto listenerIt = std::find(m_ColliderListeners.begin(), m_ColliderListeners.end(), listener);
+		if (listenerIt == m_ColliderListeners.end())
+			m_ColliderListeners.push_back(listener);
+	}
+
+	void GameObject::UnregisterColliderListener(IColliderListener* listener)
+	{
+		auto listenerIt = std::remove(m_ColliderListeners.begin(), m_ColliderListeners.end(), listener);
+		m_ColliderListeners.erase(listenerIt, m_ColliderListeners.end());
+	}
+
+	void GameObject::DispatchColliderChanged(ColliderComponent* colliderComponent)
+	{
+		for (IColliderListener* listener : m_ColliderListeners)
+		{
+			if (listener)
+				listener->OnColliderChanged(colliderComponent);
+		}
 	}
 }

@@ -4,8 +4,9 @@
 namespace DX12Engine
 {
 	PBRMaterial::PBRMaterial()
-		: Material()
+		: Material(sizeof(PBRMaterialData))
 	{
+		UpdateConstantBufferData(&m_MaterialData, sizeof(m_MaterialData));
 	}
 
 	PBRMaterial::~PBRMaterial()
@@ -26,6 +27,8 @@ namespace DX12Engine
 			return m_RoughnessMap.get();
 		case TextureType::AOMap:
 			return m_AOMap.get();
+		case TextureType::Emissive:
+			return m_EmissiveMap.get();
 		default:
 			return nullptr;
 		}
@@ -45,15 +48,17 @@ namespace DX12Engine
 			return m_RoughnessMap != nullptr;
 		case TextureType::AOMap:
 			return m_AOMap != nullptr;
+		case TextureType::Emissive:
+			return m_EmissiveMap != nullptr;
 		default:
 			return false;
 		}
 	}
-	void PBRMaterial::Bind(ID3D12GraphicsCommandList* commandList, int* startIndex)
+	void PBRMaterial::Bind(ID3D12GraphicsCommandList* commandList, int cbSlot, int textureSlot)
 	{
-		Material::Bind(commandList, startIndex);
-		if (HasTexture(TextureType::Albedo))
-			commandList->SetGraphicsRootDescriptorTable((*startIndex)++, m_AlbedoMap->GetGPUHandle());
+		Material::Bind(commandList, cbSlot, textureSlot);
+		if (HasTextureTable())
+			commandList->SetGraphicsRootDescriptorTable(textureSlot, GetTextureTableHandle());
 	}
 
 	void PBRMaterial::SetAllTextures(std::unordered_map<TextureType, std::shared_ptr<Texture>> textures)
@@ -77,37 +82,142 @@ namespace DX12Engine
 			case TextureType::AOMap:
 				SetAOMap(texture.second);
 				break;
+			case TextureType::Emissive:
+				SetEmissiveMap(texture.second);
+				break;
 			}
 		}
+	}
+
+	void PBRMaterial::SetAlbedoMap(std::shared_ptr<Texture> texture, bool hasMap)
+	{
+		m_AlbedoMap = texture;
+		m_MaterialData.HasAlbedoMap = hasMap ? 1 : 0;
+		UpdateConstantBufferData(&m_MaterialData, sizeof(m_MaterialData));
+	}
+
+	void PBRMaterial::SetNormalMap(std::shared_ptr<Texture> texture, bool hasMap)
+	{
+		m_NormalMap = texture;
+		m_MaterialData.HasNormalMap = hasMap ? 1 : 0;
+		UpdateConstantBufferData(&m_MaterialData, sizeof(m_MaterialData));
+	}
+
+	void PBRMaterial::SetMetallicMap(std::shared_ptr<Texture> texture, bool hasMap)
+	{
+		m_MetallicMap = texture;
+		m_MaterialData.HasMetallicMap = hasMap ? 1 : 0;
+		UpdateConstantBufferData(&m_MaterialData, sizeof(m_MaterialData));
+	}
+
+	void PBRMaterial::SetRoughnessMap(std::shared_ptr<Texture> texture, bool hasMap)
+	{
+		m_RoughnessMap = texture;
+		m_MaterialData.HasRoughnessMap = hasMap ? 1 : 0;
+		UpdateConstantBufferData(&m_MaterialData, sizeof(m_MaterialData));
+	}
+
+	void PBRMaterial::SetAOMap(std::shared_ptr<Texture> texture, bool hasMap)
+	{
+		m_AOMap = texture;
+		m_MaterialData.HasAOMap = hasMap ? 1 : 0;
+		UpdateConstantBufferData(&m_MaterialData, sizeof(m_MaterialData));
+	}
+
+	void PBRMaterial::SetEmissiveMap(std::shared_ptr<Texture> texture, bool hasMap)
+	{
+		m_EmissiveMap = texture;
+		m_MaterialData.HasEmissiveMap = hasMap ? 1 : 0;
+		UpdateConstantBufferData(&m_MaterialData, sizeof(m_MaterialData));
 	}
 
 	void PBRMaterial::SetAlbedo(DirectX::XMFLOAT3 albedo)
 	{
 		m_MaterialData.Albedo = albedo;
-		UpdateConstantBufferData(m_MaterialData);
+		UpdateConstantBufferData(&m_MaterialData, sizeof(m_MaterialData));
 	}
 
 	void PBRMaterial::SetMetallic(float metallic)
 	{
 		m_MaterialData.Metallic = metallic;
-		UpdateConstantBufferData(m_MaterialData);
+		UpdateConstantBufferData(&m_MaterialData, sizeof(m_MaterialData));
 	}
 
 	void PBRMaterial::SetRoughness(float roughness)
 	{
 		m_MaterialData.Roughness = roughness;
-		UpdateConstantBufferData(m_MaterialData);
+		UpdateConstantBufferData(&m_MaterialData, sizeof(m_MaterialData));
 	}
 
 	void PBRMaterial::SetAO(float ao)
 	{
 		m_MaterialData.AO = ao;
-		UpdateConstantBufferData(m_MaterialData);
+		UpdateConstantBufferData(&m_MaterialData, sizeof(m_MaterialData));
 	}
 
 	void PBRMaterial::SetEmissive(DirectX::XMFLOAT3 emissive)
 	{
 		m_MaterialData.Emissive = emissive;
-		UpdateConstantBufferData(m_MaterialData);
+		UpdateConstantBufferData(&m_MaterialData, sizeof(m_MaterialData));
+	}
+
+	void PBRMaterial::SetBaseColorAlpha(float alpha)
+	{
+		m_MaterialData.BaseColorAlpha = alpha;
+		UpdateConstantBufferData(&m_MaterialData, sizeof(m_MaterialData));
+	}
+
+	void PBRMaterial::SetNormalScale(float scale)
+	{
+		m_MaterialData.NormalScale = scale;
+		UpdateConstantBufferData(&m_MaterialData, sizeof(m_MaterialData));
+	}
+
+	void PBRMaterial::SetOcclusionStrength(float strength)
+	{
+		m_MaterialData.OcclusionStrength = strength;
+		UpdateConstantBufferData(&m_MaterialData, sizeof(m_MaterialData));
+	}
+
+	void PBRMaterial::SetAlphaMode(int mode)
+	{
+		m_MaterialData.AlphaMode = mode;
+		UpdateConstantBufferData(&m_MaterialData, sizeof(m_MaterialData));
+	}
+
+	void PBRMaterial::SetAlphaCutoff(float cutoff)
+	{
+		m_MaterialData.AlphaCutoff = cutoff;
+		UpdateConstantBufferData(&m_MaterialData, sizeof(m_MaterialData));
+	}
+
+	void PBRMaterial::SetTransmission(float transmission)
+	{
+		m_MaterialData.Transmission = transmission;
+		UpdateConstantBufferData(&m_MaterialData, sizeof(m_MaterialData));
+	}
+
+	void PBRMaterial::SetIOR(float ior)
+	{
+		m_MaterialData.IOR = ior;
+		UpdateConstantBufferData(&m_MaterialData, sizeof(m_MaterialData));
+	}
+
+	void PBRMaterial::SetEmissiveStrength(float strength)
+	{
+		m_MaterialData.EmissiveStrength = strength;
+		UpdateConstantBufferData(&m_MaterialData, sizeof(m_MaterialData));
+	}
+
+	void PBRMaterial::SetClearcoat(float clearcoat)
+	{
+		m_MaterialData.Clearcoat = clearcoat;
+		UpdateConstantBufferData(&m_MaterialData, sizeof(m_MaterialData));
+	}
+
+	void PBRMaterial::SetClearcoatRoughness(float clearcoatRoughness)
+	{
+		m_MaterialData.ClearcoatRoughness = clearcoatRoughness;
+		UpdateConstantBufferData(&m_MaterialData, sizeof(m_MaterialData));
 	}
 }

@@ -41,6 +41,8 @@ namespace DX12Engine
 
 		bool ProcessWindowMessages();
 
+		void OnResize(DirectX::XMINT2 newSize, ID3D12Device* device);
+
 	private:
 		HWND m_WindowHandle;
 		HINSTANCE m_WindowInstance;

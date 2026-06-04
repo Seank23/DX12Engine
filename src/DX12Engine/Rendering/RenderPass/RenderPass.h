@@ -8,17 +8,6 @@
 
 namespace DX12Engine
 {
-	enum class RenderTargetType
-	{
-		Albedo,
-		WorldNormal,
-		ObjectNormal,
-		Material,
-		Position,
-		Depth,
-		Composite
-	};
-
 	class RenderComponent;
 	class GPUResource;
 	class RenderTexture;
@@ -35,19 +24,25 @@ namespace DX12Engine
 		~RenderPass() = default;
 		virtual void Init();
 		virtual void Execute();
-		virtual void OnResize(DirectX::XMINT2 newSize);
-		virtual RenderTexture* GetRenderTarget(RenderTargetType type) = 0;
+		virtual void OnResize(DirectX::XMINT2 newRenderSize);
+		virtual std::shared_ptr<RenderTexture> GetRenderTarget(ResourceSlot type) = 0;
+
 		RenderPassType GetType() const { return m_Type; }
 
-		void AddInputResources(std::vector<GPUResource*> resources) 
-		{ 
-			m_InputResources.insert(m_InputResources.end(), resources.begin(), resources.end());
-		}
+		void RebuildTransientDescriptors();
+		void RemapInputResources(const std::unordered_map<GPUResource*, std::shared_ptr<GPUResource>>& resourceMap);
+		void AppendResizeRemap(std::unordered_map<GPUResource*, std::shared_ptr<GPUResource>>& resourceMap) const;
+
 		void AddInputResources(std::vector<std::shared_ptr<GPUResource>> resources)
 		{
 			m_InputResources.insert(m_InputResources.end(), resources.begin(), resources.end());
 		}
-		void AddResourceBlock(UINT size) { m_ResourceBlockSizes.push_back(size); }
+		void AddResourceBlock(InputResourceType type, UINT size)
+		{
+			if (m_ResourceBlocks.find(type) == m_ResourceBlocks.end())
+				m_ResourceBlockOrder.push_back(type);
+			m_ResourceBlocks[type] = size;
+		}
 		void SetVertexShader(const std::string& name) { m_VertexShaderName = name; }
 		void SetPixelShader(const std::string& name) { m_PixelShaderName = name; }
 		void SetRenderObjects(std::vector<RenderComponent*> renderObjects) { m_RenderObjects = renderObjects; }
@@ -58,24 +53,33 @@ namespace DX12Engine
 		void AddConstantBuffer(ConstantBuffer* cb) { m_ExternalCBs.push_back(cb); }
 
 	protected:
+		virtual void CreatePSO() = 0;
+
 		RenderContext& m_RenderContext;
 		CommandQueueManager& m_QueueManager;
 		ID3D12GraphicsCommandList& m_CommandList;
 
-		ScreenData m_ScreenData;
-		std::unique_ptr<ConstantBuffer> m_ScreenDataCB;
-		void UpdateCB();
-
 		RenderPassType m_Type;
 		std::vector<std::shared_ptr<GPUResource>> m_InputResources;
 		std::vector<DescriptorTableConfig> m_DescriptorTableConfigs;
-		std::vector<std::unique_ptr<RenderTexture>> m_RenderTargets;
+		std::unordered_map<InputResourceType, DescriptorHeapHandle> m_InputResourceBlockHandles;
+		std::vector<InputResourceType> m_ResourceBlockOrder;
+		std::vector<std::shared_ptr<RenderTexture>> m_RenderTargets;
 		std::vector<RenderComponent*> m_RenderObjects;
 		std::string m_VertexShaderName;
 		std::string m_PixelShaderName;
-		std::vector<UINT> m_ResourceBlockSizes;
+		std::unordered_map<InputResourceType, UINT> m_ResourceBlocks;
+
+		Microsoft::WRL::ComPtr<ID3D12RootSignature> m_RootSignature;
+		Microsoft::WRL::ComPtr<ID3D12PipelineState> m_PipelineState;
+
+		D3D12_VIEWPORT m_Viewport;
+		D3D12_RECT m_ScissorRect;
 
 		Camera* m_Camera;
 		std::vector<ConstantBuffer*> m_ExternalCBs;
+		std::unordered_map<GPUResource*, std::shared_ptr<GPUResource>> m_LastResizeRemap;
+
+		uint64_t m_LocalShaderGeneration = 0;
 	};
 }

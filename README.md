@@ -1,216 +1,259 @@
 # DX12Engine
 
-DX12Engine is a Windows-only DirectX 12 rendering engine written in C++20. The current repository state is an engine/static-library codebase rather than a turnkey game or demo executable: CMake builds the `DX12Engine` static library, copies runtime content into the build tree, and leaves application wiring to a downstream executable.
+A modular, learning-oriented DirectX 12 rendering engine written in modern C++20. The repository includes a reusable engine static library, an embedded demo application (`DemoScene`), shaders, and asset data for physically-based rendering (PBR), deferred lighting, shadows, and screen-space reflections (SSR).
 
-The engine contains a Direct3D 12 render context, command queues, descriptor heaps, GPU upload helpers, render passes, scene/object abstractions, resource loading, PBR-oriented materials, camera input helpers, and a small physics layer.
+<img width="1906" height="1044" alt="DX12Engine" src="https://github.com/user-attachments/assets/ff8d6682-df56-4201-b5b7-10c006990803" />
 
-## Current Status
+## Highlights
 
-- **Build target:** `DX12Engine` static library.
-- **Platform:** Windows with DirectX 12. The source includes Win32 and D3D12 headers/libraries and is not portable to Linux/macOS as-is.
-- **Application entry point:** `src/Main.cpp` and `src/ClientApplication.*` are guarded by `ENABLE_TEST_PROJECT` and are not wired into the root CMake target as a runnable executable.
-- **Primary integration model:** create your own executable, link against `DX12Engine`, implement `DX12Engine::Application`, and drive rendering through `DX12Engine::Launcher`/`Renderer`.
-- **Runtime content:** CMake copies `res/` and engine shaders into the build output under `res/`.
-
-## Feature Overview
-
-### Rendering
-
-- Direct3D 12 render context and Win32 window wrapper.
-- Graphics command queue management and fence synchronization.
-- Render-pass based pipeline configuration.
-- Built-in render pass types:
-  - `ShadowMap`
-  - `CubeShadowMap`
-  - `Geometry`
-  - `Lighting`
-  - `ScreenSpaceReflection`
-  - `UI`
-- Deferred/PBR-oriented shader set with G-Buffer outputs, lighting composite, final fullscreen presentation, and SSR.
-- Pipeline state and root signature caches/builders.
-- Descriptor heap management for staging, SRV/CBV, RTV/DSV, and render-pass descriptors.
-
-### Scene and Entity Model
-
-- `DX12Engine::Scene` owns scene objects, a light buffer, a camera, and skybox cubemap/irradiance textures.
-- `DX12Engine::GameObject` supports transform operations, mesh assignment, and component creation/lookup.
-- `GameObjectContainer` stores named objects and can collect components across all objects.
-- Renderer scene binding is performed with `Renderer::SetCurrentScene(Scene*)`; `Renderer::ExecutePipeline(...)` pulls render components, camera, lights, and texture readiness from the current scene before executing passes.
-
-### Resources and Assets
-
-- `ResourceManager` creates and owns GPU-facing resources such as vertex/index/constant buffers, textures, cubemaps, render targets, depth maps, root signatures, and pipeline states.
-- Built-in shader names are registered during `ResourceManager` construction and resolved from `res/Shaders/` at runtime.
-- `ModelLoader` loads OBJ geometry through TinyObjLoader and computes tangents for normal-mapped materials.
-- `TextureLoader` loads DDS cubemaps and WIC textures, and can load material directories containing `albedo.png`, `normal.png`, `metallic.png`, `roughness.png`, and `ao.png`.
-
-### Materials, Lighting, and Physics
-
-- Basic and PBR material classes are included.
-- `LightBuffer` supports directional, point, and spot light data for render passes.
-- `PhysicsEngine` updates physics components, checks collisions, applies positional correction, and resolves collision impulses.
-- Collision mesh types include sphere, box, and plane-style primitives.
-
-### Input
-
-- `InputHandler` maps movement commands to keyboard/mouse defaults:
-  - `W/S/A/D`: forward/back/left/right
-  - `E/Q`: up/down
-  - Right mouse button: pan/look
-  - Left mouse button: interact hook
-- `InputHandler` is currently an abstract base because `HandleMouseWheel(HWND, WPARAM)` is pure virtual; applications should derive from it or provide their own input adapter.
-- `Application::HandleWindowEvent` receives `HWND`, `UINT`, `WPARAM`, and `LPARAM`, so applications can handle keyboard, mouse, wheel, resize, and other Win32 messages.
+- **Modern C++20 + CMake** build setup (`DX12Engine` is produced as a static library).
+- **DirectX 12 rendering framework** with command queues, descriptor heap management, render context/window abstraction, and pipeline state/root signature caches.
+- **Configurable multi-pass pipeline** with render passes for:
+  - Shadow map
+  - Cube shadow map
+  - Geometry (G-Buffer)
+  - Lighting
+  - Screen-space reflection
+  - UI (framework hook)
+- **Material system** with basic and PBR materials.
+- **Resource loading** for OBJ models (TinyObjLoader) and DDS/WIC textures (DirectXTex).
+- **Simple rigid-body style physics** integration and collision handling primitives.
+- **Embedded demo application** in `DemoScene/` showing how to build an executable against the engine library.
 
 ## Repository Layout
 
 ```text
 .
-├── CMakeLists.txt                  # Root CMake configuration; builds DX12Engine static library
-├── README.md
-├── res/
-│   ├── Materials/                  # PBR texture sets and skybox cubemaps/irradiance maps
-│   └── Models/                     # OBJ/MTL model assets
-└── src/
-    ├── Main.cpp                    # Optional/guarded sample entry point
-    ├── ClientApplication.*         # Optional/guarded sample client scene setup
-    └── DX12Engine/
-        ├── Entity/                 # Scene, GameObject, components
-        ├── IO/                     # OBJ and texture loading
-        ├── Input/                  # Camera/input command handling
-        ├── Physics/                # Physics components, collision, solver
-        ├── Rendering/              # Render context, renderer, passes, queues, heaps, builders
-        ├── Resources/              # GPU resources, shaders, textures, materials, lights
-        ├── Shaders/                # HLSL shader sources
-        └── Utils/                  # Utility helpers/constants
+|-- CMakeLists.txt
+|-- DemoScene/
+|   |-- CMakeLists.txt
+|   `-- src/
+|-- res/
+|   |-- Materials/
+|   `-- Models/
+`-- src/
+    |-- DX12Engine/
+    |   |-- Entity/
+    |   |-- IO/
+    |   |-- Input/
+    |   |-- Physics/
+    |   |-- Rendering/
+    |   |-- Resources/
+    |   |-- Shaders/
+    |   `-- Utils/
+    |-- ClientApplication.cpp
+    |-- ClientApplication.h
+    `-- Main.cpp
 ```
 
 ## Requirements
 
-This project is intended to be configured and built on Windows.
+> This codebase targets **Windows + DirectX 12**.
 
-- Windows 10/11
-- Windows SDK with Direct3D 12 headers and libraries
-- DirectX 12-capable GPU and driver
+- Windows 10/11 SDK with Direct3D 12 support
+- A GPU/driver stack supporting DirectX 12
 - CMake 3.20+
-- C++20-capable compiler, with MSVC recommended
-- Git/network access for CMake `FetchContent` dependency downloads
+- A C++20-capable compiler (MSVC recommended)
+- Internet access during first configure/build (CMake fetches dependencies)
 
-CMake fetches these dependencies:
+### Third-Party Dependencies (fetched by CMake)
 
-- [microsoft/DirectX-Headers](https://github.com/microsoft/DirectX-Headers) from `main`
-- [microsoft/DirectXTex](https://github.com/microsoft/DirectXTex) from `main`
-- [tinyobjloader/tinyobjloader](https://github.com/tinyobjloader/tinyobjloader) from `release`
+- [DirectX-Headers](https://github.com/microsoft/DirectX-Headers)
+- [DirectXTex](https://github.com/microsoft/DirectXTex)
+- [tinyobjloader](https://github.com/tinyobjloader/tinyobjloader)
 
-The target also links against Windows/DirectX libraries including `d3d12`, `dxgi`, `dxguid`, `D3DCompiler`, and `dxcompiler`.
+## Building
 
-## Building the Library
+### 1) Configure
 
 From the repository root:
 
 ```bash
 cmake -S . -B build
+```
+
+### 2) Build
+
+```bash
 cmake --build build --config Release
 ```
 
-The root `CMakeLists.txt` currently:
+This produces:
 
-1. Requires CMake 3.20 and C++20.
-2. Fetches DirectX-Headers, DirectXTex, and tinyobjloader.
-3. Recursively includes `src/*.cpp`, `src/*.h`, and `src/*.hlsl` in `ENGINE_SOURCES`.
-4. Builds `DX12Engine` as a static library.
-5. Copies `res/` into the CMake binary directory.
-6. Copies shader files from `src/DX12Engine/Shaders/*.hlsl` to `${CMAKE_BINARY_DIR}/res/Shaders` through the `CopyEngineShaders` target.
+- `DX12Engine` static library
+- `DemoScene` executable target
+- `AssetCooker` command-line tool target
+- `CookAssets` build target (runs automatically in default builds)
 
-> Note: because this code links DirectX/Win32 libraries, configure/build validation from non-Windows CI or containers is expected to fail unless a compatible Windows toolchain and SDK are available.
+If you are generating with Visual Studio, the solution will be written to the build directory, for example:
 
-## Using DX12Engine from an Application
+- `build/DX12Engine.sln`
 
-A consuming application is expected to provide an executable target that links to `DX12Engine` and implements the `DX12Engine::Application` interface.
+## DemoScene
 
-At minimum, your application subclass must implement:
+`DemoScene` is an example executable that lives inside this repository and is added to the root build through `add_subdirectory(DemoScene)`.
 
-```cpp
-void Init(std::shared_ptr<DX12Engine::RenderContext> renderContext,
-          DirectX::XMFLOAT2 windowSize) override;
+### Build just the demo
 
-void Update(float ts, float elapsed) override;
-
-void HandleWindowEvent(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) override;
+```bash
+cmake --build build --target DemoScene --config Debug
 ```
 
-A typical application flow is:
+### Run the demo
 
-1. Create an `Application` subclass.
-2. Launch it with `DX12Engine::Launcher::Launch(&app, windowSize, windowTitle)`.
-3. In `Init`, create a `Renderer`, create/initialize a `Scene`, call `renderer.SetCurrentScene(...)`, and build a `RenderPipeline`.
-4. In `Update`, update input, scene/game objects, light buffers, and physics, then call `renderer.ExecutePipeline(pipeline)`.
-5. In `HandleWindowEvent`, route Win32 messages to your input and resize handling.
+After building, the executable is typically at:
 
-## Configuring a Render Pipeline
+- `build/DemoScene/Debug/DemoScene.exe`
 
-Render pipelines are described with `RenderPipelineConfig`, which contains an ordered list of `RenderPassConfig` entries. Each pass declares its type and can reference prior pass outputs with `InputResourceType` values such as:
+When `DemoScene` is built, CMake also copies runtime content automatically:
 
-- `RenderTargets_ShadowMap`
-- `RenderTargets_CubeShadowMap`
-- `RenderTargets_Geometry`
-- `RenderTargets_Lighting`
-- `ExternalTextures`
-- `VertexShader`
-- `PixelShader`
+- `res/` is copied to the build root: `build/res`
+- `res/` is copied beside the executable: `build/DemoScene/<Config>/res`
+- engine and demo `.hlsl` shaders are copied into both `build/res/Shaders` and `build/DemoScene/<Config>/res/Shaders`
+- `dxcompiler.dll` and `dxil.dll` are copied beside `DemoScene.exe`
 
-For a deferred scene with shadows and SSR, the intended pass order is generally:
+This means you can usually launch the built executable directly from Visual Studio or from the build output folder without manually copying assets.
 
-1. `ShadowMap`
-2. `CubeShadowMap`
-3. `Geometry`
-4. `Lighting`
-5. `ScreenSpaceReflection`
+## Asset Cooker
 
-If the final pass exposes a `Composite` render target, `Renderer::ExecutePipeline(...)` presents that target to the swap chain.
+`AssetCooker` is a standalone offline tool that scans a source assets directory and cooks supported textures into DDS files with mip chains.
 
-## Runtime Content Conventions
+### What it does
 
-The engine uses relative runtime paths through `ResourceManager`:
+- Recursively scans an input directory for texture files (`.dds`, `.png`, `.jpg`, `.jpeg`, `.bmp`, `.tga`, `.hdr`, `.tif`, `.tiff`)
+- Parses `.glb` files, extracts referenced textures/material bindings, and cooks embedded textures
+- Generates mesh LOD index buffers for GLB primitives using mesh simplification
+- Generates mip chains when source textures only contain a base level
+- Writes cooked textures as `.dds` into the output directory while preserving relative folder structure
+- Writes sidecar metadata files (`.dds.meta`) with dimensions, mip count, semantic hint, and format
+- Writes a `materials.json` manifest per cooked GLB with texture-slot mappings
+- Writes a `lods.json` manifest per cooked GLB plus binary LOD index buffers under `LODs/`
+- Uses an incremental cache (`asset_cooker.cache`) so unchanged assets are skipped
 
-- Materials: `res/Materials/...`
-- Models: `res/Models/...`
-- Shaders: `res/Shaders/...`
+### Usage
 
-Keep this layout available next to the executable/build output. The provided CMake logic already copies `res/` and shader files into the build tree for local builds.
+```bash
+AssetCooker --in <raw-assets-dir> --out <cooked-assets-dir> [--force] [--clean-cache]
+```
 
-## Shader Inventory
+Example:
 
-Current HLSL sources include:
+```bash
+build/tools/AssetCooker/Debug/AssetCooker.exe --in res --out build/cooked
+```
 
-- `BasicLighting_VS.hlsl`
-- `BasicLighting_PS.hlsl`
-- `PBRLighting_VS.hlsl`
-- `PBRLighting_PS.hlsl`
-- `PBRLightingDeferred_PS.hlsl`
-- `Geometry_VS.hlsl`
-- `Geometry_PS.hlsl`
-- `ShadowMap_VS.hlsl`
-- `ShadowCubeMap_VS.hlsl`
-- `ShadowCubeMap_PS.hlsl`
-- `RenderTriangle_VS.hlsl`
-- `FinalRender_PS.hlsl`
-- `SSRPass_PS.hlsl`
+Options:
 
-When adding a new built-in shader, either register it with `ResourceManager::AddShader(...)` or add it to the default shader map in `ResourceManager`.
+- `--force`: recook all supported textures regardless of cache
+- `--clean-cache`: ignore existing cache and rebuild cache entries on this run
 
-## Known Limitations
+### Build pipeline integration
 
-- The repository does not currently define a runnable executable target in the root CMake file.
-- `src/ClientApplication.*` is guarded sample/reference code and may need synchronization with the latest abstract interfaces before being used as a test executable.
-- The root CMake configuration tracks dependency branches (`main`/`release`) rather than pinned commits, so dependency behavior can change over time.
-- Resource paths are relative and assume the working directory contains the copied `res/` tree.
-- No automated test suite is currently included.
-- No license file is currently present; add one before distributing or reusing the code outside its current context.
+The root `CMakeLists.txt` now wires asset cooking into the normal build:
 
-## Development Notes
+- raw assets are read from `res/`
+- cooked/staged runtime assets are written to `build/res/`
+- `CookAssets` runs `AssetCooker` automatically for default builds
+- staged raw texture source files (`.png/.jpg/.tga/...`) are pruned from `build/res/` after cooking
+- `DemoScene` depends on `CookAssets` and copies from `build/res/` to `DemoScene/<Config>/res/`
 
-- Add new render passes by extending `RenderPassType`, implementing a `RenderPass` subclass, and updating the `Renderer::CreateRenderPass` factory.
-- If a pass consumes outputs from earlier passes, add the appropriate `InputResourceType` handling in `Renderer::CreateRenderPipeline`.
-- Keep shader filenames and registered shader names synchronized.
-- Update resource copying rules if new runtime asset directories are added.
-- Prefer deriving application-specific input from `InputHandler` rather than editing engine input defaults directly.
+This means newly added texture files under `res/` are automatically discovered and cooked on the next build.
+
+## Runtime resources
+
+The root build copies `res/` into the build directory and copies engine shaders to `build/res/Shaders`. `DemoScene` also performs its own post-build copy so assets and shaders are available next to the executable.
+
+## Running your own application
+
+The engine itself is built as a static library. To create your own executable, add a new target that links against `DX12Engine` and call `DX12Engine::Launcher::Launch(...)` with your `Application` subclass.
+
+A legacy sample app entry point still exists in `src/Main.cpp`, but it is guarded by `#if ENABLE_TEST_PROJECT` and is not part of the normal repo build.
+
+## Engine Architecture Overview
+
+### Core loop
+
+`DX12Engine::Launcher` creates a `RenderContext`, initializes your app, and runs a message/render loop that passes both per-frame delta time and elapsed time to `Application::Update`.
+
+### Rendering
+
+The renderer supports composition of render passes through `RenderPipelineConfig`, where each pass can consume typed input resources and prior pass outputs.
+
+A typical deferred pipeline in this repository is:
+
+1. ShadowMap
+2. CubeShadowMap
+3. Geometry
+4. Lighting
+5. ScreenSpaceReflection
+
+### Resources
+
+`ResourceManager` acts as a central factory/cache owner for:
+
+- Shaders
+- Buffers (vertex/index/constant)
+- Textures/cubemaps/depth maps
+- Pipeline states and root signatures
+
+### Scene + ECS-style composition
+
+Game objects can attach render and physics components. Sample scenes create objects such as `Cube`, `Ball`, and `Floor`, assign meshes/materials, and push them through rendering and optional physics updates each frame.
+
+### Physics
+
+The included `PhysicsEngine` updates component states, checks collisions, performs positional correction, and resolves impulses.
+
+## Sample Controls
+
+`InputHandler` maps commands to these defaults:
+
+- `W/S/A/D`: move forward/back/left/right
+- `E/Q`: move up/down
+- `Right Mouse Button`: camera pan/look
+- `Left Mouse Button`: interact hook
+
+Mouse movement is consumed from window messages (`WM_MOUSEMOVE`) in the sample application.
+
+## Shaders and Render Content
+
+Shaders are stored in `src/DX12Engine/Shaders/*.hlsl` and include vertex/pixel programs for:
+
+- Geometry pass
+- Basic and PBR lighting
+- Deferred lighting composite
+- Shadow maps (2D + cube)
+- Full-screen final render
+- SSR pass
+
+Assets provided in `res/` include:
+
+- OBJ models (`cube`, `sphere`, `floor`, `cylinder`)
+- PBR texture sets (albedo/normal/metallic/roughness/AO)
+- Precomputed skybox cubemap + irradiance DDS files
+
+## Notes and Limitations
+
+- The project is Windows/DirectX12-specific and will not compile as-is on non-Windows platforms.
+- The repository build currently includes the engine library and the `DemoScene` executable.
+- Some systems (such as full UI rendering integration) are scaffolded in architecture but may be incomplete for production use.
+
+## Development Tips
+
+- When adding new passes, update `RenderPassType`, implement the pass class, and extend the renderer pass factory/creation logic.
+- Keep shader names consistent with what `ResourceManager` registers.
+- Treat `res/` as runtime content; ensure build/output copies stay in sync if you add assets.
+- If you add another executable under the repo, prefer following the `DemoScene/` pattern for resource and shader copying.
+
+## Contributing
+
+1. Fork and create a feature branch.
+2. Keep changes focused and include build/test notes.
+3. Submit a pull request describing:
+   - What changed
+   - Why it changed
+   - How to build/test
+
+## License
+
+No license file is currently included in this repository. If you intend to distribute or reuse this code, add an explicit license first.

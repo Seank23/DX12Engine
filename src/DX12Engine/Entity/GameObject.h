@@ -1,11 +1,11 @@
 #pragma once
 #include "Component.h"
+#include <algorithm>
 #include <vector>
 #include <unordered_map>
 #include <string>
 #include <memory>
 #include <DirectXMath.h>
-#include "../Resources/Mesh.h"
 
 namespace DX12Engine
 {
@@ -15,12 +15,15 @@ namespace DX12Engine
 		GameObject();
 		~GameObject() = default;
 
-		template<typename T>
-		inline T* CreateComponent()
+		template<typename T, typename... Args>
+		inline T* CreateComponent(Args&&... args)
 		{
 			static_assert(std::is_base_of<Component, T>::value, "T must derive from Component");
-			m_Components.emplace_back(std::make_unique<T>(this));
-			return static_cast<T*>(m_Components.back().get());
+			m_Components.emplace_back(std::make_unique<T>(this, std::forward<Args>(args)...));
+			T* createdComponent = static_cast<T*>(m_Components.back().get());
+			if (IColliderListener* colliderListener = dynamic_cast<IColliderListener*>(createdComponent))
+				RegisterColliderListener(colliderListener);
+			return createdComponent;
 		}
 
 		template<typename T>
@@ -40,8 +43,6 @@ namespace DX12Engine
 		virtual void Init();
 		virtual void Update(float ts, float elapsed);
 
-		void SetMesh(std::shared_ptr<Mesh> mesh);
-
 		void Move(DirectX::XMVECTOR movement);
 		void Scale(DirectX::XMVECTOR scale);
 		void Rotate(DirectX::XMFLOAT3 rotation);
@@ -52,18 +53,21 @@ namespace DX12Engine
 		DirectX::XMVECTOR GetScale() const { return m_Scale; }
 		DirectX::XMVECTOR GetRotation() const { return m_Rotation; }
 		DirectX::XMMATRIX GetModelMatrix() const { return m_ModelMatrix; }
-		Mesh* GetMesh() { return m_Mesh.get(); }
+
+		void RegisterColliderListener(IColliderListener* listener);
+		void UnregisterColliderListener(IColliderListener* listener);
+		void DispatchColliderChanged(ColliderComponent* colliderComponent);
 
 	private:
 		void UpdateModelMatrix();
 
 		std::vector<std::unique_ptr<Component>> m_Components;
+		std::vector<IColliderListener*> m_ColliderListeners;
 
 		DirectX::XMVECTOR m_Position;
 		DirectX::XMVECTOR m_Scale;
 		DirectX::XMVECTOR m_Rotation;
 
-		std::shared_ptr<Mesh> m_Mesh;
 		DirectX::XMMATRIX m_ModelMatrix;
 	};
 
@@ -104,6 +108,14 @@ namespace DX12Engine
 				values.push_back(obj.second);
 			}
 			return values;
+		}
+
+		void Init()
+		{
+			for (auto& obj : Objects)
+			{
+				obj.second->Init();
+			}
 		}
 
 		void Update(float ts, float elapsed)

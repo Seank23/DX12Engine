@@ -1,27 +1,42 @@
+﻿#define NOMINMAX
 #include "PhysicsEngine.h"
-#include <iostream>
+#include <cmath>
 #include "../Entity/GameObject.h"
 #include <algorithm>
 
 namespace DX12Engine
 {
+
 	void PhysicsEngine::Update(float ts, float elapsed)
 	{
-		ts *= SIMULATION_RATE;
-		//ts = 0.002f;
-		for (const auto& component : m_Components)
+		m_Accumulator += ts;
+		int steps = 0;
+		while (m_Accumulator >= FIXED_DT && steps < MAX_SUBSTEPS)
 		{
-			if (!component->m_IsStatic && APPLY_GRAVITY)
-			{
-				DirectX::XMVECTOR gravityForce = DirectX::XMVectorSet(0.0f, -GRAVITY * component->m_Mass, 0.0f, 0.0f);
-				component->ApplyForce(Force{ gravityForce, 0.0f, component->GetPosition() });
-			}
+			Step(FIXED_DT * SIMULATION_RATE);
+			m_Accumulator -= FIXED_DT;
+			++steps;
 		}
+		if (m_Accumulator > FIXED_DT * MAX_SUBSTEPS)
+			m_Accumulator = 0.0f;
+	}
+
+	void PhysicsEngine::SetComponents(std::vector<PhysicsComponent*> components)
+	{
+		m_Components = components;
+		for (auto* c : m_Components)
+			c->m_ManagedByEngine = true;
+	}
+
+	void PhysicsEngine::Step(float dt)
+	{
+		for (const auto& component : m_Components)
+			component->IntegrateVelocity(dt);
 
 		std::vector<ContactManifold> contacts;
-		for (int i = 0; i < m_Components.size(); i++)
+		for (size_t i = 0; i < m_Components.size(); i++)
 		{
-			for (int j = i + 1; j < m_Components.size(); j++)
+			for (size_t j = i + 1; j < m_Components.size(); j++)
 			{
 				ContactManifold contact;
 				if (CheckCollision(m_Components[i], m_Components[j], &contact))
@@ -31,24 +46,78 @@ namespace DX12Engine
 			}
 		}
 
+		for (const auto& component : m_Components)
+		{
+			component->m_PseudoVelocity = DirectX::XMVectorZero();
+		}
+
 		for (auto& contact : contacts)
 		{
 			if (contact.Contacts.size() > 0)
 			{
-				PositionalCorrection(contact);
-				ResolveCollision(contact);
+				ResolveCollision(contact, dt);
 			}
 		}
 
+		// Linear-only penetration correction via pseudo-velocities
+		for (auto& contact : contacts)
+		{
+			if (contact.Contacts.empty()) continue;
+			PhysicsComponent* a = contact.A;
+			PhysicsComponent* b = contact.B;
+			float totalInvMass = a->m_InvMass + b->m_InvMass;
+			if (totalInvMass <= 0.0f) continue;
+
+			float maxPen = 0.0f;
+			for (const auto& cp : contact.Contacts)
+				maxPen = (std::max)(maxPen, cp.PenetrationDepth);
+
+			float correction = (std::max)(maxPen - PENETRATION_SLOP, 0.0f);
+			if (correction > 0.0f)
+			{
+				float biasSpeed = (BAUMGARTE_FACTOR / dt) * correction;
+				DirectX::XMVECTOR biasVel = DirectX::XMVectorScale(contact.Normal, biasSpeed);
+				if (a->m_InvMass > 0.0f)
+					a->m_PseudoVelocity = DirectX::XMVectorSubtract(a->m_PseudoVelocity,
+						DirectX::XMVectorScale(biasVel, a->m_InvMass / totalInvMass));
+				if (b->m_InvMass > 0.0f)
+					b->m_PseudoVelocity = DirectX::XMVectorAdd(b->m_PseudoVelocity,
+						DirectX::XMVectorScale(biasVel, b->m_InvMass / totalInvMass));
+			}
+		}
+
+		for (auto it = m_ContactCache.begin(); it != m_ContactCache.end();)
+		{
+			it->second.Age++;
+			if (it->second.Age > CONTACT_CACHE_MAX_AGE)
+				it = m_ContactCache.erase(it);
+			else
+				++it;
+		}
+
 		for (const auto& component : m_Components)
-			component->Update(ts, elapsed);
+			component->IntegratePosition(dt);
+
+		for (const auto& component : m_Components)
+		{
+			if (component->m_InvMass > 0.0f)
+			{
+				if (!DirectX::XMVector3Equal(component->m_PseudoVelocity, DirectX::XMVectorZero()))
+					component->m_Parent->Move(DirectX::XMVectorScale(component->m_PseudoVelocity, dt));
+			}
+		}
 	}
 
 	bool PhysicsEngine::CheckCollision(PhysicsComponent* a, PhysicsComponent* b, ContactManifold* outContact)
 	{
+		const CollisionMesh& meshA = a->GetCollisionMesh();
+		const CollisionMesh& meshB = b->GetCollisionMesh();
+		if (meshA.Type == CollisionMeshType::None || meshB.Type == CollisionMeshType::None)
+			return false;
+
 		if (a->GetBoundingBox().Intersects(b->GetBoundingBox()))
 		{
-			if (a->GetCollisionMesh().Intersects(b->GetCollisionMesh(), outContact))
+			if (meshA.Intersects(meshB, outContact))
 			{
 				outContact->A = b->m_InvMass == 0.0f ? b : a;
 				outContact->B = b->m_InvMass == 0.0f ? a : b;
@@ -58,128 +127,256 @@ namespace DX12Engine
 		return false;
 	}
 
-	void PhysicsEngine::PositionalCorrection(ContactManifold& contact)
-	{
-		const float percent = 0.02f;
-		const float slop = 0.01f;
-
-		float penetration = contact.PenetrationDepth - slop;
-		if (penetration > 0.0f) {
-			DirectX::XMVECTOR correctionDir = contact.Normal;
-			float totalInverseMass = contact.A->m_InvMass + contact.B->m_InvMass;
-			DirectX::XMVECTOR correction = DirectX::XMVectorScale(correctionDir, (penetration / totalInverseMass) * percent);
-
-			contact.A->m_Parent->Move(DirectX::XMVectorNegate(DirectX::XMVectorMultiply(correction, DirectX::XMVectorReplicate(contact.A->m_InvMass))));
-			contact.B->m_Parent->Move(DirectX::XMVectorMultiply(correction, DirectX::XMVectorReplicate(contact.B->m_InvMass)));
-		}
-	}
-
-	void PhysicsEngine::ResolveCollision(ContactManifold& contact)
+	void PhysicsEngine::ResolveCollision(ContactManifold& contact, float dt)
 	{
 		PhysicsComponent* a = contact.A;
 		PhysicsComponent* b = contact.B;
 
-		DirectX::XMVECTOR contactPoint = contact.Contacts[0].Point;
-		DirectX::XMVECTOR ra = DirectX::XMVectorSubtract(contactPoint, a->GetPosition());
-		DirectX::XMVECTOR rb = DirectX::XMVectorSubtract(contactPoint, b->GetPosition());
+		float restitution     = std::min(a->m_Restitution,    b->m_Restitution);
+		float staticFriction  = std::sqrt(a->m_StaticFriction  * b->m_StaticFriction);
+		float kineticFriction = std::sqrt(a->m_KineticFriction * b->m_KineticFriction);
 
-		DirectX::XMVECTOR velA = DirectX::XMVectorAdd(a->m_Velocity, DirectX::XMVector3Cross(a->m_AngularVelocity, ra));
-		DirectX::XMVECTOR velB = DirectX::XMVectorAdd(b->m_Velocity, DirectX::XMVector3Cross(b->m_AngularVelocity, rb));
-		DirectX::XMVECTOR relativeVelocity = DirectX::XMVectorSubtract(velB, velA);
+		constexpr float kRestitutionSlop = 0.5f;
 
-		float velocityAlongNormal = DirectX::XMVectorGetX(DirectX::XMVector3Dot(relativeVelocity, contact.Normal));
-		if (velocityAlongNormal < 0.0f)
+		const int numContacts = static_cast<int>(contact.Contacts.size());
+		if (numContacts == 0) return;
+
+		DirectX::XMVECTOR tangent0, tangent1;
+		ComputeFrictionBasis(contact.Normal, tangent0, tangent1);
+
+		std::vector<float> accJn(numContacts, 0.0f);
+		std::vector<float> accJt0(numContacts, 0.0f);
+		std::vector<float> accJt1(numContacts, 0.0f);
+
+		bool isContinuingContact = WarmStart(contact, accJn, accJt0, accJt1, tangent0, tangent1);
+
+		for (int iter = 0; iter < SOLVER_ITERATIONS; ++iter)
 		{
-			float restitution = 50.0f;
-			float impulseMagnitude = -(1.0f + restitution) * velocityAlongNormal;
-			impulseMagnitude /= a->m_InvMass + b->m_InvMass;
-			DirectX::XMVECTOR impulse = DirectX::XMVectorScale(contact.Normal, impulseMagnitude);
-			DirectX::XMVECTOR pointOnObject = DirectX::XMVectorSubtract(contactPoint, b->GetPosition());
-			std::cout << "Point on object: " << DirectX::XMVectorGetX(pointOnObject) << ", " << DirectX::XMVectorGetY(pointOnObject) << ", " << DirectX::XMVectorGetZ(pointOnObject) << std::endl;
-			if (a->m_InvMass > 0.0f)
-				a->ApplyForce(Force{ DirectX::XMVectorNegate(impulse), 0.01f, contactPoint });
-			if (b->m_InvMass > 0.0f)
-				b->ApplyForce(Force{ impulse, 0.01f, contactPoint });
-
-			// Friction
-			DirectX::XMVECTOR tangent = DirectX::XMVectorSubtract(relativeVelocity, DirectX::XMVectorScale(contact.Normal, velocityAlongNormal));
-			float tangentLength = DirectX::XMVectorGetX(DirectX::XMVector3Length(tangent));
-			if (tangentLength > 1e-4f)
-				tangent = DirectX::XMVector3Normalize(tangent);
-			else
-				tangent = DirectX::XMVectorZero();
-
-			float jt = -DirectX::XMVectorGetX(DirectX::XMVector3Dot(relativeVelocity, tangent));
-			jt /= a->m_InvMass + b->m_InvMass;
-
-			float frictionCoefficient = 0.3f;
-			float maxFriction = frictionCoefficient * impulseMagnitude;
-			jt = std::clamp(jt, -maxFriction, maxFriction);
-			if (jt != 0.0f)
+			for (int ci = 0; ci < numContacts; ++ci)
 			{
-				DirectX::XMVECTOR frictionImpulse = DirectX::XMVectorScale(tangent, jt);
-				if (a->m_InvMass > 0.0f)
-					a->ApplyForce(Force{ DirectX::XMVectorNegate(frictionImpulse), 0.01f, contactPoint });
-				if (b->m_InvMass > 0.0f)
-					b->ApplyForce(Force{ frictionImpulse, 0.01f, contactPoint });
-			}
+				const ContactPoint& cp = contact.Contacts[ci];
+				DirectX::XMVECTOR ra = DirectX::XMVectorSubtract(cp.Point, a->GetPosition());
+				DirectX::XMVECTOR rb = DirectX::XMVectorSubtract(cp.Point, b->GetPosition());
 
-			// Angular friction
-			if (a->m_InvMass > 0.0f)
-			{
-				DirectX::XMVECTOR relPositionA = DirectX::XMVectorSubtract(contactPoint, a->GetPosition());
-				DirectX::XMVECTOR relVelocityA = DirectX::XMVectorAdd(a->m_Velocity, DirectX::XMVector3Cross(a->m_AngularVelocity, relPositionA));
-				DirectX::XMVECTOR velocityNormalA = DirectX::XMVectorMultiply(DirectX::XMVector3Dot(relVelocityA, contact.Normal), contact.Normal);
-				DirectX::XMVECTOR velocityWithoutNormalA = DirectX::XMVectorSubtract(relVelocityA, velocityNormalA);
-				if (DirectX::XMVectorGetX(DirectX::XMVector3Length(velocityWithoutNormalA)) > 1e-5f)
+				// --- Normal constraint (Gauss-Seidel: reads current velocities) ---
+				DirectX::XMVECTOR contactVelA = DirectX::XMVectorAdd(a->m_Velocity, DirectX::XMVector3Cross(a->m_AngularVelocity, ra));
+				DirectX::XMVECTOR contactVelB = DirectX::XMVectorAdd(b->m_Velocity, DirectX::XMVector3Cross(b->m_AngularVelocity, rb));
+				DirectX::XMVECTOR relVel = DirectX::XMVectorSubtract(contactVelB, contactVelA);
+
+				float vn = DirectX::XMVectorGetX(DirectX::XMVector3Dot(relVel, contact.Normal));
+				DirectX::XMVECTOR raCrossN = DirectX::XMVector3Cross(ra, contact.Normal);
+				DirectX::XMVECTOR rbCrossN = DirectX::XMVector3Cross(rb, contact.Normal);
+				float angTermA = DirectX::XMVectorGetX(DirectX::XMVector3Dot(
+					DirectX::XMVector3Cross(DirectX::XMVector3Transform(raCrossN, a->m_InverseInertiaTensor), ra), contact.Normal));
+				float angTermB = DirectX::XMVectorGetX(DirectX::XMVector3Dot(
+					DirectX::XMVector3Cross(DirectX::XMVector3Transform(rbCrossN, b->m_InverseInertiaTensor), rb), contact.Normal));
+				float effMassN = a->m_InvMass + b->m_InvMass + angTermA + angTermB;
+				if (effMassN <= 0.0f) continue;
+
+				float e = (iter == 0 && !isContinuingContact && vn < -kRestitutionSlop) ? restitution : 0.0f;
+
+				float jn = -(1.0f + e) * vn / effMassN;
+				float oldAccJn = accJn[ci];
+				accJn[ci] = (std::max)(oldAccJn + jn, 0.0f);
+				jn = accJn[ci] - oldAccJn;
+
+				if (jn != 0.0f)
 				{
-					DirectX::XMVECTOR posCrossTangent = DirectX::XMVector3Cross(relPositionA, DirectX::XMVector3Normalize(velocityWithoutNormalA));
-					DirectX::XMVECTOR angularComp = DirectX::XMVector3Transform(posCrossTangent, a->m_InverseInertiaTensor);
-					float angularDenom = DirectX::XMVectorGetX(DirectX::XMVector3Dot(DirectX::XMVector3Cross(angularComp, relPositionA), DirectX::XMVector3Normalize(velocityWithoutNormalA)));
-					if (fabs(angularDenom) > 1e-5f)
+					DirectX::XMVECTOR impulse = DirectX::XMVectorScale(contact.Normal, jn);
+					if (a->m_InvMass > 0.0f)
 					{
-						DirectX::XMVECTOR frictionDir = DirectX::XMVector3Normalize(velocityWithoutNormalA);
-						float frictionTorqueMag = frictionCoefficient * (DirectX::XMVectorGetX(DirectX::XMVector3Length(velocityWithoutNormalA)) / angularDenom) * DirectX::XMVectorGetX(DirectX::XMVector3Length(relPositionA));
-						DirectX::XMVECTOR frictionTorque = DirectX::XMVectorScale(DirectX::XMVector3Cross(relPositionA, frictionDir), frictionTorqueMag);
-						a->ApplyTorque(DirectX::XMVectorNegate(frictionTorque));
+						a->m_Velocity = DirectX::XMVectorSubtract(a->m_Velocity, DirectX::XMVectorScale(impulse, a->m_InvMass));
+						a->m_AngularVelocity = DirectX::XMVectorSubtract(a->m_AngularVelocity,
+							DirectX::XMVector3Transform(DirectX::XMVectorScale(raCrossN, jn), a->m_InverseInertiaTensor));
+					}
+					if (b->m_InvMass > 0.0f)
+					{
+						b->m_Velocity = DirectX::XMVectorAdd(b->m_Velocity, DirectX::XMVectorScale(impulse, b->m_InvMass));
+						b->m_AngularVelocity = DirectX::XMVectorAdd(b->m_AngularVelocity,
+							DirectX::XMVector3Transform(DirectX::XMVectorScale(rbCrossN, jn), b->m_InverseInertiaTensor));
 					}
 				}
-			}
-			if (b->m_InvMass > 0.0f)
-			{
-				DirectX::XMVECTOR relPositionB = DirectX::XMVectorSubtract(contactPoint, b->GetPosition());
-				DirectX::XMVECTOR relVelocityB = DirectX::XMVectorAdd(b->m_Velocity, DirectX::XMVector3Cross(b->m_AngularVelocity, relPositionB));
-				DirectX::XMVECTOR velocityNormalB = DirectX::XMVectorMultiply(DirectX::XMVector3Dot(relVelocityB, contact.Normal), contact.Normal);
-				DirectX::XMVECTOR velocityWithoutNormalB = DirectX::XMVectorSubtract(relVelocityB, velocityNormalB);
-				if (DirectX::XMVectorGetX(DirectX::XMVector3Length(velocityWithoutNormalB)) > 1e-5f)
+
+				// --- Friction constraints (re-read velocities after normal impulse) ---
+				contactVelA = DirectX::XMVectorAdd(a->m_Velocity, DirectX::XMVector3Cross(a->m_AngularVelocity, ra));
+				contactVelB = DirectX::XMVectorAdd(b->m_Velocity, DirectX::XMVector3Cross(b->m_AngularVelocity, rb));
+				relVel = DirectX::XMVectorSubtract(contactVelB, contactVelA);
+
+				float maxFriction = staticFriction * accJn[ci];
+
+				// Tangent0
 				{
-					DirectX::XMVECTOR posCrossTangent = DirectX::XMVector3Cross(relPositionB, DirectX::XMVector3Normalize(velocityWithoutNormalB));
-					DirectX::XMVECTOR angularComp = DirectX::XMVector3Transform(posCrossTangent, b->m_InverseInertiaTensor);
-					float angularDenom = DirectX::XMVectorGetX(DirectX::XMVector3Dot(DirectX::XMVector3Cross(angularComp, relPositionB), DirectX::XMVector3Normalize(velocityWithoutNormalB)));
-					if (fabs(angularDenom) > 1e-5f)
+					float vt = DirectX::XMVectorGetX(DirectX::XMVector3Dot(relVel, tangent0));
+					DirectX::XMVECTOR raCrossT = DirectX::XMVector3Cross(ra, tangent0);
+					DirectX::XMVECTOR rbCrossT = DirectX::XMVector3Cross(rb, tangent0);
+					float angTermTA = DirectX::XMVectorGetX(DirectX::XMVector3Dot(
+						DirectX::XMVector3Cross(DirectX::XMVector3Transform(raCrossT, a->m_InverseInertiaTensor), ra), tangent0));
+					float angTermTB = DirectX::XMVectorGetX(DirectX::XMVector3Dot(
+						DirectX::XMVector3Cross(DirectX::XMVector3Transform(rbCrossT, b->m_InverseInertiaTensor), rb), tangent0));
+					float effMassT = a->m_InvMass + b->m_InvMass + angTermTA + angTermTB;
+					if (effMassT > 0.0f)
 					{
-						DirectX::XMVECTOR frictionDir = DirectX::XMVector3Normalize(velocityWithoutNormalB);
-						float frictionTorqueMag = frictionCoefficient * (DirectX::XMVectorGetX(DirectX::XMVector3Length(velocityWithoutNormalB)) / angularDenom) * DirectX::XMVectorGetX(DirectX::XMVector3Length(relPositionB));
-						DirectX::XMVECTOR frictionTorque = DirectX::XMVectorScale(DirectX::XMVector3Cross(relPositionB, frictionDir), frictionTorqueMag);
-						b->ApplyTorque(DirectX::XMVectorNegate(frictionTorque));
+						float lambda = -vt / effMassT;
+						float oldAcc = accJt0[ci];
+						accJt0[ci] = (std::max)(-maxFriction, (std::min)(oldAcc + lambda, maxFriction));
+						lambda = accJt0[ci] - oldAcc;
+						if (lambda != 0.0f)
+						{
+							DirectX::XMVECTOR imp = DirectX::XMVectorScale(tangent0, lambda);
+							if (a->m_InvMass > 0.0f)
+							{
+								a->m_Velocity = DirectX::XMVectorSubtract(a->m_Velocity, DirectX::XMVectorScale(imp, a->m_InvMass));
+								a->m_AngularVelocity = DirectX::XMVectorSubtract(a->m_AngularVelocity,
+									DirectX::XMVector3Transform(DirectX::XMVectorScale(raCrossT, lambda), a->m_InverseInertiaTensor));
+							}
+							if (b->m_InvMass > 0.0f)
+							{
+								b->m_Velocity = DirectX::XMVectorAdd(b->m_Velocity, DirectX::XMVectorScale(imp, b->m_InvMass));
+								b->m_AngularVelocity = DirectX::XMVectorAdd(b->m_AngularVelocity,
+									DirectX::XMVector3Transform(DirectX::XMVectorScale(rbCrossT, lambda), b->m_InverseInertiaTensor));
+							}
+						}
+					}
+				}
+
+				// Tangent1
+				{
+					float vt = DirectX::XMVectorGetX(DirectX::XMVector3Dot(relVel, tangent1));
+					DirectX::XMVECTOR raCrossT = DirectX::XMVector3Cross(ra, tangent1);
+					DirectX::XMVECTOR rbCrossT = DirectX::XMVector3Cross(rb, tangent1);
+					float angTermTA = DirectX::XMVectorGetX(DirectX::XMVector3Dot(
+						DirectX::XMVector3Cross(DirectX::XMVector3Transform(raCrossT, a->m_InverseInertiaTensor), ra), tangent1));
+					float angTermTB = DirectX::XMVectorGetX(DirectX::XMVector3Dot(
+						DirectX::XMVector3Cross(DirectX::XMVector3Transform(rbCrossT, b->m_InverseInertiaTensor), rb), tangent1));
+					float effMassT = a->m_InvMass + b->m_InvMass + angTermTA + angTermTB;
+					if (effMassT > 0.0f)
+					{
+						float lambda = -vt / effMassT;
+						float oldAcc = accJt1[ci];
+						accJt1[ci] = (std::max)(-maxFriction, (std::min)(oldAcc + lambda, maxFriction));
+						lambda = accJt1[ci] - oldAcc;
+						if (lambda != 0.0f)
+						{
+							DirectX::XMVECTOR imp = DirectX::XMVectorScale(tangent1, lambda);
+							if (a->m_InvMass > 0.0f)
+							{
+								a->m_Velocity = DirectX::XMVectorSubtract(a->m_Velocity, DirectX::XMVectorScale(imp, a->m_InvMass));
+								a->m_AngularVelocity = DirectX::XMVectorSubtract(a->m_AngularVelocity,
+									DirectX::XMVector3Transform(DirectX::XMVectorScale(raCrossT, lambda), a->m_InverseInertiaTensor));
+							}
+							if (b->m_InvMass > 0.0f)
+							{
+								b->m_Velocity = DirectX::XMVectorAdd(b->m_Velocity, DirectX::XMVectorScale(imp, b->m_InvMass));
+								b->m_AngularVelocity = DirectX::XMVectorAdd(b->m_AngularVelocity,
+									DirectX::XMVector3Transform(DirectX::XMVectorScale(rbCrossT, lambda), b->m_InverseInertiaTensor));
+							}
+						}
 					}
 				}
 			}
 		}
+
+		StoreCache(contact, accJn, accJt0, accJt1, tangent0, tangent1);
 	}
 
-	DirectX::XMVECTOR PhysicsEngine::CalculateContactTangent(DirectX::XMVECTOR normal)
+	void PhysicsEngine::ComputeFrictionBasis(DirectX::XMVECTOR normal, DirectX::XMVECTOR& outTangent0, DirectX::XMVECTOR& outTangent1)
 	{
-		DirectX::XMVECTOR up = DirectX::XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f);
-		DirectX::XMVECTOR right = DirectX::XMVectorSet(1.0f, 0.0f, 0.0f, 0.0f);
+		DirectX::XMVECTOR ref = (std::abs(DirectX::XMVectorGetY(normal)) < 0.9f)
+			? DirectX::XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f)
+			: DirectX::XMVectorSet(1.0f, 0.0f, 0.0f, 0.0f);
+		outTangent0 = DirectX::XMVector3Normalize(DirectX::XMVector3Cross(normal, ref));
+		outTangent1 = DirectX::XMVector3Cross(normal, outTangent0);
+	}
 
-		// Use up if normal is not too close to Y axis
-		DirectX::XMVECTOR tangent = DirectX::XMVector3Cross(normal, up);
-		if (DirectX::XMVector3LengthSq(tangent).m128_f32[0] < 1e-4f) 
+	BodyPairKey PhysicsEngine::MakeKey(PhysicsComponent* a, PhysicsComponent* b)
+	{
+		if (a < b) return { a, b };
+		return { b, a };
+	}
+
+	bool PhysicsEngine::WarmStart(ContactManifold& contact, std::vector<float>& accJn, std::vector<float>& accJt0,
+		std::vector<float>& accJt1, DirectX::XMVECTOR tangent0, DirectX::XMVECTOR tangent1)
+	{
+		BodyPairKey key = MakeKey(contact.A, contact.B);
+		auto it = m_ContactCache.find(key);
+		if (it == m_ContactCache.end()) return false;
+
+		CachedManifold& cached = it->second;
+		PhysicsComponent* a = contact.A;
+		PhysicsComponent* b = contact.B;
+		const int numContacts = static_cast<int>(contact.Contacts.size());
+
+		for (int ci = 0; ci < numContacts; ++ci)
 		{
-			tangent = DirectX::XMVector3Cross(normal, right);
-		}
+			const ContactPoint& cp = contact.Contacts[ci];
+			int bestIdx = -1;
+			float bestDistSq = CONTACT_MATCH_THRESHOLD_SQ;
+			for (int j = 0; j < static_cast<int>(cached.Contacts.size()); ++j)
+			{
+				float distSq = DirectX::XMVectorGetX(DirectX::XMVector3LengthSq(
+					DirectX::XMVectorSubtract(cp.Point, cached.Contacts[j].Point)));
+				if (distSq < bestDistSq) { bestDistSq = distSq; bestIdx = j; }
+			}
+			if (bestIdx < 0) continue;
 
-		return DirectX::XMVector3Normalize(tangent);
+			const CachedContact& cc = cached.Contacts[bestIdx];
+			DirectX::XMVECTOR oldTangentImpulse = DirectX::XMVectorAdd(
+				DirectX::XMVectorScale(cached.Tangent0, cc.AccJt0),
+				DirectX::XMVectorScale(cached.Tangent1, cc.AccJt1));
+			float warmJn  = cc.AccJn * WARM_START_FACTOR;
+			float warmJt0 = DirectX::XMVectorGetX(DirectX::XMVector3Dot(oldTangentImpulse, tangent0)) * WARM_START_FACTOR;
+			float warmJt1 = DirectX::XMVectorGetX(DirectX::XMVector3Dot(oldTangentImpulse, tangent1)) * WARM_START_FACTOR;
+			accJn[ci] = warmJn; accJt0[ci] = warmJt0; accJt1[ci] = warmJt1;
+
+			DirectX::XMVECTOR ra = DirectX::XMVectorSubtract(cp.Point, a->GetPosition());
+			DirectX::XMVECTOR rb = DirectX::XMVectorSubtract(cp.Point, b->GetPosition());
+			DirectX::XMVECTOR totalImpulse = DirectX::XMVectorAdd(
+				DirectX::XMVectorScale(contact.Normal, warmJn),
+				DirectX::XMVectorAdd(DirectX::XMVectorScale(tangent0, warmJt0), DirectX::XMVectorScale(tangent1, warmJt1)));
+
+			if (a->m_InvMass > 0.0f)
+			{
+				a->m_Velocity = DirectX::XMVectorSubtract(a->m_Velocity, DirectX::XMVectorScale(totalImpulse, a->m_InvMass));
+				DirectX::XMVECTOR angA = DirectX::XMVectorAdd(
+					DirectX::XMVector3Transform(DirectX::XMVectorScale(DirectX::XMVector3Cross(ra, contact.Normal), warmJn), a->m_InverseInertiaTensor),
+					DirectX::XMVectorAdd(
+						DirectX::XMVector3Transform(DirectX::XMVectorScale(DirectX::XMVector3Cross(ra, tangent0), warmJt0), a->m_InverseInertiaTensor),
+						DirectX::XMVector3Transform(DirectX::XMVectorScale(DirectX::XMVector3Cross(ra, tangent1), warmJt1), a->m_InverseInertiaTensor)));
+				a->m_AngularVelocity = DirectX::XMVectorSubtract(a->m_AngularVelocity, angA);
+			}
+			if (b->m_InvMass > 0.0f)
+			{
+				b->m_Velocity = DirectX::XMVectorAdd(b->m_Velocity, DirectX::XMVectorScale(totalImpulse, b->m_InvMass));
+				DirectX::XMVECTOR angB = DirectX::XMVectorAdd(
+					DirectX::XMVector3Transform(DirectX::XMVectorScale(DirectX::XMVector3Cross(rb, contact.Normal), warmJn), b->m_InverseInertiaTensor),
+					DirectX::XMVectorAdd(
+						DirectX::XMVector3Transform(DirectX::XMVectorScale(DirectX::XMVector3Cross(rb, tangent0), warmJt0), b->m_InverseInertiaTensor),
+						DirectX::XMVector3Transform(DirectX::XMVectorScale(DirectX::XMVector3Cross(rb, tangent1), warmJt1), b->m_InverseInertiaTensor)));
+				b->m_AngularVelocity = DirectX::XMVectorAdd(b->m_AngularVelocity, angB);
+			}
+		}
+		return true;
+	}
+
+	void PhysicsEngine::StoreCache(const ContactManifold& contact, const std::vector<float>& accJn,
+		const std::vector<float>& accJt0, const std::vector<float>& accJt1,
+		DirectX::XMVECTOR tangent0, DirectX::XMVECTOR tangent1)
+	{
+		BodyPairKey key = MakeKey(contact.A, contact.B);
+		CachedManifold cached;
+		cached.Normal = contact.Normal;
+		cached.Tangent0 = tangent0;
+		cached.Tangent1 = tangent1;
+		cached.Age = 0;
+		const int numContacts = static_cast<int>(contact.Contacts.size());
+		cached.Contacts.resize(numContacts);
+		for (int ci = 0; ci < numContacts; ++ci)
+		{
+			cached.Contacts[ci].Point = contact.Contacts[ci].Point;
+			cached.Contacts[ci].AccJn = accJn[ci];
+			cached.Contacts[ci].AccJt0 = accJt0[ci];
+			cached.Contacts[ci].AccJt1 = accJt1[ci];
+		}
+		m_ContactCache[key] = cached;
 	}
 }

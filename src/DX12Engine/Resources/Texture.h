@@ -2,6 +2,7 @@
 #include <DirectXMath.h>
 #include "GPUResource.h"
 #include "../Rendering/Heaps/DescriptorHeapHandle.h"
+#include <DirectXTex.h>
 
 namespace DX12Engine
 {
@@ -11,7 +12,8 @@ namespace DX12Engine
 		Normal,
 		Metallic,
 		Roughness,
-		AOMap
+		AOMap,
+		Emissive
 	};
 
 	class Texture : public GPUResource
@@ -19,10 +21,10 @@ namespace DX12Engine
 	public:
 		friend class GPUUploader;
 
-		Texture(ID3D12Resource* mainResource, ID3D12Resource* uploadResource, D3D12_RESOURCE_STATES usageState, std::vector<D3D12_SUBRESOURCE_DATA> data, DescriptorHeapHandle descriptor, D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc, bool isCubemap);
+		Texture(DirectX::ScratchImage* scratchImage, ID3D12Resource* mainResource, ID3D12Resource* uploadResource, D3D12_RESOURCE_STATES usageState, std::vector<D3D12_SUBRESOURCE_DATA> data, DescriptorHeapHandle descriptor, D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc, bool isCubemap);
 		~Texture();
 
-		D3D12_GPU_DESCRIPTOR_HANDLE GetGPUHandle() { return GetDescriptor()->GetGPUHandle(); }
+		D3D12_GPU_DESCRIPTOR_HANDLE GetGPUHandle() { return GetTransientDescriptor()->GetGPUHandle(); }
 		bool IsCubemap() { return m_IsCubemap; }
 
 	private:
@@ -31,6 +33,9 @@ namespace DX12Engine
 		std::vector<D3D12_SUBRESOURCE_DATA> m_Data;
 		bool m_IsCubemap = false;
 		bool m_IsUploaded = false;
+		// Owns the decoded pixel data that D3D12_SUBRESOURCE_DATA::pData points into.
+		// Must outlive the GPU upload; deleted in the destructor.
+		DirectX::ScratchImage* m_ScratchImage = nullptr;
 	};
 }
 

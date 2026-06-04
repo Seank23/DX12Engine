@@ -1,6 +1,7 @@
 #pragma once
 #include <Windows.h>
 #include <string>
+#include <functional>
 
 namespace DX12Engine
 {
@@ -26,6 +27,18 @@ namespace DX12Engine
 		static bool IsKeyPressed(int key)
 		{
 			return GetAsyncKeyState(key) & 0x8000;
+		}
+
+		static void IsNewKeyPress(UINT msg, WPARAM wParam, LPARAM lParam, std::function<void(WPARAM)> onNewKeyPress)
+		{
+			if (msg == WM_KEYDOWN || msg == WM_SYSKEYDOWN)
+			{
+				const bool wasPreviouslyPressed = (lParam & 0x40000000) != 0;
+				const bool isNowPressed = (lParam & 0x80000000) == 0;
+
+				if (isNowPressed && !wasPreviouslyPressed)
+					onNewKeyPress(wParam);
+			}
 		}
 
 		virtual void Update(float deltaTime) = 0;

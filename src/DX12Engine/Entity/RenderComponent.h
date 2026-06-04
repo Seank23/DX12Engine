@@ -1,13 +1,18 @@
 #pragma once
 #include "Component.h"
-#include "../Resources/Mesh.h"
 #include "../Rendering/Buffers/VertexBuffer.h"
 #include "../Rendering/Buffers/IndexBuffer.h"
 #include "../Rendering/Buffers/ConstantBuffer.h"
 #include "../Resources/Materials/Material.h"
+#include "../Asset/ModelInstance.h"
+#include <memory>
+#include <vector>
 
 namespace DX12Engine
 {
+	class MeshPrimitive;
+	class MaterialAsset;
+
 	struct RenderComponentData
 	{
 		DirectX::XMMATRIX ModelMatrix;
@@ -15,13 +20,28 @@ namespace DX12Engine
 		DirectX::XMMATRIX ViewMatrix;
 		DirectX::XMMATRIX ProjectionMatrix;
 		DirectX::XMMATRIX MVPMatrix;
-		DirectX::XMMATRIX InvViewMatrix;
-		DirectX::XMMATRIX InvProjectionMatrix;
 		DirectX::XMFLOAT3 CameraPosition;
 		float Padding;
+		DirectX::XMMATRIX PrevMVPMatrix;
+		DirectX::XMMATRIX UnjitteredMVPMatrix;
 	};
 
 	class GameObject;
+
+	struct ResolvedPrimitiveBinding
+	{
+		MeshPrimitive* Primitive = nullptr;
+		MaterialAsset* MaterialAsset = nullptr;
+		DirectX::XMFLOAT4X4 NodeWorldTransform = [](){
+			DirectX::XMFLOAT4X4 m{};
+			DirectX::XMStoreFloat4x4(&m, DirectX::XMMatrixIdentity());
+			return m;
+		}();
+		std::unique_ptr<ConstantBuffer> PrimitiveConstantBuffer;
+		D3D12_GPU_VIRTUAL_ADDRESS CBVAddress = 0;
+		DirectX::XMMATRIX PrevUnjitteredMVPMatrix = DirectX::XMMatrixIdentity();
+		bool HasValidPrevUnjitteredMVP = false;
+	};
 
 	class RenderComponent : public Component
 	{
@@ -30,31 +50,33 @@ namespace DX12Engine
 		friend class ProceduralRenderer;
 
 		RenderComponent(GameObject* parent);
+		RenderComponent(GameObject* parent, std::shared_ptr<ModelInstance> asset);
 		~RenderComponent();
 
 		virtual void Init() override;
 		virtual void Update(float ts, float elapsed) override;
 
-		virtual void OnMeshChanged(Mesh* newMesh) override;
 		virtual void OnTransformChanged(TransformType type) override;
 
-		void SetMaterial(std::shared_ptr<Material> material) { m_Material = material; }
-
-		Material* GetMaterial() { return m_Material.get(); }	
-		D3D12_GPU_VIRTUAL_ADDRESS GetCBVAddress() { return m_ConstantBuffer->GetGPUAddress(); }
-
-		D3D12_VERTEX_BUFFER_VIEW GetVertexBufferView() { return m_VertexBuffer->GetVertexBufferView(); }
-		D3D12_INDEX_BUFFER_VIEW GetIndexBufferView() { return m_IndexBuffer->GetIndexBufferView(); }
+		void SetAsset(std::shared_ptr<ModelInstance> asset);
+		ModelInstance* GetAsset() const { return m_Asset.get(); }
+		const std::vector<ResolvedPrimitiveBinding>& GetResolvedPrimitiveBindings() const { return m_ResolvedPrimitiveBindings; }
+		std::vector<ResolvedPrimitiveBinding>& GetResolvedPrimitiveBindings() { return m_ResolvedPrimitiveBindings; }
 
 		DirectX::XMMATRIX GetModelMatrix();
 
 	private:
-		void UpdateConstantBufferData(DirectX::XMMATRIX viewMatrix, DirectX::XMMATRIX projectionMatrix, DirectX::XMFLOAT3 cameraPosition);
+		void UpdateConstantBufferData(
+			ResolvedPrimitiveBinding& binding,
+			DirectX::XMMATRIX modelMatrix,
+			DirectX::XMMATRIX viewMatrix,
+			DirectX::XMMATRIX projectionMatrix,
+			DirectX::XMMATRIX unjitteredProjectionMatrix,
+			DirectX::XMFLOAT3 cameraPosition);
+		void RebuildResolvedPrimitiveBindings();
 
-		std::unique_ptr<VertexBuffer> m_VertexBuffer;
-		std::unique_ptr<IndexBuffer> m_IndexBuffer;
-		std::unique_ptr<ConstantBuffer> m_ConstantBuffer;
+		std::shared_ptr<ModelInstance> m_Asset;
 		RenderComponentData m_RenderObjectData;
-		std::shared_ptr<Material> m_Material;
+		std::vector<ResolvedPrimitiveBinding> m_ResolvedPrimitiveBindings;
 	};
 }

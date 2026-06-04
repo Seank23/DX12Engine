@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 #include "RenderPass.h"
 #include "../../Resources/ResourceManager.h"
 #include "../RenderContext.h"
@@ -10,45 +10,124 @@ namespace DX12Engine
 {
 	void RenderPass::Init()
 	{
-		if (m_InputResources.size() > 0)
-		{
-			ResourceManager::GetInstance().UpdateSRVDescriptors(EngineUtils::VectorSharedPtrToPtrs(m_InputResources));
-			UINT baseRegister = 0;
-			for (UINT size : m_ResourceBlockSizes)
-			{
-				AddDescriptorTableConfig({ size, D3D12_DESCRIPTOR_RANGE_TYPE_SRV, baseRegister });
-				baseRegister += size;
-			}
-		}
+		m_InputResourceBlockHandles.clear();
+		m_DescriptorTableConfigs.clear();
 
-		DirectX::XMINT2 windowSize = m_RenderContext.GetWindowSize();
-		m_ScreenDataCB = ResourceManager::GetInstance().CreateConstantBuffer(sizeof(ScreenData));
-		m_ScreenData.ScreenSize = DirectX::XMFLOAT2(windowSize.x, windowSize.y);
+		// Build descriptor table configs for PSO root signature construction only.
+		// No transient allocation here -- RebuildTransientDescriptors allocates fresh
+		// shader-visible slots every frame from the current frame's transient region.
+		UINT baseRegister = 0;
+		for (InputResourceType type : m_ResourceBlockOrder)
+		{
+			auto blockIt = m_ResourceBlocks.find(type);
+			if (blockIt == m_ResourceBlocks.end())
+				continue;
+
+			AddDescriptorTableConfig({ blockIt->second, D3D12_DESCRIPTOR_RANGE_TYPE_SRV, baseRegister });
+			baseRegister += blockIt->second;
+		}
+	}
+
+	void RenderPass::RebuildTransientDescriptors()
+	{
+		if (m_InputResources.empty())
+			return;
+
+		m_InputResourceBlockHandles.clear();
+
+		// Allocate one contiguous transient block for all input resources and capture
+		// the base handle. Block-start GPU handles are computed by offset from this base
+		// so that clobbers from other passes' UpdateSRVDescriptors calls cannot corrupt them.
+		std::vector<GPUResource*> inputResources;
+		for (const auto& resource : m_InputResources)
+			inputResources.push_back(resource.get());
+		DescriptorHeapHandle blockBase = ResourceManager::GetInstance().UpdateSRVDescriptors(inputResources);
+
+		UINT descriptorSize = m_RenderContext.GetHeapManager().GetRenderPassHeap().GetDescriptorSize();
+		UINT baseRegister = 0;
+		for (InputResourceType type : OrderedInputTypes)
+		{
+			auto sizeIt = m_ResourceBlocks.find(type);
+			if (sizeIt == m_ResourceBlocks.end())
+				continue;
+			UINT size = sizeIt->second;
+
+			if (size > 0 && baseRegister < static_cast<UINT>(m_InputResources.size()))
+			{
+				DescriptorHeapHandle blockStart;
+				D3D12_CPU_DESCRIPTOR_HANDLE cpu = blockBase.GetCPUHandle();
+				cpu.ptr += baseRegister * descriptorSize;
+				D3D12_GPU_DESCRIPTOR_HANDLE gpu = blockBase.GetGPUHandle();
+				gpu.ptr += baseRegister * descriptorSize;
+				blockStart.SetCPUHandle(cpu);
+				blockStart.SetGPUHandle(gpu);
+				blockStart.SetHeapIndex(blockBase.GetHeapIndex() + baseRegister);
+				m_InputResourceBlockHandles[type] = blockStart;
+			}
+			baseRegister += size;
+		}
 	}
 
 	void RenderPass::Execute()
 	{
-		UpdateCB();
+		if (m_LocalShaderGeneration != ResourceManager::GetInstance().GetShaderGeneration())
+		{
+			CreatePSO();
+			m_LocalShaderGeneration = ResourceManager::GetInstance().GetShaderGeneration();
+		}
+		RebuildTransientDescriptors();
 		m_QueueManager.GetGraphicsQueue().ResetCommandAllocatorAndList();
 	}
 
-	void RenderPass::OnResize(DirectX::XMINT2 newSize)
+	void RenderPass::RemapInputResources(const std::unordered_map<GPUResource*, std::shared_ptr<GPUResource>>& resourceMap)
 	{
-		m_ScreenData.ScreenSize = DirectX::XMFLOAT2((float)newSize.x, (float)newSize.y);
-		if (m_ScreenDataCB)
-			m_ScreenDataCB->Update(&m_ScreenData, sizeof(ScreenData));
+		if (resourceMap.empty())
+			return;
+
+		for (std::shared_ptr<GPUResource>& inputResource : m_InputResources)
+		{
+			auto remappedResource = resourceMap.find(inputResource.get());
+			if (remappedResource != resourceMap.end())
+				inputResource = remappedResource->second;
+		}
 	}
 
-	void RenderPass::UpdateCB()
+	void RenderPass::AppendResizeRemap(std::unordered_map<GPUResource*, std::shared_ptr<GPUResource>>& resourceMap) const
 	{
-		if (m_Camera != nullptr)
+		for (const auto& [oldResource, newResource] : m_LastResizeRemap)
+			resourceMap[oldResource] = newResource;
+	}
+
+	void RenderPass::OnResize(DirectX::XMINT2 newRenderSize)
+	{
+		std::vector<std::shared_ptr<RenderTexture>> newRenderTargets(m_RenderTargets.size());
+		m_LastResizeRemap.clear();
+
+		for (int i = 0; i < m_RenderTargets.size(); i++)
 		{
-			m_ScreenData.CameraPosition = DirectX::XMFLOAT4(m_Camera->GetPosition().x, m_Camera->GetPosition().y, m_Camera->GetPosition().z, 1.0f);
-			m_ScreenData.ViewMatrix = m_Camera->GetViewMatrix();
-			m_ScreenData.ProjectionMatrix = m_Camera->GetProjectionMatrix();
-			m_ScreenData.InvViewMatrix = DirectX::XMMatrixInverse(nullptr, m_Camera->GetViewMatrix());
-			m_ScreenData.InvProjectionMatrix = DirectX::XMMatrixInverse(nullptr, m_Camera->GetProjectionMatrix());
-			m_ScreenDataCB->Update(&m_ScreenData, sizeof(ScreenData));
+			RenderTextureConfig config = m_RenderTargets[i]->GetConfig();
+			if (!config.ShouldResize || config.Format == DXGI_FORMAT_UNKNOWN)
+			{
+				newRenderTargets[i] = m_RenderTargets[i];
+			}
+			else
+			{
+				config.Dimensions = DirectX::XMINT3(newRenderSize.x, newRenderSize.y, config.Dimensions.z);
+
+				if (m_RenderTargets[i]->IsDepth())
+					newRenderTargets[i] = ResourceManager::GetInstance().CreateDepthMap(config);
+				else
+					newRenderTargets[i] = ResourceManager::GetInstance().CreateRenderTargetTexture(config);
+			}
+			m_LastResizeRemap[m_RenderTargets[i].get()] = std::static_pointer_cast<GPUResource>(newRenderTargets[i]);
 		}
+
+		RemapInputResources(m_LastResizeRemap);
+		m_RenderTargets = std::move(newRenderTargets);
+
+		m_Viewport.Width = (float)newRenderSize.x;
+		m_Viewport.Height = (float)newRenderSize.y;
+		m_ScissorRect.right = (LONG)newRenderSize.x;
+		m_ScissorRect.bottom = (LONG)newRenderSize.y;
 	}
 }

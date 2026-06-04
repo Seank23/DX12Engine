@@ -16,7 +16,7 @@ namespace DX12Engine
 		virtual Texture* GetTexture(TextureType type) override;
 		virtual bool HasTexture(TextureType type) override;
 
-		virtual void Bind(ID3D12GraphicsCommandList* commandList, int* startIndex) override;
+		virtual void Bind(ID3D12GraphicsCommandList* commandList, int cbSlot, int textureSlot) override;
 
 		virtual void SetAllTextures(std::unordered_map<TextureType, std::shared_ptr<Texture>> textures) override;
 

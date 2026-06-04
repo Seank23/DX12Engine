@@ -9,9 +9,11 @@ cbuffer ShadowConstants : register(b0)
 struct PSInput
 {
     float4 Position : SV_POSITION;
+    float3 WorldPos : TEXCOORD0;
 };
 
 float main(PSInput input) : SV_Depth
 {
-    return input.Position.z * 0.5 + 0.5;
+    float dist = length(input.WorldPos - LightPos);
+    return dist / FarPlane;
 }

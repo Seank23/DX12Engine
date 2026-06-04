@@ -6,6 +6,21 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 include(FetchContent)
 
+# Debug UI feature gate
+# Defaults:
+# - Single-config generators: ON for Debug, OFF for Release/other.
+# - Multi-config generators: ON (per-config compile/link rules still compile ImGui out for Release).
+set(DX12ENGINE_IMGUI_DEBUG_UI_DEFAULT OFF)
+if(CMAKE_CONFIGURATION_TYPES)
+  set(DX12ENGINE_IMGUI_DEBUG_UI_DEFAULT ON)
+elseif(CMAKE_BUILD_TYPE)
+  string(TOUPPER "${CMAKE_BUILD_TYPE}" _DX12ENGINE_BUILD_TYPE_UPPER)
+  if(_DX12ENGINE_BUILD_TYPE_UPPER STREQUAL "DEBUG")
+    set(DX12ENGINE_IMGUI_DEBUG_UI_DEFAULT ON)
+  endif()
+endif()
+option(DX12ENGINE_ENABLE_IMGUI_DEBUG_UI "Enable Dear ImGui debug UI backend integration" ${DX12ENGINE_IMGUI_DEBUG_UI_DEFAULT})
+
 # DirectX-Headers
 FetchContent_Declare(
   DirectX-Headers
@@ -30,19 +45,142 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(tinyobjloader)
 
+set(TINYGLTF_HEADER_ONLY ON CACHE INTERNAL "" FORCE)
+set(TINYGLTF_INSTALL OFF CACHE INTERNAL "" FORCE)
+FetchContent_Declare(
+  tinygltf
+  GIT_REPOSITORY https://github.com/syoyo/tinygltf.git
+  GIT_TAG        release
+)
+FetchContent_MakeAvailable(tinygltf)
+
+FetchContent_Declare(
+  meshoptimizer
+  GIT_REPOSITORY https://github.com/zeux/meshoptimizer.git
+  GIT_TAG        master
+)
+FetchContent_MakeAvailable(meshoptimizer)
+
+FetchContent_Declare(
+    nlohmann_json
+    GIT_REPOSITORY https://github.com/nlohmann/json.git
+    GIT_TAG        v3.11.3
+)
+FetchContent_MakeAvailable(nlohmann_json)
+
+# FreeType (required by RmlUi)
+set(FT_DISABLE_BROTLI ON CACHE BOOL "Disable FreeType Brotli" FORCE)
+set(FT_DISABLE_BZIP2 ON CACHE BOOL "Disable FreeType bzip2" FORCE)
+set(FT_DISABLE_HARFBUZZ ON CACHE BOOL "Disable FreeType HarfBuzz" FORCE)
+set(FT_DISABLE_PNG ON CACHE BOOL "Disable FreeType PNG" FORCE)
+set(FT_DISABLE_ZLIB ON CACHE BOOL "Disable FreeType zlib" FORCE)
+FetchContent_Declare(
+  freetype
+  GIT_REPOSITORY https://github.com/freetype/freetype.git
+  GIT_TAG        master
+)
+FetchContent_MakeAvailable(freetype)
+if(TARGET freetype AND NOT TARGET Freetype::Freetype)
+  add_library(Freetype::Freetype ALIAS freetype)
+endif()
+
+# RmlUi
+set(RMLUI_SAMPLES OFF CACHE BOOL "Disable RmlUi samples" FORCE)
+set(RMLUI_TESTS OFF CACHE BOOL "Disable RmlUi tests" FORCE)
+FetchContent_Declare(
+  RmlUi
+  GIT_REPOSITORY https://github.com/mikke89/RmlUi.git
+  GIT_TAG        master
+)
+FetchContent_MakeAvailable(RmlUi)
+
+# Dear ImGui
+if(DX12ENGINE_ENABLE_IMGUI_DEBUG_UI)
+  FetchContent_Declare(
+    imgui
+    GIT_REPOSITORY https://github.com/ocornut/imgui.git
+    GIT_TAG        docking
+  )
+  FetchContent_GetProperties(imgui)
+  if(NOT imgui_POPULATED)
+    FetchContent_Populate(imgui)
+  endif()
+
+  add_library(imgui STATIC EXCLUDE_FROM_ALL
+    ${imgui_SOURCE_DIR}/imgui.cpp
+    ${imgui_SOURCE_DIR}/imgui_draw.cpp
+    ${imgui_SOURCE_DIR}/imgui_tables.cpp
+    ${imgui_SOURCE_DIR}/imgui_widgets.cpp
+    ${imgui_SOURCE_DIR}/backends/imgui_impl_dx12.cpp
+    ${imgui_SOURCE_DIR}/backends/imgui_impl_win32.cpp
+  )
+  target_include_directories(imgui PUBLIC
+    ${imgui_SOURCE_DIR}
+    ${imgui_SOURCE_DIR}/backends
+  )
+  target_link_libraries(imgui PUBLIC
+    D3D12.lib
+    dxgi.lib
+  )
+  if(CMAKE_CONFIGURATION_TYPES)
+    set_target_properties(imgui PROPERTIES
+      EXCLUDE_FROM_DEFAULT_BUILD_RELEASE TRUE
+      EXCLUDE_FROM_DEFAULT_BUILD_RELWITHDEBINFO TRUE
+      EXCLUDE_FROM_DEFAULT_BUILD_MINSIZEREL TRUE
+    )
+  endif()
+endif()
+
 file(GLOB_RECURSE ENGINE_SOURCES CONFIGURE_DEPENDS
     src/*.cpp
     src/*.h
     src/*.hlsl
+    src/*.hlsli
 )
+
+# ImGui debug backend is compiled only when enabled and only for Debug config.
+list(FILTER ENGINE_SOURCES EXCLUDE REGEX "src[/\\\\]DX12Engine[/\\\\]UI[/\\\\]Debug[/\\\\]ImGuiDebugBackend\\.(h|cpp)$")
 
 # Your executable
 add_library(DX12Engine STATIC ${ENGINE_SOURCES})
+
+if(DX12ENGINE_ENABLE_IMGUI_DEBUG_UI)
+  target_sources(DX12Engine PRIVATE
+    $<$<CONFIG:Debug>:${CMAKE_SOURCE_DIR}/src/DX12Engine/UI/Debug/ImGuiDebugBackend.h>
+    $<$<CONFIG:Debug>:${CMAKE_SOURCE_DIR}/src/DX12Engine/UI/Debug/ImGuiDebugBackend.cpp>
+  )
+endif()
+
+add_subdirectory(DemoScene)
+add_subdirectory(tools/AssetCooker)
+
+set(RAW_ASSET_DIR "${CMAKE_SOURCE_DIR}/res")
+set(COOKED_ASSET_DIR "${CMAKE_BINARY_DIR}/res")
+
+add_custom_target(CookAssets ALL
+    COMMAND ${CMAKE_COMMAND} -E make_directory "${COOKED_ASSET_DIR}"
+    COMMAND ${CMAKE_COMMAND} -E copy_directory "${RAW_ASSET_DIR}" "${COOKED_ASSET_DIR}"
+    COMMAND $<TARGET_FILE:AssetCooker> --in "${RAW_ASSET_DIR}" --out "${COOKED_ASSET_DIR}"
+    COMMAND ${CMAKE_COMMAND}
+        -DCOOKED_DIR="${COOKED_ASSET_DIR}"
+        -P "${CMAKE_SOURCE_DIR}/cmake/PruneCookedSourceTextures.cmake"
+    DEPENDS AssetCooker
+    COMMENT "Cooking assets into ${COOKED_ASSET_DIR}"
+)
+
+if(TARGET CopyDemoResources)
+    add_dependencies(CopyDemoResources CookAssets)
+endif()
+
+if(TARGET DemoScene)
+    add_dependencies(DemoScene CookAssets)
+endif()
 
 # Link dependencies
 target_link_libraries(DX12Engine PUBLIC
     DirectXTex
     tinyobjloader
+    nlohmann_json::nlohmann_json
     D3D12.lib
     d3d12.lib
     dxgi.lib
@@ -52,9 +190,45 @@ target_link_libraries(DX12Engine PUBLIC
 	Microsoft::DirectX-Headers
 )
 
+if(DX12ENGINE_ENABLE_IMGUI_DEBUG_UI)
+  target_link_libraries(DX12Engine PUBLIC $<$<CONFIG:Debug>:imgui>)
+endif()
+
+if(DX12ENGINE_ENABLE_IMGUI_DEBUG_UI)
+  target_compile_definitions(DX12Engine PUBLIC
+    $<$<CONFIG:Debug>:DX12ENGINE_ENABLE_IMGUI_DEBUG_UI=1>
+    $<$<NOT:$<CONFIG:Debug>>:DX12ENGINE_ENABLE_IMGUI_DEBUG_UI=0>
+  )
+else()
+  target_compile_definitions(DX12Engine PUBLIC DX12ENGINE_ENABLE_IMGUI_DEBUG_UI=0)
+endif()
+
+if(TARGET RmlUi::Core)
+  target_link_libraries(DX12Engine PUBLIC RmlUi::Core)
+elseif(TARGET RmlUi::RmlCore)
+  target_link_libraries(DX12Engine PUBLIC RmlUi::RmlCore)
+elseif(TARGET RmlCore)
+  target_link_libraries(DX12Engine PUBLIC RmlCore)
+elseif(TARGET rmlui_core)
+  target_link_libraries(DX12Engine PUBLIC rmlui_core)
+elseif(TARGET RmlUi::RmlUi)
+  target_link_libraries(DX12Engine PUBLIC RmlUi::RmlUi)
+endif()
+
+if(TARGET RmlUi::Debugger)
+  target_link_libraries(DX12Engine PUBLIC RmlUi::Debugger)
+elseif(TARGET RmlUi::RmlDebugger)
+  target_link_libraries(DX12Engine PUBLIC RmlUi::RmlDebugger)
+elseif(TARGET RmlDebugger)
+    target_link_libraries(DX12Engine PUBLIC RmlDebugger)
+elseif(TARGET rmlui_debugger)
+  target_link_libraries(DX12Engine PUBLIC rmlui_debugger)
+endif()
+
 # Include headers
 target_include_directories(DX12Engine PRIVATE
     ${directx-headers_SOURCE_DIR}/include/directx
+    ${tinygltf_SOURCE_DIR}
 )
 
 foreach(SHADER ${ENGINE_SOURCES})
@@ -81,28 +255,4 @@ foreach(SHADER ${ENGINE_SOURCES})
 endforeach()
 
 source_group(TREE ${CMAKE_CURRENT_SOURCE_DIR}/src PREFIX "Source Files" FILES ${ENGINE_SOURCES})
-
-file(COPY "${CMAKE_SOURCE_DIR}/res" DESTINATION "${CMAKE_CURRENT_BINARY_DIR}")
-
-set(SHADER_OUTPUT_DIR "${CMAKE_BINARY_DIR}/res/Shaders")
-file(GLOB_RECURSE SHADER_FILES CONFIGURE_DEPENDS src/*.hlsl)
-
-foreach(SHADER_FILE ${SHADER_FILES})
-    get_filename_component(SHADER_NAME ${SHADER_FILE} NAME)
-
-    add_custom_command(
-        OUTPUT "${SHADER_OUTPUT_DIR}/${SHADER_NAME}"
-        COMMAND ${CMAKE_COMMAND} -E copy_if_different "${SHADER_FILE}" "${SHADER_OUTPUT_DIR}/${SHADER_NAME}"
-        DEPENDS "${SHADER_FILE}"
-        COMMENT "Copying ${SHADER_NAME} to ${SHADER_OUTPUT_DIR}"
-        VERBATIM
-    )
-
-    list(APPEND COPIED_SHADER_FILES "${SHADER_OUTPUT_DIR}/${SHADER_NAME}")
-endforeach()
-
-add_custom_target(CopyEngineShaders ALL
-    DEPENDS ${COPIED_SHADER_FILES}
-)
-add_dependencies(DX12Engine CopyEngineShaders)
 

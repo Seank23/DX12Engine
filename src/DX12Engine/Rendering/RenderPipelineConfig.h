@@ -5,14 +5,44 @@
 
 namespace DX12Engine
 {
+	enum class ResourceSlot
+	{
+		Albedo,
+		WorldNormal,
+		ObjectNormal,
+		Material,
+		Position,
+		Depth,
+		Composite,
+		Emissive,
+		EnvironmentMap,
+		Velocity,
+		ReactiveMask,
+	};
+
 	enum class RenderPassType
 	{
 		ShadowMap,
 		CubeShadowMap,
+		CascadedShadowMap,
 		Geometry,
 		Lighting,
+		Transparent,
 		ScreenSpaceReflection,
+		TAA,
 		UI,
+	};
+
+	enum class PipelineResource
+	{
+		SceneColor,
+		Depth,
+		GBuffer,
+		ReactiveMask,
+		ShadowMap,
+		CubeShadowMap,
+		CascadedShadowMap,
+		EnvironmentMap
 	};
 
 	enum class InputResourceType
@@ -21,22 +51,53 @@ namespace DX12Engine
 		LightData,
 		LightBuffer,
 		Camera,
-		RenderTargets_ShadowMap,
-		RenderTargets_CubeShadowMap,
-		RenderTargets_Geometry,
-		RenderTargets_Lighting,
-		ExternalTextures,
+		EnvironmentMap,
+		ShadowMap,
+		CubeShadowMap,
+		CascadedShadowMap,
+		GBuffer,
+		SceneColor,
+		Depth,
+		ReactiveMask,
 		VertexShader,
 		PixelShader,
 	};
 
+	static std::vector<InputResourceType> OrderedInputTypes = {
+			InputResourceType::EnvironmentMap,
+			InputResourceType::GBuffer,
+			InputResourceType::ShadowMap,
+			InputResourceType::CubeShadowMap,
+			InputResourceType::CascadedShadowMap,
+			InputResourceType::SceneColor,
+			InputResourceType::Depth,
+			InputResourceType::ReactiveMask,
+			InputResourceType::VertexShader,
+			InputResourceType::PixelShader,
+	};
+
 	class GPUResource;
+
+	struct ResourceBinding
+	{
+		InputResourceType InputType;
+		PipelineResource Resource;
+		std::vector<ResourceSlot> Slots;
+	};
+
+	struct ResourceWrite
+	{
+		PipelineResource Resource;
+		RenderPassType SourcePass;
+	};
 
 	struct RenderPassConfig
 	{
 		RenderPassType Type;
 		int Count = 1;
 		std::unordered_map<InputResourceType, void*> InputResources;
+		std::vector<ResourceBinding> ResourceBindings;
+		std::vector<ResourceWrite> Writes;
 	};
 
 	struct RenderPipelineConfig

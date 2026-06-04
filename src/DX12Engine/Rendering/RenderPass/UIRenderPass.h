@@ -4,6 +4,7 @@
 namespace DX12Engine
 {
 	class ConstantBuffer;
+	class UISystem;
 
 	class UIRenderPass : public RenderPass
 	{
@@ -13,16 +14,14 @@ namespace DX12Engine
 
 		void Init() override;
 		void Execute() override;
-		RenderTexture* GetRenderTarget(RenderTargetType type) override;
+		std::shared_ptr<RenderTexture> GetRenderTarget(ResourceSlot type) override;
+
+		void SetUISystem(UISystem* uiSystem) { m_UISystem = uiSystem; }
 
 	private:
-		void CreateUIPassPSO();
-
-		Microsoft::WRL::ComPtr<ID3D12RootSignature> m_RootSignature;
-		Microsoft::WRL::ComPtr<ID3D12PipelineState> m_PipelineState;
-
-		D3D12_VIEWPORT m_Viewport;
-		D3D12_RECT m_ScissorRect;
+		void CreatePSO() override;
+		
+		UISystem* m_UISystem;
 	};
 }
 

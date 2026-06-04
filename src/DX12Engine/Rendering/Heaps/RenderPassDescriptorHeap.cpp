@@ -1,49 +1,74 @@
+#define NOMINMAX
 #include "RenderPassDescriptorHeap.h"
 #include <stdexcept>
+#include <algorithm>
 
 namespace DX12Engine
 {
-	RenderPassDescriptorHeap::RenderPassDescriptorHeap(ID3D12Device* device, D3D12_DESCRIPTOR_HEAP_TYPE heapType, UINT numDescriptors)
-		: DescriptorHeap(device, heapType, numDescriptors, true)
+	RenderPassDescriptorHeap::RenderPassDescriptorHeap(ID3D12Device* device, D3D12_DESCRIPTOR_HEAP_TYPE heapType, UINT transientCapacityPerFrame)
+		: DescriptorHeap(device, heapType, transientCapacityPerFrame * FRAMES_IN_FLIGHT, true)
+		, m_TransientCapacityPerFrame(transientCapacityPerFrame)
+		, m_CurrentFrameIndex(0)
+		, m_AllocationFailures(0)
 	{
-		m_CurrentDescriptorIndex = 0;
+		for (UINT i = 0; i < FRAMES_IN_FLIGHT; i++)
+		{
+			m_TransientCursors[i] = 0;
+			m_TransientPeak[i] = 0;
+		}
 	}
 
 	RenderPassDescriptorHeap::~RenderPassDescriptorHeap()
 	{
 	}
 
-	void RenderPassDescriptorHeap::Reset()
+	void RenderPassDescriptorHeap::BeginFrame(UINT frameIndex)
 	{
-		m_CurrentDescriptorIndex = 0;
+		m_CurrentFrameIndex = frameIndex % FRAMES_IN_FLIGHT;
+		m_TransientCursors[m_CurrentFrameIndex] = 0;
 	}
 
-	DescriptorHeapHandle RenderPassDescriptorHeap::GetHeapHandleBlock(UINT count)
+	DescriptorHeapHandle RenderPassDescriptorHeap::AllocateHandleBlock(UINT count)
 	{
-        UINT newHandleID = 0;
-        UINT blockEnd = m_CurrentDescriptorIndex + count;
+		UINT& cursor = m_TransientCursors[m_CurrentFrameIndex];
+		if (cursor + count > m_TransientCapacityPerFrame)
+		{
+			m_AllocationFailures++;
+			throw std::runtime_error("Ran out of transient descriptor heap handles for this frame, need to increase transient capacity.");
+		}
 
-        if (blockEnd < m_MaxDescriptors)
-        {
-            newHandleID = m_CurrentDescriptorIndex;
-            m_CurrentDescriptorIndex = blockEnd;
-        }
-        else
-        {
-            std::runtime_error("Ran out of render pass descriptor heap handles, need to increase heap size.");
-        }
+		// Transient region starts right after the persistent region, offset per frame slot.
+		UINT frameOffset = m_CurrentFrameIndex * m_TransientCapacityPerFrame;
+		UINT index = frameOffset + cursor;
+		cursor += count;
 
-        DescriptorHeapHandle newHandle;
-        D3D12_CPU_DESCRIPTOR_HANDLE cpuHandle = m_DescriptorHeapCPUStart;
-        cpuHandle.ptr += newHandleID * m_DescriptorSize;
-        newHandle.SetCPUHandle(cpuHandle);
+		m_TransientPeak[m_CurrentFrameIndex] = std::max(m_TransientPeak[m_CurrentFrameIndex], cursor);
 
-        D3D12_GPU_DESCRIPTOR_HANDLE gpuHandle = m_DescriptorHeapGPUStart;
-        gpuHandle.ptr += newHandleID * m_DescriptorSize;
-        newHandle.SetGPUHandle(gpuHandle);
+		DescriptorHeapHandle handle;
+		D3D12_CPU_DESCRIPTOR_HANDLE cpuHandle = m_DescriptorHeapCPUStart;
+		cpuHandle.ptr += index * m_DescriptorSize;
+		handle.SetCPUHandle(cpuHandle);
 
-        newHandle.SetHeapIndex(newHandleID);
+		D3D12_GPU_DESCRIPTOR_HANDLE gpuHandle = m_DescriptorHeapGPUStart;
+		gpuHandle.ptr += index * m_DescriptorSize;
+		handle.SetGPUHandle(gpuHandle);
 
-        return newHandle;
+		handle.SetHeapIndex(index);
+		return handle;
+	}
+
+	DescriptorHeapStats RenderPassDescriptorHeap::GetStats() const
+	{
+		UINT peakTransient = 0;
+		for (UINT i = 0; i < FRAMES_IN_FLIGHT; i++)
+			peakTransient = std::max(peakTransient, m_TransientPeak[i]);
+
+		DescriptorHeapStats stats{};
+		stats.transientUsedThisFrame = m_TransientCursors[m_CurrentFrameIndex];
+		stats.transientPeakThisFrame = peakTransient;
+		stats.transientCapacityPerFrame = m_TransientCapacityPerFrame;
+		stats.allocationFailures = m_AllocationFailures;
+		return stats;
 	}
 }
+

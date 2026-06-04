@@ -1,5 +1,6 @@
 #pragma once
 #include "RenderPass.h"
+#include "RenderPassData.h"
 
 namespace DX12Engine
 {
@@ -13,16 +14,23 @@ namespace DX12Engine
 
 		void Init() override;
 		void Execute() override;
-		RenderTexture* GetRenderTarget(RenderTargetType type) override;
+		std::shared_ptr<RenderTexture> GetRenderTarget(ResourceSlot type) override;
+		void OnResize(DirectX::XMINT2 newRenderSize) override;
 
 	private:
-		void CreateSSRPassPSO();
+		void CreatePSO() override;
+		void TransitionHistoryBuffer(D3D12_RESOURCE_STATES from, D3D12_RESOURCE_STATES to);
 
-		Microsoft::WRL::ComPtr<ID3D12RootSignature> m_RootSignature;
-		Microsoft::WRL::ComPtr<ID3D12PipelineState> m_PipelineState;
+		// Ping-pong history buffers for temporal accumulation (index 0 = write, 1 = read)
+		std::unique_ptr<RenderTexture> m_HistoryBuffers[2];
+		int m_WriteIndex = 0;
 
-		D3D12_VIEWPORT m_Viewport;
-		D3D12_RECT m_ScissorRect;
+		SSRTemporalData m_TemporalData;
+		std::unique_ptr<ConstantBuffer> m_TemporalCB;
+		uint32_t m_FrameIndex = 0;
+		ScreenData m_PrevFrameScreenData;
+
+		std::unique_ptr<Texture> m_FallbackEnvMap;
 	};
 }
 

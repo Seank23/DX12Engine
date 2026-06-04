@@ -1,13 +1,13 @@
 #pragma once
 #include <memory>
-#include "../Resources/Mesh.h"
 
 namespace DX12Engine
 {
 	enum class ComponentType
 	{
 		Render,
-		Physics
+		Physics,
+		Collider
 	};
 
 	enum TransformType
@@ -18,6 +18,15 @@ namespace DX12Engine
 	};
 
 	class GameObject;
+	class ModelInstance;
+	class ColliderComponent;
+
+	class IColliderListener
+	{
+	public:
+		virtual ~IColliderListener() = default;
+		virtual void OnColliderChanged(ColliderComponent* colliderComponent) = 0;
+	};
 
 	class Component
 	{
@@ -28,7 +37,6 @@ namespace DX12Engine
 		virtual void Init() = 0;
 		virtual void Update(float ts, float elapsed) = 0;
 
-		virtual void OnMeshChanged(Mesh* newMesh) = 0;
 		virtual void OnTransformChanged(TransformType type) = 0;
 
 		inline bool ShouldSkipUpdate() const { return m_SkipUpdate; }

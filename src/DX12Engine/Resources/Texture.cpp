@@ -2,9 +2,10 @@
 
 namespace DX12Engine
 {
-	Texture::Texture(ID3D12Resource* mainResource, ID3D12Resource* uploadResource, D3D12_RESOURCE_STATES usageState, std::vector<D3D12_SUBRESOURCE_DATA> data, DescriptorHeapHandle descriptor, D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc, bool isCubemap)
+	Texture::Texture(DirectX::ScratchImage* scratchImage, ID3D12Resource* mainResource, ID3D12Resource* uploadResource, D3D12_RESOURCE_STATES usageState, std::vector<D3D12_SUBRESOURCE_DATA> data, DescriptorHeapHandle descriptor, D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc, bool isCubemap)
 		: GPUResource(mainResource, usageState, descriptor, srvDesc)
 	{
+		m_ScratchImage = scratchImage;
 		m_MainResource = mainResource;
 		m_UploadResource = uploadResource;
 		m_Data = data;
@@ -14,5 +15,12 @@ namespace DX12Engine
 
 	Texture::~Texture()
 	{
+		if (m_UploadResource)
+		{
+			m_UploadResource->Release();
+			m_UploadResource = nullptr;
+		}
+		delete m_ScratchImage;
+		m_ScratchImage = nullptr;
 	}
 }

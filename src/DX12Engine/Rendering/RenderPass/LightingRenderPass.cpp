@@ -19,19 +19,38 @@ namespace DX12Engine
 
 	void LightingRenderPass::Init()
 	{
+		const bool hasEnvMap = m_ResourceBlocks.find(InputResourceType::EnvironmentMap) != m_ResourceBlocks.end();
+		if (!hasEnvMap)
+		{
+			m_FallbackEnvMap = ResourceManager::GetInstance().CreateDefaultCubeMap();
+			m_FallbackIrradianceMap = ResourceManager::GetInstance().CreateDefaultCubeMap();
+			m_InputResources.insert(m_InputResources.begin(),
+				{ std::shared_ptr<GPUResource>(m_FallbackEnvMap.get(), [](GPUResource*) {}),
+				  std::shared_ptr<GPUResource>(m_FallbackIrradianceMap.get(), [](GPUResource*) {})
+				});
+			AddResourceBlock(InputResourceType::EnvironmentMap, 2);
+		}
+
 		RenderPass::Init();
 
 		m_VertexShaderName = m_VertexShaderName.empty() ? "RenderTriangle_VS" : m_VertexShaderName;
 		m_PixelShaderName = m_PixelShaderName.empty() ? "PBRLightingDeferred_PS" : m_PixelShaderName;
 
-		DirectX::XMINT2 windowSize = m_RenderContext.GetWindowSize();
-		m_RenderTargets.emplace_back(ResourceManager::GetInstance().CreateRenderTargetTexture(windowSize, DXGI_FORMAT_R8G8B8A8_UNORM));
-		ResourceManager::GetInstance().UpdateSRVDescriptors(reinterpret_cast<std::vector<GPUResource*> const&>(m_RenderTargets));
+		DirectX::XMINT3 renderSize{m_RenderContext.GetRenderSize().x, m_RenderContext.GetRenderSize().y, 1};
+		m_RenderTargets.emplace_back(ResourceManager::GetInstance().CreateRenderTargetTexture(RenderTextureConfig{ renderSize, DXGI_FORMAT_R16G16B16A16_FLOAT }));
 
-		m_Viewport = { 0.0f, 0.0f, (float)windowSize.x, (float)windowSize.y, -1.0f, 1.0f };
-		m_ScissorRect = { 0, 0, (LONG)windowSize.x, (LONG)windowSize.y };
+		m_Viewport = { 0.0f, 0.0f, (float)renderSize.x, (float)renderSize.y, -1.0f, 1.0f };
+		m_ScissorRect = { 0, 0, (LONG)renderSize.x, (LONG)renderSize.y };
 
-		CreateLightingPassPSO();
+		if (!m_FallbackCascadedShadowCB)
+		{
+			m_FallbackCascadedShadowCB = ResourceManager::GetInstance().CreateConstantBuffer(sizeof(CascadedShadowData));
+			CascadedShadowData noCSMData{};
+			noCSMData.Params0 = DirectX::XMFLOAT4(0.0f, 0.0f, 0.0f, 0.0f);
+			m_FallbackCascadedShadowCB->Update(&noCSMData, sizeof(CascadedShadowData));
+		}
+
+		CreatePSO();
 	}
 
 	void LightingRenderPass::Execute()
@@ -56,20 +75,24 @@ namespace DX12Engine
 		D3D12_CPU_DESCRIPTOR_HANDLE rtvHandle = renderTarget->GetTextureDescriptor().GetCPUHandle();
 		m_CommandList.OMSetRenderTargets(1, &rtvHandle, FALSE, nullptr);
 
-		const float clearColor[] = { 0.0f, 0.0f, 0.0f, 1.0f };
-		m_CommandList.ClearRenderTargetView(rtvHandle, clearColor, 0, nullptr);
+		m_CommandList.ClearRenderTargetView(rtvHandle, renderTarget->GetClearColorArray(), 0, nullptr);
 
 		auto srvHeap = m_RenderContext.GetHeapManager().GetRenderPassHeap().GetHeap();
 		m_CommandList.SetDescriptorHeaps(1, &srvHeap);
 
-		m_CommandList.SetGraphicsRootConstantBufferView(0, m_ScreenDataCB->GetGPUAddress());
-		m_CommandList.SetGraphicsRootConstantBufferView(1, m_LightBuffer->GetCBVAddress());
-		int startIndex = 2;
-		for (int i = 0; i < m_DescriptorTableConfigs.size(); i++)
+		auto bindPassInputTables = [this]()
 		{
-			int resourceIndex = m_DescriptorTableConfigs[i].BaseShaderRegister;
-			m_CommandList.SetGraphicsRootDescriptorTable(startIndex + i, m_InputResources[resourceIndex]->GetDescriptor()->GetGPUHandle());
-		}
+			ConstantBuffer* cascadedShadowCB = !m_ExternalCBs.empty() ? m_ExternalCBs[0] : m_FallbackCascadedShadowCB.get();
+			m_CommandList.SetGraphicsRootConstantBufferView(0, m_RenderContext.GetScreenDataBuffer().GetGPUAddress());
+			m_CommandList.SetGraphicsRootConstantBufferView(1, m_LightBuffer->GetCBVAddress());
+			m_CommandList.SetGraphicsRootConstantBufferView(2, cascadedShadowCB->GetGPUAddress());
+			m_CommandList.SetGraphicsRootDescriptorTable(3, m_InputResourceBlockHandles[InputResourceType::EnvironmentMap].GetGPUHandle());
+			m_CommandList.SetGraphicsRootDescriptorTable(4, m_InputResourceBlockHandles[InputResourceType::GBuffer].GetGPUHandle());
+			m_CommandList.SetGraphicsRootDescriptorTable(5, m_InputResourceBlockHandles[InputResourceType::ShadowMap].GetGPUHandle());
+			m_CommandList.SetGraphicsRootDescriptorTable(6, m_InputResourceBlockHandles[InputResourceType::CubeShadowMap].GetGPUHandle());
+			m_CommandList.SetGraphicsRootDescriptorTable(7, m_InputResourceBlockHandles[InputResourceType::CascadedShadowMap].GetGPUHandle());
+		};
+		bindPassInputTables();
 
 		m_CommandList.IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 		m_CommandList.DrawInstanced(3, 1, 0, 0);
@@ -82,22 +105,21 @@ namespace DX12Engine
 		m_CommandList.ResourceBarrier(1, &barrier);
 		renderTarget->SetUsageState(D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
 
-		UINT fenceVal = m_QueueManager.GetGraphicsQueue().ExecuteCommandList();
-		m_QueueManager.GetGraphicsQueue().WaitForFenceCPUBlocking(fenceVal);
+		m_QueueManager.GetGraphicsQueue().ExecuteCommandList();
 	}
 
-	RenderTexture* LightingRenderPass::GetRenderTarget(RenderTargetType type)
+	std::shared_ptr<RenderTexture> LightingRenderPass::GetRenderTarget(ResourceSlot type)
 	{
 		switch (type)
 		{
-		case RenderTargetType::Composite:
-			return m_RenderTargets[0].get();
+		case ResourceSlot::Composite:
+			return m_RenderTargets[0];
 		default:
 			return nullptr;
 		}
 	}
 
-	void LightingRenderPass::CreateLightingPassPSO()
+	void LightingRenderPass::CreatePSO()
 	{
 		PipelineStateBuilder pipelineStateBuilder;
 		RootSignatureBuilder rootSignatureBuilder;
@@ -105,11 +127,11 @@ namespace DX12Engine
 		pipelineStateBuilder = pipelineStateBuilder.SetBlendState(CD3DX12_BLEND_DESC(D3D12_DEFAULT))
 			.SetRasterizerState(CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT))
 			.SetPrimitiveTopologyType(D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE)
-			.SetRenderTargets({ DXGI_FORMAT_R8G8B8A8_UNORM })
+			.SetRenderTargets({ DXGI_FORMAT_R16G16B16A16_FLOAT })
 			.SetSampleDesc(UINT_MAX, 1, 0).SetVertexShader(ResourceManager::GetInstance().GetShader(m_VertexShaderName))
 			.SetPixelShader(ResourceManager::GetInstance().GetShader(m_PixelShaderName));
 
-		rootSignatureBuilder = rootSignatureBuilder.AddConstantBuffer(0).AddConstantBuffer(1)
+		rootSignatureBuilder = rootSignatureBuilder.AddConstantBuffer(0).AddConstantBuffer(1).AddConstantBuffer(2)
 			.AddDescriptorTables(m_DescriptorTableConfigs)
 			.AddSampler(0, D3D12_FILTER_ANISOTROPIC)
 			.AddShadowMapSampler(1);

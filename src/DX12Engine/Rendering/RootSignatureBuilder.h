@@ -32,9 +32,9 @@ namespace DX12Engine
                 .AddSampler(0, D3D12_FILTER_ANISOTROPIC);
         }
 
-        RootSignatureBuilder& AddDescriptorTables(std::vector<DescriptorTableConfig> configs) 
+        RootSignatureBuilder& AddDescriptorTables(std::vector<DescriptorTableConfig> configs)
         {
-            for (int i = 0; i < configs.size(); i++)
+            for (size_t i = 0; i < configs.size(); i++)
             {
                 D3D12_DESCRIPTOR_RANGE range{};
                 range.RangeType = configs[i].Type;
@@ -42,18 +42,20 @@ namespace DX12Engine
                 range.BaseShaderRegister = configs[i].BaseShaderRegister;
                 range.RegisterSpace = configs[i].Space;
                 range.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
-
                 m_DescriptorRanges.push_back(range);
             }
-            for (int i = 0; i < configs.size(); i++)
+            for (size_t i = 0; i < configs.size(); i++)
             {
+                // Store the index into m_DescriptorRanges rather than a pointer;
+                // the pointer fixup is deferred to Build() once no further
+                // push_backs can invalidate the vector's internal storage.
                 CD3DX12_ROOT_PARAMETER param{};
                 param.ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
                 param.DescriptorTable.NumDescriptorRanges = 1;
-                param.DescriptorTable.pDescriptorRanges = &m_DescriptorRanges[i];
+                param.DescriptorTable.pDescriptorRanges = nullptr; // fixed up in Build()
                 param.ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
-
                 m_Parameters.push_back(param);
+                m_DescriptorTableRangeIndices.push_back(m_DescriptorRanges.size() - configs.size() + i);
             }
             return *this;
         }
@@ -80,6 +82,9 @@ namespace DX12Engine
             staticSamplerDesc.AddressW = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
             staticSamplerDesc.ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
             staticSamplerDesc.ShaderRegister = shaderRegister;
+            staticSamplerDesc.MaxLOD = D3D12_FLOAT32_MAX;
+            staticSamplerDesc.MinLOD = 0.0f;
+            staticSamplerDesc.MipLODBias = 0.0f;
             m_StaticSamplers.push_back(staticSamplerDesc);
             return *this;
         }
@@ -109,8 +114,21 @@ namespace DX12Engine
             m_Parameters.push_back(param);
         }
 
-        D3D12_ROOT_SIGNATURE_DESC Build() 
+        D3D12_ROOT_SIGNATURE_DESC Build()
         {
+            // Fix up descriptor-table pointers now that m_DescriptorRanges will
+            // not be resized again, so the addresses are stable.
+            size_t tableParamIdx = 0;
+            for (size_t pi = 0; pi < m_Parameters.size(); pi++)
+            {
+                if (m_Parameters[pi].ParameterType == D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE
+                    && m_Parameters[pi].DescriptorTable.pDescriptorRanges == nullptr)
+                {
+                    m_Parameters[pi].DescriptorTable.pDescriptorRanges =
+                        &m_DescriptorRanges[m_DescriptorTableRangeIndices[tableParamIdx++]];
+                }
+            }
+
             m_RootSignatureDesc.NumParameters = static_cast<UINT>(m_Parameters.size());
             m_RootSignatureDesc.pParameters = m_Parameters.data();
             m_RootSignatureDesc.NumStaticSamplers = static_cast<UINT>(m_StaticSamplers.size());
@@ -124,6 +142,9 @@ namespace DX12Engine
         D3D12_ROOT_SIGNATURE_DESC m_RootSignatureDesc;
         std::vector<CD3DX12_ROOT_PARAMETER> m_Parameters;
         std::vector<D3D12_DESCRIPTOR_RANGE> m_DescriptorRanges;
+        // Parallel to the descriptor-table entries in m_Parameters: records which
+        // index in m_DescriptorRanges each table's single range lives at.
+        std::vector<size_t> m_DescriptorTableRangeIndices;
         std::vector<D3D12_STATIC_SAMPLER_DESC> m_StaticSamplers;
     };
 
