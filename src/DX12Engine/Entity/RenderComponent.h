@@ -32,11 +32,7 @@ namespace DX12Engine
 	{
 		MeshPrimitive* Primitive = nullptr;
 		MaterialAsset* MaterialAsset = nullptr;
-		DirectX::XMFLOAT4X4 NodeWorldTransform = [](){
-			DirectX::XMFLOAT4X4 m{};
-			DirectX::XMStoreFloat4x4(&m, DirectX::XMMatrixIdentity());
-			return m;
-		}();
+		int NodeIndex = -1;
 		std::unique_ptr<ConstantBuffer> PrimitiveConstantBuffer;
 		D3D12_GPU_VIRTUAL_ADDRESS CBVAddress = 0;
 		DirectX::XMMATRIX PrevUnjitteredMVPMatrix = DirectX::XMMatrixIdentity();
@@ -64,6 +60,8 @@ namespace DX12Engine
 		std::vector<ResolvedPrimitiveBinding>& GetResolvedPrimitiveBindings() { return m_ResolvedPrimitiveBindings; }
 
 		DirectX::XMMATRIX GetModelMatrix();
+
+		void PlayAnimation(const std::string& animationName, bool loop = true);
 
 	private:
 		void UpdateConstantBufferData(

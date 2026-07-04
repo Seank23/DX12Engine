@@ -35,6 +35,8 @@ namespace DX12Engine
 
 	void RenderComponent::Update(float ts, float elapsed)
 	{
+		if (m_Asset)
+			m_Asset->UpdateAnimation(ts);
 	}
 
 	void RenderComponent::OnTransformChanged(TransformType type)
@@ -52,6 +54,11 @@ namespace DX12Engine
 		return m_Parent->GetModelMatrix();
 	}
 
+	void RenderComponent::PlayAnimation(const std::string& animationName, bool loop)
+	{
+		m_Asset->PlayAnimation(animationName, loop);
+	}
+
 	void RenderComponent::RebuildResolvedPrimitiveBindings()
 	{
 		m_ResolvedPrimitiveBindings.clear();
@@ -63,29 +70,7 @@ namespace DX12Engine
 		if (!modelAsset)
 			return;
 
-		// Build accumulated world transforms for every node by walking the hierarchy.
 		const std::size_t nodeCount = modelAsset->GetNodeCount();
-		std::vector<DirectX::XMFLOAT4X4> nodeWorldTransforms(nodeCount);
-		for (std::size_t ni = 0; ni < nodeCount; ++ni)
-		{
-			const ModelNode* node = modelAsset->GetNode(ni);
-			if (!node)
-			{
-				DirectX::XMStoreFloat4x4(&nodeWorldTransforms[ni], DirectX::XMMatrixIdentity());
-				continue;
-			}
-
-			DirectX::XMMATRIX local = DirectX::XMLoadFloat4x4(&node->LocalTransform);
-			if (node->ParentIndex >= 0 && static_cast<std::size_t>(node->ParentIndex) < ni)
-			{
-				DirectX::XMMATRIX parentWorld = DirectX::XMLoadFloat4x4(&nodeWorldTransforms[node->ParentIndex]);
-				DirectX::XMStoreFloat4x4(&nodeWorldTransforms[ni], parentWorld * local);
-			}
-			else
-			{
-				DirectX::XMStoreFloat4x4(&nodeWorldTransforms[ni], local);
-			}
-		}
 
 		// For each node that references a mesh, emit one binding per primitive.
 		for (std::size_t ni = 0; ni < nodeCount; ++ni)
@@ -111,7 +96,7 @@ namespace DX12Engine
 				ResolvedPrimitiveBinding binding;
 				binding.Primitive = &primitive;
 				binding.MaterialAsset = materialAsset;
-				binding.NodeWorldTransform = nodeWorldTransforms[ni];
+				binding.NodeIndex = static_cast<int>(ni);
 				m_ResolvedPrimitiveBindings.push_back(std::move(binding));
 			}
 		}
@@ -141,7 +126,7 @@ namespace DX12Engine
 					ResolvedPrimitiveBinding binding;
 					binding.Primitive = &primitive;
 					binding.MaterialAsset = materialAsset;
-					binding.NodeWorldTransform = identity;
+					binding.NodeIndex = -1;
 					m_ResolvedPrimitiveBindings.push_back(std::move(binding));
 				}
 			}

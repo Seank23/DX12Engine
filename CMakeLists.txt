@@ -139,15 +139,15 @@ file(GLOB_RECURSE ENGINE_SOURCES CONFIGURE_DEPENDS
 )
 
 # ImGui debug backend is compiled only when enabled and only for Debug config.
-list(FILTER ENGINE_SOURCES EXCLUDE REGEX "src[/\\\\]DX12Engine[/\\\\]UI[/\\\\]Debug[/\\\\]ImGuiDebugBackend\\.(h|cpp)$")
+list(FILTER ENGINE_SOURCES EXCLUDE REGEX "src[/\\\\]DX12Engine[/\\\\]UI[/\\\\]DebugBackend[/\\\\]ImGuiDebugBackend\\.(h|cpp)$")
 
 # Your executable
 add_library(DX12Engine STATIC ${ENGINE_SOURCES})
 
 if(DX12ENGINE_ENABLE_IMGUI_DEBUG_UI)
   target_sources(DX12Engine PRIVATE
-    $<$<CONFIG:Debug>:${CMAKE_SOURCE_DIR}/src/DX12Engine/UI/Debug/ImGuiDebugBackend.h>
-    $<$<CONFIG:Debug>:${CMAKE_SOURCE_DIR}/src/DX12Engine/UI/Debug/ImGuiDebugBackend.cpp>
+    $<$<CONFIG:Debug>:${CMAKE_SOURCE_DIR}/src/DX12Engine/UI/DebugBackend/ImGuiDebugBackend.h>
+    $<$<CONFIG:Debug>:${CMAKE_SOURCE_DIR}/src/DX12Engine/UI/DebugBackend/ImGuiDebugBackend.cpp>
   )
 endif()
 

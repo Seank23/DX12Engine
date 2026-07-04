@@ -58,7 +58,7 @@ namespace DX12EngineDemo
 		pbrWornMetal->SetAllTextures(wornMetalTextures);
 
 		DX12Engine::ModelLoader modelLoader;
-		auto mazdaModel = modelLoader.LoadCookedModel("Mazda3");
+		auto mazdaModel = modelLoader.LoadCookedModel("Mazda3_Anim");
 		auto floorMesh = std::make_shared<DX12Engine::MeshAsset>(modelLoader.LoadObj(DX12Engine::ResourceManager::GetModelPath("floor.obj")));
 
 		auto floorModel = std::make_shared<DX12Engine::ModelAsset>("Floor");
@@ -95,6 +95,8 @@ namespace DX12EngineDemo
 		m_SceneObjects.Add("Mazda", mazda);
 
 		m_SceneObjects.Init();
+
+		m_SceneObjects.Get("Mazda")->GetComponent<DX12Engine::RenderComponent>()->PlayAnimation("Hood_Open", false);
 	}
 
 	void ComplexDemoScene::Update(float ts, float elapsed)

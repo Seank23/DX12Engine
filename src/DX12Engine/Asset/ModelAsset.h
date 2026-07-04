@@ -1,8 +1,8 @@
 #pragma once
 #include "MaterialAsset.h"
 #include "MeshAsset.h"
+#include "Animation.h"
 #include <DirectXMath.h>
-#include <cstddef>
 #include <memory>
 #include <string>
 #include <utility>
@@ -105,10 +105,21 @@ namespace DX12Engine
 		std::vector<ModelNode>& GetNodes() { return m_Nodes; }
 		const std::vector<ModelNode>& GetNodes() const { return m_Nodes; }
 
+		size_t AddAnimation(const AnimationClip& animation, const std::string& name = "")
+		{
+			std::string animName = name.empty() ? animation.Name : name;
+			m_Animations[animName] = animation;
+			return m_Animations.size() - 1;
+		}
+		const AnimationClip& GetAnimation(const std::string& name) const { return m_Animations.at(name); }
+		size_t GetAnimationCount() const { return m_Animations.size(); }
+		bool DoesAnimationExist(const std::string& name) const { return m_Animations.find(name) != m_Animations.end(); }
+
 	private:
 		std::string m_Name;
 		std::vector<std::shared_ptr<MeshAsset>> m_Meshes;
 		std::vector<std::shared_ptr<MaterialAsset>> m_Materials;
 		std::vector<ModelNode> m_Nodes;
+		std::unordered_map<std::string, AnimationClip> m_Animations;
 	};
 }

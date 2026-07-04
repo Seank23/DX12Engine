@@ -11,7 +11,7 @@ namespace DX12Engine
     // Block 1 runtime cooked model container constants.
     constexpr std::uint32_t kCookedModelMagic = 0x444D5844u; // 'DXMD'
     constexpr std::uint16_t kCookedModelVersionMajor = 1;
-    constexpr std::uint16_t kCookedModelVersionMinor = 0;
+    constexpr std::uint16_t kCookedModelVersionMinor = 1;
     constexpr std::uint8_t kCookedModelEndianLittle = 1;
     constexpr std::uint32_t kCookedModelAlignment = 64;
 
@@ -25,7 +25,8 @@ namespace DX12Engine
         Meshes = 2,
         Nodes = 3,
         Materials = 4,
-        Strings = 5
+        Strings = 5,
+        Animations = 6
     };
 
     struct CookedModelChunkDesc
@@ -158,7 +159,7 @@ namespace DX12Engine
                 return fail("Chunk offset does not meet alignment requirements");
             }
 
-            if (chunk.Type > static_cast<std::uint32_t>(CookedModelChunkType::Strings))
+            if (chunk.Type > static_cast<std::uint32_t>(CookedModelChunkType::Animations))
             {
                 return fail("Unknown cooked model chunk type");
             }

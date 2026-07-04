@@ -403,7 +403,11 @@ namespace DX12Engine
 				if (!material || !binding.PrimitiveConstantBuffer || !binding.Primitive)
 					continue;
 
-				DirectX::XMMATRIX nodeWorldTransform = DirectX::XMLoadFloat4x4(&binding.NodeWorldTransform);
+				DirectX::XMMATRIX nodeWorldTransform = DirectX::XMMatrixIdentity();
+				ModelInstance* instance = comp->GetAsset();
+				if (instance && binding.NodeIndex >= 0)
+					nodeWorldTransform = instance->GetNodeWorldTransform(static_cast<std::size_t>(binding.NodeIndex));
+
 				DirectX::XMMATRIX modelMatrix = nodeWorldTransform * comp->GetModelMatrix();
 
 				binding.Primitive->ComputeOrientedBoundingBox(modelMatrix);

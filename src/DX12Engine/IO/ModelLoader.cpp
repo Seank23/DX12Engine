@@ -376,6 +376,15 @@ namespace DX12Engine
         };
     }
 
+    static AnimationInterpolation ParseAnimationInterpolation(const std::string& interpolation)
+    {
+        if (interpolation == "STEP")
+            return AnimationInterpolation::Step;
+        if (interpolation == "CUBICSPLINE")
+            return AnimationInterpolation::CubicSpline;
+        return AnimationInterpolation::Linear;
+    }
+
     // -------------------------------------------------------------------------
     // Default 1x1 texture helpers
     // -------------------------------------------------------------------------
@@ -1118,6 +1127,148 @@ namespace DX12Engine
             ImportNodeRecursive(ctx, r, syntheticRoot);
     }
 
+    static void ImportAnimations(GltfImportContext& ctx)
+    {
+        const tinygltf::Model& model = ctx.model;
+        if (model.animations.empty() || ctx.nodeMap.empty())
+            return;
+
+        for (size_t ai = 0; ai < model.animations.size(); ++ai)
+        {
+            const tinygltf::Animation& gltfAnim = model.animations[ai];
+
+            AnimationClip clip;
+            clip.Name = gltfAnim.name.empty() ? ("animation_" + std::to_string(ai)) : gltfAnim.name;
+            clip.Samplers.resize(gltfAnim.samplers.size());
+
+            std::vector<int> samplerPathHint(gltfAnim.samplers.size(), -1); // 0=T,1=R,2=S
+            for (const tinygltf::AnimationChannel& gltfChannel : gltfAnim.channels)
+            {
+                if (gltfChannel.sampler < 0 || gltfChannel.sampler >= static_cast<int>(clip.Samplers.size()))
+                    continue;
+
+                if (gltfChannel.target_node < 0 || gltfChannel.target_node >= static_cast<int>(ctx.nodeMap.size()))
+                    continue;
+
+                const int mappedNode = ctx.nodeMap[gltfChannel.target_node];
+                if (mappedNode < 0)
+                    continue;
+
+                AnimationPath path;
+                int pathHint = -1;
+                if (gltfChannel.target_path == "translation")
+                {
+                    path = AnimationPath::Translation;
+                    pathHint = 0;
+                }
+                else if (gltfChannel.target_path == "rotation")
+                {
+                    path = AnimationPath::Rotation;
+                    pathHint = 1;
+                }
+                else if (gltfChannel.target_path == "scale")
+                {
+                    path = AnimationPath::Scale;
+                    pathHint = 2;
+                }
+                else
+                {
+                    // Ignore morph targets and unsupported channel paths.
+                    continue;
+                }
+
+                int& samplerHint = samplerPathHint[gltfChannel.sampler];
+                if (samplerHint == -1)
+                    samplerHint = pathHint;
+                else if (samplerHint != pathHint)
+                {
+                    std::cerr << "[glTF] Animation \"" << clip.Name
+                              << "\" reuses sampler " << gltfChannel.sampler
+                              << " across incompatible target paths; channel skipped.\n";
+                    continue;
+                }
+
+                AnimationChannel channel;
+                channel.NodeIndex = static_cast<uint32_t>(mappedNode);
+                channel.Path = path;
+                channel.SamplerIndex = static_cast<uint32_t>(gltfChannel.sampler);
+                clip.Channels.push_back(channel);
+            }
+
+            float maxTime = 0.0f;
+            for (size_t si = 0; si < gltfAnim.samplers.size(); ++si)
+            {
+                const tinygltf::AnimationSampler& gltfSampler = gltfAnim.samplers[si];
+                AnimationSampler& sampler = clip.Samplers[si];
+                sampler.Interpolation = ParseAnimationInterpolation(gltfSampler.interpolation);
+
+                if (gltfSampler.input < 0 || gltfSampler.input >= static_cast<int>(model.accessors.size()))
+                    continue;
+                if (gltfSampler.output < 0 || gltfSampler.output >= static_cast<int>(model.accessors.size()))
+                    continue;
+
+                const tinygltf::Accessor& timeAcc = model.accessors[gltfSampler.input];
+                const tinygltf::Accessor& valueAcc = model.accessors[gltfSampler.output];
+
+                const size_t keyCount = timeAcc.count;
+                if (keyCount == 0)
+                    continue;
+
+                sampler.Times.resize(keyCount);
+                for (size_t ki = 0; ki < keyCount; ++ki)
+                {
+                    const uint8_t* tp = AccessorElement(model, timeAcc, ki);
+                    const float t = ReadScalarFloat(tp, timeAcc.componentType, timeAcc.normalized);
+                    sampler.Times[ki] = t;
+                    maxTime = (std::max)(maxTime, t);
+                }
+
+                const bool cubicSpline = sampler.Interpolation == AnimationInterpolation::CubicSpline;
+                const size_t expectedOutputCount = cubicSpline ? keyCount * 3 : keyCount;
+                if (valueAcc.count < expectedOutputCount)
+                    continue;
+
+                const int pathHint = samplerPathHint[si];
+                if (pathHint == 0)
+                {
+                    sampler.Translations.resize(keyCount);
+                    for (size_t ki = 0; ki < keyCount; ++ki)
+                    {
+                        const size_t valueIndex = cubicSpline ? (ki * 3 + 1) : ki;
+                        const uint8_t* vp = AccessorElement(model, valueAcc, valueIndex);
+                        DirectX::XMFLOAT3 v = ReadVec3(vp, valueAcc.componentType, valueAcc.normalized);
+                        sampler.Translations[ki] = { v.x, v.y, -v.z };
+                    }
+                }
+                else if (pathHint == 1)
+                {
+                    sampler.Rotations.resize(keyCount);
+                    for (size_t ki = 0; ki < keyCount; ++ki)
+                    {
+                        const size_t valueIndex = cubicSpline ? (ki * 3 + 1) : ki;
+                        DirectX::XMFLOAT4 q = ReadVec4(AccessorElement(model, valueAcc, valueIndex), valueAcc.componentType, valueAcc.normalized);
+                        sampler.Rotations[ki] = { -q.x, -q.y, q.z, q.w };
+                    }
+                }
+                else if (pathHint == 2)
+                {
+                    sampler.Scales.resize(keyCount);
+                    for (size_t ki = 0; ki < keyCount; ++ki)
+                    {
+                        const size_t valueIndex = cubicSpline ? (ki * 3 + 1) : ki;
+                        sampler.Scales[ki] = ReadVec3(AccessorElement(model, valueAcc, valueIndex), valueAcc.componentType, valueAcc.normalized);
+                    }
+                }
+            }
+
+            if (!clip.Channels.empty())
+            {
+                clip.Duration = maxTime;
+                ctx.outModel->AddAnimation(clip);
+            }
+        }
+    }
+
     // -------------------------------------------------------------------------
     // Final validation
     // -------------------------------------------------------------------------
@@ -1151,14 +1302,16 @@ namespace DX12Engine
         }
 
         printf("[glTF] Import complete: %zu nodes, %zu meshes, %d primitives imported"
-               ", %d skipped, %d invalid, %zu materials, %zu textures\n",
+               ", %d skipped, %d invalid, %zu materials, %zu textures, %zu animations (source clips: %zu)\n",
                model.GetNodeCount(),
                model.GetMeshCount(),
                ctx.importedPrimitives,
                ctx.skippedPrimitives,
                invalidPrimCount,
                model.GetMaterialCount(),
-               ctx.model.textures.size());
+               ctx.model.textures.size(),
+               model.GetAnimationCount(),
+               ctx.model.animations.size());
     }
 
     struct CookedVertexChunkHeaderDisk
@@ -1239,6 +1392,56 @@ namespace DX12Engine
         };
     };
 
+    struct CookedAnimationsChunkHeaderDisk
+    {
+        std::uint32_t ClipCount = 0;
+        std::uint32_t SamplerCount = 0;
+        std::uint32_t ChannelCount = 0;
+        std::uint32_t TimeKeyCount = 0;
+        std::uint32_t TranslationKeyCount = 0;
+        std::uint32_t RotationKeyCount = 0;
+        std::uint32_t ScaleKeyCount = 0;
+        std::uint32_t Reserved = 0;
+        std::uint64_t ClipTableOffset = 0;
+        std::uint64_t SamplerTableOffset = 0;
+        std::uint64_t ChannelTableOffset = 0;
+        std::uint64_t TimeDataOffset = 0;
+        std::uint64_t TranslationDataOffset = 0;
+        std::uint64_t RotationDataOffset = 0;
+        std::uint64_t ScaleDataOffset = 0;
+    };
+
+    struct CookedAnimationClipRecordDisk
+    {
+        std::uint32_t NameStringOffset = 0;
+        std::uint32_t SamplerStart = 0;
+        std::uint32_t SamplerCount = 0;
+        std::uint32_t ChannelStart = 0;
+        std::uint32_t ChannelCount = 0;
+        float Duration = 0.0f;
+        std::uint32_t Reserved0 = 0;
+        std::uint64_t Reserved1 = 0;
+    };
+
+    struct CookedAnimationSamplerRecordDisk
+    {
+        std::uint32_t Interpolation = 0;
+        std::uint32_t Path = 0;
+        std::uint32_t KeyCount = 0;
+        std::uint32_t Reserved0 = 0;
+        std::uint32_t TimeOffset = 0;
+        std::uint32_t ValueOffset = 0;
+        std::uint64_t Reserved1 = 0;
+    };
+
+    struct CookedAnimationChannelRecordDisk
+    {
+        std::uint32_t NodeIndex = 0;
+        std::uint32_t Path = 0;
+        std::uint32_t SamplerIndex = 0;
+        std::uint32_t Reserved = 0;
+    };
+
     struct CookedMaterialsChunkHeaderDisk
     {
         std::uint32_t MaterialCount = 0;
@@ -1293,6 +1496,7 @@ namespace DX12Engine
         CookedChunkView NodesChunk;
         CookedChunkView MaterialsChunk;
         CookedChunkView StringsChunk;
+        CookedChunkView AnimationsChunk;
 
         const CookedVertexChunkHeaderDisk* VertexHeader = nullptr;
         const CookedVertexPrimitiveRecordDisk* VertexPrimitiveRecords = nullptr;
@@ -1311,6 +1515,15 @@ namespace DX12Engine
         const CookedMaterialsChunkHeaderDisk* MaterialsHeader = nullptr;
         const CookedMaterialRecordDisk* MaterialRecords = nullptr;
         const CookedTextureRefRecordDisk* TextureRefRecords = nullptr;
+
+        const CookedAnimationsChunkHeaderDisk* AnimationsHeader = nullptr;
+        const CookedAnimationClipRecordDisk* AnimationClipRecords = nullptr;
+        const CookedAnimationSamplerRecordDisk* AnimationSamplerRecords = nullptr;
+        const CookedAnimationChannelRecordDisk* AnimationChannelRecords = nullptr;
+        const float* AnimationTimes = nullptr;
+        const DirectX::XMFLOAT3* AnimationTranslations = nullptr;
+        const DirectX::XMFLOAT4* AnimationRotations = nullptr;
+        const DirectX::XMFLOAT3* AnimationScales = nullptr;
     };
 
     static void ValidateAndLogCooked(
@@ -1347,7 +1560,7 @@ namespace DX12Engine
         }
 
         printf("[CookedModel] Import complete (%s): %zu nodes, %zu meshes, %zu primitives imported"
-               ", %d skipped, %d invalid, %zu materials, %u textures\n",
+               ", %d skipped, %d invalid, %zu materials, %u textures, %zu animations (cooked clips: %u)\n",
                modelId.c_str(),
                model.GetNodeCount(),
                model.GetMeshCount(),
@@ -1355,7 +1568,9 @@ namespace DX12Engine
                0,
                invalidPrimCount,
                model.GetMaterialCount(),
-               mapped.MaterialsHeader ? mapped.MaterialsHeader->TextureRefCount : 0u);
+               mapped.MaterialsHeader ? mapped.MaterialsHeader->TextureRefCount : 0u,
+               model.GetAnimationCount(),
+               mapped.AnimationsHeader ? mapped.AnimationsHeader->ClipCount : 0u);
     }
 
     static std::string DeriveModelIdFromPath(const std::string& path)
@@ -1515,6 +1730,30 @@ namespace DX12Engine
         return false;
     }
 
+    static bool TryGetChunkViewByType(const CookedModelMappedView& mapped, CookedModelChunkType type, CookedChunkView& outView, std::string& outError)
+    {
+        outView = {};
+        const std::uint32_t typeValue = static_cast<std::uint32_t>(type);
+        for (const CookedModelChunkDesc& desc : mapped.Chunks)
+        {
+            if (desc.Type != typeValue)
+                continue;
+
+            if (!CheckRange(desc.Offset, desc.Size, mapped.FileBytes.size()))
+            {
+                outError = "Optional chunk payload is out of file bounds";
+                return false;
+            }
+
+            outView.Desc = &desc;
+            outView.Data = mapped.FileBytes.data() + static_cast<std::size_t>(desc.Offset);
+            outView.Size = static_cast<std::size_t>(desc.Size);
+            return true;
+        }
+
+        return true;
+    }
+
     static bool MapCookedModelBinary(const fs::path& modelBinaryPath, CookedModelMappedView& outMapped, std::string& outError)
     {
         outMapped = {};
@@ -1581,6 +1820,19 @@ namespace DX12Engine
         if (!MapChunkStruct(outMapped.MaterialsChunk, 0, outMapped.MaterialsHeader, outError, "materials")) return false;
         if (!MapChunkArray(outMapped.MaterialsChunk, outMapped.MaterialsHeader->MaterialTableOffset, outMapped.MaterialsHeader->MaterialCount, outMapped.MaterialRecords, outError, "material table")) return false;
         if (!MapChunkArray(outMapped.MaterialsChunk, outMapped.MaterialsHeader->TextureRefTableOffset, outMapped.MaterialsHeader->TextureRefCount, outMapped.TextureRefRecords, outError, "texture ref table")) return false;
+
+        if (!TryGetChunkViewByType(outMapped, CookedModelChunkType::Animations, outMapped.AnimationsChunk, outError)) return false;
+        if (outMapped.AnimationsChunk.Data && outMapped.AnimationsChunk.Size > 0)
+        {
+            if (!MapChunkStruct(outMapped.AnimationsChunk, 0, outMapped.AnimationsHeader, outError, "animations")) return false;
+            if (!MapChunkArray(outMapped.AnimationsChunk, outMapped.AnimationsHeader->ClipTableOffset, outMapped.AnimationsHeader->ClipCount, outMapped.AnimationClipRecords, outError, "animation clip table")) return false;
+            if (!MapChunkArray(outMapped.AnimationsChunk, outMapped.AnimationsHeader->SamplerTableOffset, outMapped.AnimationsHeader->SamplerCount, outMapped.AnimationSamplerRecords, outError, "animation sampler table")) return false;
+            if (!MapChunkArray(outMapped.AnimationsChunk, outMapped.AnimationsHeader->ChannelTableOffset, outMapped.AnimationsHeader->ChannelCount, outMapped.AnimationChannelRecords, outError, "animation channel table")) return false;
+            if (!MapChunkArray(outMapped.AnimationsChunk, outMapped.AnimationsHeader->TimeDataOffset, outMapped.AnimationsHeader->TimeKeyCount, outMapped.AnimationTimes, outError, "animation time keys")) return false;
+            if (!MapChunkArray(outMapped.AnimationsChunk, outMapped.AnimationsHeader->TranslationDataOffset, outMapped.AnimationsHeader->TranslationKeyCount, outMapped.AnimationTranslations, outError, "animation translation keys")) return false;
+            if (!MapChunkArray(outMapped.AnimationsChunk, outMapped.AnimationsHeader->RotationDataOffset, outMapped.AnimationsHeader->RotationKeyCount, outMapped.AnimationRotations, outError, "animation rotation keys")) return false;
+            if (!MapChunkArray(outMapped.AnimationsChunk, outMapped.AnimationsHeader->ScaleDataOffset, outMapped.AnimationsHeader->ScaleKeyCount, outMapped.AnimationScales, outError, "animation scale keys")) return false;
+        }
 
         return true;
     }
@@ -2161,6 +2413,134 @@ namespace DX12Engine
             std::memcpy(&node.LocalTransform, nodeRecord.LocalTransform.data(), sizeof(node.LocalTransform));
             outModel->AddNode(node);
         }
+
+        if (mapped.AnimationsHeader)
+        {
+            for (std::uint32_t clipIndex = 0; clipIndex < mapped.AnimationsHeader->ClipCount; ++clipIndex)
+            {
+                const CookedAnimationClipRecordDisk& clipRecord = mapped.AnimationClipRecords[clipIndex];
+
+                if (clipRecord.SamplerStart > mapped.AnimationsHeader->SamplerCount ||
+                    clipRecord.SamplerCount > mapped.AnimationsHeader->SamplerCount - clipRecord.SamplerStart)
+                {
+                    outError = "Cooked animation sampler range is out of bounds";
+                    return nullptr;
+                }
+
+                if (clipRecord.ChannelStart > mapped.AnimationsHeader->ChannelCount ||
+                    clipRecord.ChannelCount > mapped.AnimationsHeader->ChannelCount - clipRecord.ChannelStart)
+                {
+                    outError = "Cooked animation channel range is out of bounds";
+                    return nullptr;
+                }
+
+                AnimationClip clip;
+                std::string clipName;
+                std::string stringError;
+                if (ResolveCookedString(mapped, clipRecord.NameStringOffset, clipName, stringError) && !clipName.empty())
+                    clip.Name = clipName;
+                else
+                    clip.Name = "animation_" + std::to_string(clipIndex);
+                clip.Duration = clipRecord.Duration;
+                clip.Samplers.resize(clipRecord.SamplerCount);
+
+                for (std::uint32_t localSampler = 0; localSampler < clipRecord.SamplerCount; ++localSampler)
+                {
+                    const CookedAnimationSamplerRecordDisk& samplerRecord = mapped.AnimationSamplerRecords[clipRecord.SamplerStart + localSampler];
+                    AnimationSampler& sampler = clip.Samplers[localSampler];
+
+                    switch (samplerRecord.Interpolation)
+                    {
+                    case 1: sampler.Interpolation = AnimationInterpolation::Step; break;
+                    case 2: sampler.Interpolation = AnimationInterpolation::CubicSpline; break;
+                    default: sampler.Interpolation = AnimationInterpolation::Linear; break;
+                    }
+
+                    const std::uint32_t keyCount = samplerRecord.KeyCount;
+                    if (samplerRecord.TimeOffset > mapped.AnimationsHeader->TimeKeyCount ||
+                        keyCount > mapped.AnimationsHeader->TimeKeyCount - samplerRecord.TimeOffset)
+                    {
+                        outError = "Cooked animation time key range is out of bounds";
+                        return nullptr;
+                    }
+
+                    sampler.Times.resize(keyCount);
+                    std::memcpy(
+                        sampler.Times.data(),
+                        mapped.AnimationTimes + samplerRecord.TimeOffset,
+                        static_cast<size_t>(keyCount) * sizeof(float));
+
+                    if (samplerRecord.Path == 0)
+                    {
+                        if (samplerRecord.ValueOffset > mapped.AnimationsHeader->TranslationKeyCount ||
+                            keyCount > mapped.AnimationsHeader->TranslationKeyCount - samplerRecord.ValueOffset)
+                        {
+                            outError = "Cooked animation translation key range is out of bounds";
+                            return nullptr;
+                        }
+
+                        sampler.Translations.resize(keyCount);
+                        std::memcpy(
+                            sampler.Translations.data(),
+                            mapped.AnimationTranslations + samplerRecord.ValueOffset,
+                            static_cast<size_t>(keyCount) * sizeof(DirectX::XMFLOAT3));
+                    }
+                    else if (samplerRecord.Path == 1)
+                    {
+                        if (samplerRecord.ValueOffset > mapped.AnimationsHeader->RotationKeyCount ||
+                            keyCount > mapped.AnimationsHeader->RotationKeyCount - samplerRecord.ValueOffset)
+                        {
+                            outError = "Cooked animation rotation key range is out of bounds";
+                            return nullptr;
+                        }
+
+                        sampler.Rotations.resize(keyCount);
+                        std::memcpy(
+                            sampler.Rotations.data(),
+                            mapped.AnimationRotations + samplerRecord.ValueOffset,
+                            static_cast<size_t>(keyCount) * sizeof(DirectX::XMFLOAT4));
+                    }
+                    else if (samplerRecord.Path == 2)
+                    {
+                        if (samplerRecord.ValueOffset > mapped.AnimationsHeader->ScaleKeyCount ||
+                            keyCount > mapped.AnimationsHeader->ScaleKeyCount - samplerRecord.ValueOffset)
+                        {
+                            outError = "Cooked animation scale key range is out of bounds";
+                            return nullptr;
+                        }
+
+                        sampler.Scales.resize(keyCount);
+                        std::memcpy(
+                            sampler.Scales.data(),
+                            mapped.AnimationScales + samplerRecord.ValueOffset,
+                            static_cast<size_t>(keyCount) * sizeof(DirectX::XMFLOAT3));
+                    }
+                }
+
+                for (std::uint32_t localChannel = 0; localChannel < clipRecord.ChannelCount; ++localChannel)
+                {
+                    const CookedAnimationChannelRecordDisk& channelRecord = mapped.AnimationChannelRecords[clipRecord.ChannelStart + localChannel];
+                    if (channelRecord.NodeIndex >= outModel->GetNodeCount())
+                        continue;
+                    if (channelRecord.SamplerIndex >= clip.Samplers.size())
+                        continue;
+
+                    AnimationChannel channel;
+                    channel.NodeIndex = channelRecord.NodeIndex;
+                    channel.SamplerIndex = channelRecord.SamplerIndex;
+                    switch (channelRecord.Path)
+                    {
+                    case 1: channel.Path = AnimationPath::Rotation; break;
+                    case 2: channel.Path = AnimationPath::Scale; break;
+                    default: channel.Path = AnimationPath::Translation; break;
+                    }
+                    clip.Channels.push_back(channel);
+                }
+
+                if (!clip.Channels.empty())
+                    outModel->AddAnimation(clip);
+            }
+        }
         return outModel;
     }
 
@@ -2402,6 +2782,7 @@ namespace DX12Engine
         ImportMeshes(ctx);
         TryApplyCookedMeshLods(modelName, *ctx.outModel);
         ImportNodes(ctx);
+        ImportAnimations(ctx);
         ValidateAndLog(ctx);
 
         return ctx.outModel;
