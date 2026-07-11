@@ -3,6 +3,8 @@
 #include "Animation.h"
 #include <DirectXMath.h>
 #include <memory>
+#include <string>
+#include <unordered_map>
 #include <vector>
 
 namespace DX12Engine
@@ -31,24 +33,29 @@ namespace DX12Engine
 		void UpdateNodeWorldTransforms();
 		DirectX::XMMATRIX GetNodeWorldTransform(std::size_t nodeIndex);
 
-		void PlayAnimation(const std::string& animationName, bool loop = true);
+		void PlayAnimation(const std::string& animationName, bool loop = true, bool reverse = false);
 		void UpdateAnimation(float deltaSeconds);
 
 	private:
+		struct ActiveAnimationState
+		{
+			const AnimationClip* Clip = nullptr;
+			float Time = 0.0f;
+			float Weight = 1.0f;
+			bool Loop = true;
+			bool Reverse = false;
+		};
+
 		std::shared_ptr<ModelAsset> m_ModelAsset;
 		DirectX::XMFLOAT4X4 m_WorldTransform{};
 		std::vector<std::shared_ptr<MaterialAsset>> m_MaterialOverrides;
 
 		std::vector<DirectX::XMFLOAT4X4> m_LocalNodeTransforms;
 		std::vector<DirectX::XMFLOAT4X4> m_WorldNodeTransforms;
+		std::vector<DirectX::XMFLOAT4X4> m_BaseNodeTransforms;
 		bool m_NodeTransformsDirty = true;
 
-		AnimationClip* m_CurrentClip = nullptr;
-
-		std::string m_CurrentAnimation;
-		float m_AnimationTime = 0.0f;
+		std::vector<ActiveAnimationState> m_ActiveAnimations;
 		float m_AnimationSpeed = 1.0f;
-		bool m_LoopAnimation = true;
-		bool m_PlayingAnimation = false;
 	};
 }

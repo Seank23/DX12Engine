@@ -166,4 +166,9 @@ namespace DX12EngineDemo
 		if (m_Camera)
 			m_Camera->SetAspectRatio(newSize.x / newSize.y);
 	}
+
+	DX12Engine::GameObject* DemoScene::GetInteractiveObject()
+	{
+		return nullptr;
+	}
 }

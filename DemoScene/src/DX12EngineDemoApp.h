@@ -10,6 +10,7 @@
 #include "DX12Engine/UI/UISystem.h"
 #include "DX12Engine/UI/UIContext.h"
 #include "Input/DemoInputHandler.h"
+#include "Input/InteractionController.h"
 
 namespace DX12EngineDemo
 {
@@ -30,6 +31,7 @@ namespace DX12EngineDemo
 		DX12Engine::UIDebugSnapshot BuildDebugSnapshot(float ts, float elasped);
 
 		std::unique_ptr<DemoInputHandler> m_InputHandler;
+		std::unique_ptr<InteractionController> m_InteractionController;
 		std::unique_ptr<DX12Engine::Scene> m_Scene;
 		std::unique_ptr<DX12Engine::Renderer> m_Renderer;
 		DX12Engine::RenderPipeline m_RenderPipeline;

@@ -16,6 +16,7 @@ namespace DX12Engine
 		Pan,
 		Interact,
 		Scroll,
+		Custom
 	};
 
 	class InputController
@@ -41,9 +42,20 @@ namespace DX12Engine
 			}
 		}
 
+		bool IsKeyPressedThisFrame(int key)
+		{
+			bool isPressed = IsKeyPressed(key);
+			bool wasPressed = m_PreviousKeyStates[key];
+			m_PreviousKeyStates[key] = isPressed;
+			return isPressed && !wasPressed;
+		}
+
 		virtual void Update(float deltaTime) = 0;
 		virtual void ProcessKeyInput(InputCommand command, float deltaTime) = 0;
 		virtual void ProcessMouseInput(InputCommand command, float dX, float dY) = 0;
+
+	private:
+		std::unordered_map<int, bool> m_PreviousKeyStates;
 	};
 }
 

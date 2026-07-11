@@ -1,14 +1,12 @@
 #include "InputHandler.h"
 #include <windowsx.h>
-#include <cstdio>
 #include "InputController.h"
-#include "Camera.h"
 #include "../UI/UISystem.h"
 
 namespace DX12Engine
 {
 	InputHandler::InputHandler(std::shared_ptr<UISystem> uiSystem)
-		: m_Camera(nullptr), m_UISystem(uiSystem)
+		: m_UISystem(uiSystem)
 	{
 		m_CommandMap = {
 			{ InputCommand::MoveForward,  'W'},
@@ -28,14 +26,17 @@ namespace DX12Engine
 
 	void InputHandler::ProcessInput(float deltaTime)
 	{
-		if (!m_Camera || m_UISystem->WantsKeyboardCapture()) return;
+		if (m_UISystem->WantsKeyboardCapture()) return;
 		for (const auto& [command, key] : m_CommandMap)
 		{
 			if (InputController::IsKeyPressed(key))
 			{
-				m_Camera->ProcessKeyInput(command, deltaTime);
+				for (auto* controller : m_InputControllers)
+					controller->ProcessKeyInput(command, deltaTime);
 			}
 		}
+		for (auto* controller : m_InputControllers)
+			controller->ProcessKeyInput(InputCommand::Custom, deltaTime);
 	}
 
 	void InputHandler::HandleMouseMovement(HWND hwnd, LPARAM lParam)
@@ -59,12 +60,12 @@ namespace DX12Engine
 		m_LastMouseX = (float)mouseX;
 		m_LastMouseY = (float)mouseY;
 
-		if (!m_Camera) return;
 		for (const auto& [command, key] : m_CommandMap)
 		{
 			if (InputController::IsKeyPressed(key))
 			{
-				m_Camera->ProcessMouseInput(command, deltaX, deltaY);
+				for (auto* controller : m_InputControllers)
+					controller->ProcessMouseInput(command, deltaX, deltaY);
 			}
 		}
 	}

@@ -54,9 +54,9 @@ namespace DX12Engine
 		return m_Parent->GetModelMatrix();
 	}
 
-	void RenderComponent::PlayAnimation(const std::string& animationName, bool loop)
+	void RenderComponent::PlayAnimation(const std::string& animationName, bool loop, bool reverse)
 	{
-		m_Asset->PlayAnimation(animationName, loop);
+		m_Asset->PlayAnimation(animationName, loop, reverse);
 	}
 
 	void RenderComponent::RebuildResolvedPrimitiveBindings()

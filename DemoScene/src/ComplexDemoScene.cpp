@@ -95,8 +95,6 @@ namespace DX12EngineDemo
 		m_SceneObjects.Add("Mazda", mazda);
 
 		m_SceneObjects.Init();
-
-		m_SceneObjects.Get("Mazda")->GetComponent<DX12Engine::RenderComponent>()->PlayAnimation("Hood_Open", false);
 	}
 
 	void ComplexDemoScene::Update(float ts, float elapsed)
@@ -111,5 +109,10 @@ namespace DX12EngineDemo
 		m_WindowSize = newSize;
 		if (m_Camera)
 			m_Camera->SetAspectRatio(newSize.x / newSize.y);
+	}
+
+	DX12Engine::GameObject* ComplexDemoScene::GetInteractiveObject()
+	{
+		return m_SceneObjects.Get("Mazda").get();
 	}
 }

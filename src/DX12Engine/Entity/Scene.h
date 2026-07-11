@@ -16,6 +16,7 @@ namespace DX12Engine
 		virtual void Init() = 0;
 		virtual void Update(float ts, float elapsed) = 0;
 		virtual void OnResize(DirectX::XMFLOAT2 newSize) = 0;
+		virtual GameObject* GetInteractiveObject() = 0;
 
 		GameObjectContainer& GetSceneObjects() { return m_SceneObjects; }
 		LightBuffer* GetLightBuffer() { return m_LightBuffer.get(); }

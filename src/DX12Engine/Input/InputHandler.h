@@ -5,8 +5,8 @@
 
 namespace DX12Engine
 {
-	class Camera;
 	class UISystem;
+	class InputController;
 	enum class InputCommand;
 
 	class InputHandler
@@ -15,7 +15,7 @@ namespace DX12Engine
 		InputHandler(std::shared_ptr<UISystem> uiSystem);
 		~InputHandler();
 
-		void SetCamera(Camera* camera) { m_Camera = camera; }
+		void AddInputController(InputController* controller) { m_InputControllers.push_back(controller); }
 
 		virtual void ProcessInput(float deltaTime);
 		virtual void HandleMouseMovement(HWND hwnd, LPARAM lParam);
@@ -23,9 +23,8 @@ namespace DX12Engine
 		virtual void HandleMouseWheel(HWND hwnd, WPARAM wParam) = 0;
 
 	protected:
-		Camera* m_Camera;
 		std::shared_ptr<UISystem> m_UISystem;
-
+		std::vector<InputController*> m_InputControllers;
 
 		float m_LastMouseX = 0.0f;
 		float m_LastMouseY = 0.0f;

@@ -61,7 +61,7 @@ namespace DX12Engine
 
 		DirectX::XMMATRIX GetModelMatrix();
 
-		void PlayAnimation(const std::string& animationName, bool loop = true);
+		void PlayAnimation(const std::string& animationName, bool loop = true, bool reverse = false);
 
 	private:
 		void UpdateConstantBufferData(

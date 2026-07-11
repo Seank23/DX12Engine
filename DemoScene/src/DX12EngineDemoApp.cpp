@@ -49,7 +49,10 @@ namespace DX12EngineDemo
 		m_Renderer->SetUISystem(m_UISystem.get());
 
 		m_InputHandler = std::make_unique<DemoInputHandler>(m_UISystem);
-		m_InputHandler->SetCamera(m_Scene->GetCamera());
+		m_InputHandler->AddInputController(m_Scene->GetCamera());
+
+		m_InteractionController = std::make_unique<InteractionController>(m_UISystem);
+		m_InputHandler->AddInputController(m_InteractionController.get());
 
 		auto shadowCastingLights = m_Scene->GetLightBuffer()->GetLightsByType({ DX12Engine::LightType::Spot });
 		auto cubeShadowCastingLights = m_Scene->GetLightBuffer()->GetLightsByType({ DX12Engine::LightType::Point });
@@ -167,6 +170,7 @@ namespace DX12EngineDemo
 		auto frameContext = DX12Engine::UIFrameContext{ elapsed, ts, 0, static_cast<uint32_t>(screenSize.x), static_cast<uint32_t>(screenSize.y), BuildDebugSnapshot(ts, elapsed) };
 		m_UISystem->BeginFrame(frameContext);
 
+		m_InteractionController->SetTarget(m_Scene->GetInteractiveObject());
 		m_InputHandler->ProcessInput(ts);
 		m_PhysicsEngine->Update(ts, elapsed);
 		m_Scene->Update(ts, elapsed);

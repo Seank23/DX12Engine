@@ -31,4 +31,6 @@ namespace DX12Engine
         std::vector<AnimationSampler> Samplers;
         std::vector<AnimationChannel> Channels;
     };
+
+	enum class AnimationState { Stopped, Playing, Paused, Reversed };
 }

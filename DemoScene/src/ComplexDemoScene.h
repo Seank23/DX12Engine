@@ -21,6 +21,7 @@ namespace DX12EngineDemo
 		virtual void Init() override;
 		virtual void Update(float ts, float elapsed) override;
 		virtual void OnResize(DirectX::XMFLOAT2 newSize) override;
+		virtual DX12Engine::GameObject* GetInteractiveObject() override;
 
 	private:
 		std::shared_ptr<DX12Engine::RenderContext> m_RenderContext;
