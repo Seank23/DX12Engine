@@ -11,6 +11,7 @@
 #include "DX12Engine/Physics/PhysicsEngine.h"
 #include "DX12Engine/Asset/ModelAsset.h"
 #include "DX12Engine/Entity/ColliderComponent.h"
+#include "DX12Engine/Entity/AnimationComponent.h"
 
 namespace DX12EngineDemo
 {
@@ -85,6 +86,7 @@ namespace DX12EngineDemo
 		std::shared_ptr<DX12Engine::GameObject> mazda = std::make_shared<DX12Engine::GameObject>();
 		mazda->CreateComponent<DX12Engine::RenderComponent>(std::make_shared<DX12Engine::ModelInstance>(mazdaModel));
 		mazda->Scale({ 5.0f, 5.0f, 5.0f });
+		mazda->CreateComponent<DX12Engine::AnimationComponent>();
 		DX12Engine::ColliderComponent* mazdaColliderComp = mazda->CreateComponent<DX12Engine::ColliderComponent>(DX12Engine::CollisionMeshType::Box);
 		mazdaColliderComp->SetUseRenderModelForCollision(true);
 		DX12Engine::PhysicsComponent* mazdaPhysicsComp = mazda->CreateComponent<DX12Engine::PhysicsComponent>();

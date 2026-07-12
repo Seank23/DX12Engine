@@ -23,6 +23,8 @@ namespace DX12EngineDemo
 		void SetTarget(DX12Engine::GameObject* target) { m_Target = target; }
 
 	private:
+		void PlayAnimation(const std::string& animationName);
+
 		DX12Engine::GameObject* m_Target = nullptr;
 
 		std::unordered_map<std::string, DX12Engine::AnimationState> m_AnimationStates;

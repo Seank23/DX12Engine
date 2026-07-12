@@ -29,6 +29,7 @@ namespace DX12EngineDemo
 	private:
 		void OnResize(DirectX::XMFLOAT2 newSize);
 		DX12Engine::UIDebugSnapshot BuildDebugSnapshot(float ts, float elasped);
+		int GetActiveAnimationCount() const;
 
 		std::unique_ptr<DemoInputHandler> m_InputHandler;
 		std::unique_ptr<InteractionController> m_InteractionController;

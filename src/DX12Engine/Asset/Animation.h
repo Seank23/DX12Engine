@@ -33,4 +33,13 @@ namespace DX12Engine
     };
 
 	enum class AnimationState { Stopped, Playing, Paused, Reversed };
+
+    struct ActiveAnimationState
+    {
+        const AnimationClip* Clip = nullptr;
+        float Time = 0.0f;
+        float Weight = 1.0f;
+        bool Loop = true;
+        bool Reverse = false;
+    };
 }

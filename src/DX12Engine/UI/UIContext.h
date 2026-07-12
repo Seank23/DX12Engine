@@ -39,6 +39,7 @@ namespace DX12Engine
 		float FPS;
 		uint32_t DrawnPrimitiveCount;
 		DirectX::XMFLOAT3 CameraPosition;
+		int ActiveAnimationCount = 0;
 		RendererOptions* RendererOptions = nullptr;
 		std::function<void(DX12Engine::RendererOptions*)> ApplyRendererOptions;
 	};

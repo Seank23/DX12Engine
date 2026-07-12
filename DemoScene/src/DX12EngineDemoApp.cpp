@@ -7,6 +7,7 @@
 #include "DX12Engine/Rendering/RenderPipelineConfig.h"
 #include "DX12Engine/Rendering/PipelineBuilder.h"
 #include "DX12Engine/UI/UIContext.h"
+#include "DX12Engine/Entity/AnimationComponent.h"
 
 namespace DX12EngineDemo
 {
@@ -235,9 +236,21 @@ namespace DX12EngineDemo
 		snapshot.FrameTimeMs = ts * 1000;
 		snapshot.FPS = 1.0f / ts;
 		snapshot.DrawnPrimitiveCount = m_Renderer->GetLastDrawnPrimitiveCount();
+		snapshot.ActiveAnimationCount = GetActiveAnimationCount();
 		snapshot.CameraPosition = m_Scene->GetCamera()->GetPosition();
 		snapshot.RendererOptions = &m_Renderer->GetOptions();
 		snapshot.ApplyRendererOptions = [this](DX12Engine::RendererOptions* options) { ApplyRendererOptions(options); };
 		return snapshot;
+	}
+
+	int DX12EngineDemoApp::GetActiveAnimationCount() const
+	{
+		int count = 0;
+		for (const auto& comp : m_Scene->GetSceneObjects().GetAllComponents<DX12Engine::AnimationComponent>())
+		{
+			if (comp)
+				count += comp->GetActiveAnimationCount();
+		}
+		return count;
 	}
 }

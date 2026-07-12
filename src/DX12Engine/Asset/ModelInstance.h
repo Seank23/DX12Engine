@@ -32,30 +32,16 @@ namespace DX12Engine
 		void ResetNodeTransforms();
 		void UpdateNodeWorldTransforms();
 		DirectX::XMMATRIX GetNodeWorldTransform(std::size_t nodeIndex);
-
-		void PlayAnimation(const std::string& animationName, bool loop = true, bool reverse = false);
-		void UpdateAnimation(float deltaSeconds);
+		std::vector<DirectX::XMFLOAT4X4>& GetLocalNodeTransforms() { return m_LocalNodeTransforms; }
+		void InvalidateNodeTransforms() { m_NodeTransformsDirty = true; }
 
 	private:
-		struct ActiveAnimationState
-		{
-			const AnimationClip* Clip = nullptr;
-			float Time = 0.0f;
-			float Weight = 1.0f;
-			bool Loop = true;
-			bool Reverse = false;
-		};
-
 		std::shared_ptr<ModelAsset> m_ModelAsset;
 		DirectX::XMFLOAT4X4 m_WorldTransform{};
 		std::vector<std::shared_ptr<MaterialAsset>> m_MaterialOverrides;
 
-		std::vector<DirectX::XMFLOAT4X4> m_LocalNodeTransforms;
 		std::vector<DirectX::XMFLOAT4X4> m_WorldNodeTransforms;
-		std::vector<DirectX::XMFLOAT4X4> m_BaseNodeTransforms;
+		std::vector<DirectX::XMFLOAT4X4> m_LocalNodeTransforms;
 		bool m_NodeTransformsDirty = true;
-
-		std::vector<ActiveAnimationState> m_ActiveAnimations;
-		float m_AnimationSpeed = 1.0f;
 	};
 }

@@ -7,7 +7,8 @@ namespace DX12Engine
 	{
 		Render,
 		Physics,
-		Collider
+		Collider,
+		Animation
 	};
 
 	enum TransformType

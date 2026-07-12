@@ -35,8 +35,6 @@ namespace DX12Engine
 
 	void RenderComponent::Update(float ts, float elapsed)
 	{
-		if (m_Asset)
-			m_Asset->UpdateAnimation(ts);
 	}
 
 	void RenderComponent::OnTransformChanged(TransformType type)
@@ -52,11 +50,6 @@ namespace DX12Engine
 	DirectX::XMMATRIX RenderComponent::GetModelMatrix()
 	{
 		return m_Parent->GetModelMatrix();
-	}
-
-	void RenderComponent::PlayAnimation(const std::string& animationName, bool loop, bool reverse)
-	{
-		m_Asset->PlayAnimation(animationName, loop, reverse);
 	}
 
 	void RenderComponent::RebuildResolvedPrimitiveBindings()

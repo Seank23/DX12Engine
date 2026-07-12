@@ -56,12 +56,11 @@ namespace DX12Engine
 
 		void SetAsset(std::shared_ptr<ModelInstance> asset);
 		ModelInstance* GetAsset() const { return m_Asset.get(); }
+		std::shared_ptr<ModelInstance> GetAssetShared() const { return m_Asset; }
 		const std::vector<ResolvedPrimitiveBinding>& GetResolvedPrimitiveBindings() const { return m_ResolvedPrimitiveBindings; }
 		std::vector<ResolvedPrimitiveBinding>& GetResolvedPrimitiveBindings() { return m_ResolvedPrimitiveBindings; }
 
 		DirectX::XMMATRIX GetModelMatrix();
-
-		void PlayAnimation(const std::string& animationName, bool loop = true, bool reverse = false);
 
 	private:
 		void UpdateConstantBufferData(
