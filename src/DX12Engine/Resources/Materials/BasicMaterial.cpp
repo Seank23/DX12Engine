@@ -67,4 +67,4 @@ namespace DX12Engine
 			}
 		}
 	}
-}	
+}

@@ -6,7 +6,7 @@ namespace DX12Engine
 {
 	Camera::Camera(float aspectRatio, float zNear, float zFar)
 		: InputController(), m_AspectRatio(aspectRatio), m_ZNear(zNear), m_ZFar(zFar), m_FOV(60.0f), m_Speed(5.0f),
-		m_Position({ 0.0f, 0.0f, 0.0f }), m_Pitch(0.0f), m_Yaw(0.0f), m_hasChanged(false)
+		  m_Position({ 0.0f, 0.0f, 0.0f }), m_Pitch(0.0f), m_Yaw(0.0f), m_hasChanged(false)
 	{
 		UpdateProjectionMatrix();
 		UpdateViewMatrix();
@@ -116,8 +116,7 @@ namespace DX12Engine
 			DirectX::XMConvertToRadians(m_FOV),
 			m_AspectRatio,
 			m_ZNear,
-			m_ZFar
-		);
+			m_ZFar);
 	}
 
 	void Camera::UpdateViewMatrix()

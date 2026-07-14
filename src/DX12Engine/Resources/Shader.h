@@ -34,4 +34,3 @@ namespace DX12Engine
 		std::filesystem::file_time_type m_LastModifiedTime;
 	};
 }
-

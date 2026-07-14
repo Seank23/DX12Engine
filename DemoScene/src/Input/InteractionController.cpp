@@ -4,10 +4,12 @@
 namespace DX12EngineDemo
 {
 	InteractionController::InteractionController(std::shared_ptr<DX12Engine::UISystem> uiSystem)
-	{}
+	{
+	}
 
 	void InteractionController::Update(float deltaTime)
-	{}
+	{
+	}
 
 	void InteractionController::ProcessKeyInput(DX12Engine::InputCommand command, float deltaTime)
 	{
@@ -43,14 +45,16 @@ namespace DX12EngineDemo
 	}
 
 	void InteractionController::ProcessMouseInput(DX12Engine::InputCommand command, float dX, float dY)
-	{}
+	{
+	}
 
 	void InteractionController::PlayAnimation(const std::string& animationName)
 	{
 		if (m_Target)
 		{
 			auto animationComp = m_Target->GetComponent<DX12Engine::AnimationComponent>();
-			if (!animationComp) return;
+			if (!animationComp)
+				return;
 
 			auto& animationState = m_AnimationStates[animationName];
 			animationComp->PlayAnimation(animationName, false, animationState == DX12Engine::AnimationState::Reversed);

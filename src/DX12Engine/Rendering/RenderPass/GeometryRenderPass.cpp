@@ -8,214 +8,210 @@
 
 namespace DX12Engine
 {
-    GeometryRenderPass::GeometryRenderPass(RenderContext& context)
+	GeometryRenderPass::GeometryRenderPass(RenderContext& context)
 		: RenderPass(context)
-    {
+	{
 		m_Type = RenderPassType::Geometry;
-    }
+	}
 
-    GeometryRenderPass::~GeometryRenderPass()
-    {
-    }
+	GeometryRenderPass::~GeometryRenderPass()
+	{
+	}
 
-    void GeometryRenderPass::Init()
-    {
-        RenderPass::Init();
+	void GeometryRenderPass::Init()
+	{
+		RenderPass::Init();
 
 		m_VertexShaderName = m_VertexShaderName.empty() ? "Geometry_VS" : m_VertexShaderName;
 		m_PixelShaderName = m_PixelShaderName.empty() ? "Geometry_PS" : m_PixelShaderName;
 
-        DirectX::XMINT3 renderSize{m_RenderContext.GetRenderSize().x, m_RenderContext.GetRenderSize().y, 1};
-        m_RenderTargets.emplace_back(ResourceManager::GetInstance().CreateRenderTargetTexture(RenderTextureConfig{ renderSize, DXGI_FORMAT_R8G8B8A8_UNORM })); // Albedo
-        m_RenderTargets.emplace_back(ResourceManager::GetInstance().CreateRenderTargetTexture(RenderTextureConfig{ renderSize, DXGI_FORMAT_R16G16B16A16_FLOAT })); // World Normal
-        m_RenderTargets.emplace_back(ResourceManager::GetInstance().CreateRenderTargetTexture(RenderTextureConfig{ renderSize, DXGI_FORMAT_R16G16B16A16_FLOAT })); // Object Normal
-        m_RenderTargets.emplace_back(ResourceManager::GetInstance().CreateRenderTargetTexture(RenderTextureConfig{ renderSize, DXGI_FORMAT_R16G16B16A16_FLOAT })); // Metallic, Roughness, AO
-        m_RenderTargets.emplace_back(ResourceManager::GetInstance().CreateRenderTargetTexture(RenderTextureConfig{ renderSize, DXGI_FORMAT_R16G16B16A16_FLOAT })); // Position
-        m_RenderTargets.emplace_back(ResourceManager::GetInstance().CreateRenderTargetTexture(RenderTextureConfig{ renderSize, DXGI_FORMAT_R16G16B16A16_FLOAT })); // Emissive
-        m_RenderTargets.emplace_back(ResourceManager::GetInstance().CreateRenderTargetTexture(RenderTextureConfig{ renderSize, DXGI_FORMAT_R16G16_FLOAT })); // Velocity
-        m_RenderTargets.emplace_back(ResourceManager::GetInstance().CreateDepthMap(RenderTextureConfig{ renderSize, DXGI_FORMAT_R32_FLOAT, DXGI_FORMAT_D32_FLOAT })); // Depth
+		DirectX::XMINT3 renderSize{ m_RenderContext.GetRenderSize().x, m_RenderContext.GetRenderSize().y, 1 };
+		m_RenderTargets.emplace_back(ResourceManager::GetInstance().CreateRenderTargetTexture(RenderTextureConfig{ renderSize, DXGI_FORMAT_R8G8B8A8_UNORM }));		  // Albedo
+		m_RenderTargets.emplace_back(ResourceManager::GetInstance().CreateRenderTargetTexture(RenderTextureConfig{ renderSize, DXGI_FORMAT_R16G16B16A16_FLOAT }));	  // World Normal
+		m_RenderTargets.emplace_back(ResourceManager::GetInstance().CreateRenderTargetTexture(RenderTextureConfig{ renderSize, DXGI_FORMAT_R16G16B16A16_FLOAT }));	  // Object Normal
+		m_RenderTargets.emplace_back(ResourceManager::GetInstance().CreateRenderTargetTexture(RenderTextureConfig{ renderSize, DXGI_FORMAT_R16G16B16A16_FLOAT }));	  // Metallic, Roughness, AO
+		m_RenderTargets.emplace_back(ResourceManager::GetInstance().CreateRenderTargetTexture(RenderTextureConfig{ renderSize, DXGI_FORMAT_R16G16B16A16_FLOAT }));	  // Position
+		m_RenderTargets.emplace_back(ResourceManager::GetInstance().CreateRenderTargetTexture(RenderTextureConfig{ renderSize, DXGI_FORMAT_R16G16B16A16_FLOAT }));	  // Emissive
+		m_RenderTargets.emplace_back(ResourceManager::GetInstance().CreateRenderTargetTexture(RenderTextureConfig{ renderSize, DXGI_FORMAT_R16G16_FLOAT }));		  // Velocity
+		m_RenderTargets.emplace_back(ResourceManager::GetInstance().CreateDepthMap(RenderTextureConfig{ renderSize, DXGI_FORMAT_R32_FLOAT, DXGI_FORMAT_D32_FLOAT })); // Depth
 
-        m_Viewport = { 0.0f, 0.0f, (float)renderSize.x, (float)renderSize.y, 0.0f, 1.0f };
-        m_ScissorRect = { 0, 0, (LONG)renderSize.x, (LONG)renderSize.y };
+		m_Viewport = { 0.0f, 0.0f, (float)renderSize.x, (float)renderSize.y, 0.0f, 1.0f };
+		m_ScissorRect = { 0, 0, (LONG)renderSize.x, (LONG)renderSize.y };
 
-        CreatePSO();
-    }
+		CreatePSO();
+	}
 
-    void GeometryRenderPass::Execute()
-    {
+	void GeometryRenderPass::Execute()
+	{
 		RenderPass::Execute();
 
 		RenderUtils::UpdateMaterialBindings(m_DrawItems);
 
-        m_CommandList.RSSetViewports(1, &m_Viewport);
-        m_CommandList.RSSetScissorRects(1, &m_ScissorRect);
+		m_CommandList.RSSetViewports(1, &m_Viewport);
+		m_CommandList.RSSetScissorRects(1, &m_ScissorRect);
 
 		CD3DX12_RESOURCE_BARRIER rtBarriers[8];
-        D3D12_CPU_DESCRIPTOR_HANDLE rtvHandles[7];
-        for (int i = 0; i < 7; i++)
-        {
+		D3D12_CPU_DESCRIPTOR_HANDLE rtvHandles[7];
+		for (int i = 0; i < 7; i++)
+		{
 			rtBarriers[i] = CD3DX12_RESOURCE_BARRIER::Transition(
 				m_RenderTargets[i]->GetResource(),
-                m_RenderTargets[i]->GetUsageState(),
-				D3D12_RESOURCE_STATE_RENDER_TARGET
-			);
+				m_RenderTargets[i]->GetUsageState(),
+				D3D12_RESOURCE_STATE_RENDER_TARGET);
 			m_RenderTargets[i]->SetUsageState(D3D12_RESOURCE_STATE_RENDER_TARGET);
-            rtvHandles[i] = m_RenderTargets[i]->GetTextureDescriptor().GetCPUHandle();
-        }
+			rtvHandles[i] = m_RenderTargets[i]->GetTextureDescriptor().GetCPUHandle();
+		}
 		rtBarriers[7] = CD3DX12_RESOURCE_BARRIER::Transition(
 			m_RenderTargets[7]->GetResource(),
 			m_RenderTargets[7]->GetUsageState(),
-			D3D12_RESOURCE_STATE_DEPTH_WRITE
-		);
-        m_RenderTargets[7]->SetUsageState(D3D12_RESOURCE_STATE_DEPTH_WRITE);
-        m_CommandList.ResourceBarrier(m_RenderTargets.size(), rtBarriers);
+			D3D12_RESOURCE_STATE_DEPTH_WRITE);
+		m_RenderTargets[7]->SetUsageState(D3D12_RESOURCE_STATE_DEPTH_WRITE);
+		m_CommandList.ResourceBarrier(m_RenderTargets.size(), rtBarriers);
 
 		auto dsvHandle = m_RenderTargets[7]->GetTextureDescriptor().GetCPUHandle();
 		m_CommandList.OMSetRenderTargets(7, rtvHandles, false, &dsvHandle);
 
-        for (int i = 0; i < 7; i++)
-            m_CommandList.ClearRenderTargetView(rtvHandles[i], m_RenderTargets[i]->GetClearColorArray(), 0, nullptr);
+		for (int i = 0; i < 7; i++)
+			m_CommandList.ClearRenderTargetView(rtvHandles[i], m_RenderTargets[i]->GetClearColorArray(), 0, nullptr);
 
 		m_CommandList.ClearDepthStencilView(dsvHandle, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
 
-        m_CommandList.IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+		m_CommandList.IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
-        auto srvHeap = m_RenderContext.GetHeapManager().GetRenderPassHeap().GetHeap();
-        m_CommandList.SetDescriptorHeaps(1, &srvHeap);
+		auto srvHeap = m_RenderContext.GetHeapManager().GetRenderPassHeap().GetHeap();
+		m_CommandList.SetDescriptorHeaps(1, &srvHeap);
 
 		D3D12_GPU_VIRTUAL_ADDRESS lastCBV = 0;
 		Material* lastMaterial = nullptr;
 		MeshPrimitive* lastPrimitive = nullptr;
-        UINT lastLodLevel = UINT_MAX;
-        uint64_t lastPipelineKey = -1;
+		UINT lastLodLevel = UINT_MAX;
+		uint64_t lastPipelineKey = -1;
 
-        for (const DrawItem& item : m_DrawItems)
-        {
-            if (!item.Primitive || !item.Material)
-                continue;
+		for (const DrawItem& item : m_DrawItems)
+		{
+			if (!item.Primitive || !item.Material)
+				continue;
 
-            if (item.BlendMode == AlphaMode::Blend)
-                continue;
+			if (item.BlendMode == AlphaMode::Blend)
+				continue;
 
-            MaterialTemplate* tmpl = item.Template;
-            const bool hasTemplatePSO = tmpl && tmpl->GetPassTarget() == PassTarget::Geometry && tmpl->HasResolvedPSO();
+			MaterialTemplate* tmpl = item.Template;
+			const bool hasTemplatePSO = tmpl && tmpl->GetPassTarget() == PassTarget::Geometry && tmpl->HasResolvedPSO();
 
-            if (!hasTemplatePSO)
-            {
-                m_CommandList.SetPipelineState(m_PipelineState.Get());
-                m_CommandList.SetGraphicsRootSignature(m_RootSignature.Get());
-                lastCBV = 0;
-                lastMaterial = nullptr;
-                lastPipelineKey = UINT64_MAX;
-                lastPrimitive = nullptr;
-            }
-            else if (item.PipelineKey != lastPipelineKey)
-            {
-                m_CommandList.SetPipelineState(tmpl->GetPipelineState());
-                m_CommandList.SetGraphicsRootSignature(tmpl->GetRootSignature());
+			if (!hasTemplatePSO)
+			{
+				m_CommandList.SetPipelineState(m_PipelineState.Get());
+				m_CommandList.SetGraphicsRootSignature(m_RootSignature.Get());
+				lastCBV = 0;
+				lastMaterial = nullptr;
+				lastPipelineKey = UINT64_MAX;
+				lastPrimitive = nullptr;
+			}
+			else if (item.PipelineKey != lastPipelineKey)
+			{
+				m_CommandList.SetPipelineState(tmpl->GetPipelineState());
+				m_CommandList.SetGraphicsRootSignature(tmpl->GetRootSignature());
 				lastPipelineKey = item.PipelineKey;
 				lastCBV = 0;
 				lastMaterial = nullptr;
-                lastPrimitive = nullptr;
-            }
+				lastPrimitive = nullptr;
+			}
 
-            if (item.CBVAddress != lastCBV)
-            {
-                m_CommandList.SetGraphicsRootConstantBufferView(0, item.CBVAddress);
-                lastCBV = item.CBVAddress;
-            }
+			if (item.CBVAddress != lastCBV)
+			{
+				m_CommandList.SetGraphicsRootConstantBufferView(0, item.CBVAddress);
+				lastCBV = item.CBVAddress;
+			}
 
-            if (item.Material != lastMaterial)
-            {
-                item.Material->Bind(&m_CommandList, 1, 2);
-                lastMaterial = item.Material;
-            }
+			if (item.Material != lastMaterial)
+			{
+				item.Material->Bind(&m_CommandList, 1, 2);
+				lastMaterial = item.Material;
+			}
 
-            if (item.Primitive != lastPrimitive)
-            {
-                item.Primitive->SetActiveLOD(item.ActiveLODLevel);
-                auto vertexBufferView = item.Primitive->GetVertexBufferView();
-                auto indexBufferView  = item.Primitive->GetActiveIndexBufferView();
-                m_CommandList.IASetVertexBuffers(0, 1, &vertexBufferView);
-                m_CommandList.IASetIndexBuffer(&indexBufferView);
-                lastPrimitive = item.Primitive;
-                lastLodLevel = item.ActiveLODLevel;
-            }
-            else if (item.ActiveLODLevel != lastLodLevel)
-            {
-                item.Primitive->SetActiveLOD(item.ActiveLODLevel);
-                auto indexBufferView = item.Primitive->GetActiveIndexBufferView();
-                m_CommandList.IASetIndexBuffer(&indexBufferView);
-                lastLodLevel = item.ActiveLODLevel;
-            }
+			if (item.Primitive != lastPrimitive)
+			{
+				item.Primitive->SetActiveLOD(item.ActiveLODLevel);
+				auto vertexBufferView = item.Primitive->GetVertexBufferView();
+				auto indexBufferView = item.Primitive->GetActiveIndexBufferView();
+				m_CommandList.IASetVertexBuffers(0, 1, &vertexBufferView);
+				m_CommandList.IASetIndexBuffer(&indexBufferView);
+				lastPrimitive = item.Primitive;
+				lastLodLevel = item.ActiveLODLevel;
+			}
+			else if (item.ActiveLODLevel != lastLodLevel)
+			{
+				item.Primitive->SetActiveLOD(item.ActiveLODLevel);
+				auto indexBufferView = item.Primitive->GetActiveIndexBufferView();
+				m_CommandList.IASetIndexBuffer(&indexBufferView);
+				lastLodLevel = item.ActiveLODLevel;
+			}
 
-            m_CommandList.DrawIndexedInstanced(item.IndexCount, 1, item.FirstIndex, item.BaseVertex, 0);
-        }
-        for (int i = 0; i < m_RenderTargets.size(); i++)
-        {
-            rtBarriers[i] = CD3DX12_RESOURCE_BARRIER::Transition(
-                m_RenderTargets[i]->GetResource(),
-                m_RenderTargets[i]->GetUsageState(),
-                D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE
-            );
-            m_RenderTargets[i]->SetUsageState(D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
-        }
-        m_CommandList.ResourceBarrier(static_cast<UINT>(m_RenderTargets.size()), rtBarriers);
+			m_CommandList.DrawIndexedInstanced(item.IndexCount, 1, item.FirstIndex, item.BaseVertex, 0);
+		}
+		for (int i = 0; i < m_RenderTargets.size(); i++)
+		{
+			rtBarriers[i] = CD3DX12_RESOURCE_BARRIER::Transition(
+				m_RenderTargets[i]->GetResource(),
+				m_RenderTargets[i]->GetUsageState(),
+				D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+			m_RenderTargets[i]->SetUsageState(D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+		}
+		m_CommandList.ResourceBarrier(static_cast<UINT>(m_RenderTargets.size()), rtBarriers);
 
-        m_QueueManager.GetGraphicsQueue().ExecuteCommandList();
-    }
+		m_QueueManager.GetGraphicsQueue().ExecuteCommandList();
+	}
 
-    std::shared_ptr<RenderTexture> GeometryRenderPass::GetRenderTarget(ResourceSlot type)
-    {
-        switch (type)
-        {
+	std::shared_ptr<RenderTexture> GeometryRenderPass::GetRenderTarget(ResourceSlot type)
+	{
+		switch (type)
+		{
 		case ResourceSlot::Albedo:
 			return m_RenderTargets[0];
 		case ResourceSlot::WorldNormal:
 			return m_RenderTargets[1];
-        case ResourceSlot::ObjectNormal:
-            return m_RenderTargets[2];
+		case ResourceSlot::ObjectNormal:
+			return m_RenderTargets[2];
 		case ResourceSlot::Material:
 			return m_RenderTargets[3];
 		case ResourceSlot::Position:
 			return m_RenderTargets[4];
-        case ResourceSlot::Emissive:
-            return m_RenderTargets[5];
-        case ResourceSlot::Velocity:
-            return m_RenderTargets[6];
-        case ResourceSlot::Depth:
-            return m_RenderTargets[7];
-        default:
-            return nullptr;
-        }
-    }
+		case ResourceSlot::Emissive:
+			return m_RenderTargets[5];
+		case ResourceSlot::Velocity:
+			return m_RenderTargets[6];
+		case ResourceSlot::Depth:
+			return m_RenderTargets[7];
+		default:
+			return nullptr;
+		}
+	}
 
-    void GeometryRenderPass::CreatePSO()
-    {
-        PipelineStateBuilder pipelineStateBuilder;
-        RootSignatureBuilder rootSignatureBuilder;
+	void GeometryRenderPass::CreatePSO()
+	{
+		PipelineStateBuilder pipelineStateBuilder;
+		RootSignatureBuilder rootSignatureBuilder;
 
-        pipelineStateBuilder = pipelineStateBuilder
-            .ConfigureFromDefault(ResourceManager::GetInstance().GetShader(m_VertexShaderName), ResourceManager::GetInstance().GetShader(m_PixelShaderName))
-            .SetRenderTargets({
-                DXGI_FORMAT_R8G8B8A8_UNORM,
-                DXGI_FORMAT_R16G16B16A16_FLOAT,
-                DXGI_FORMAT_R16G16B16A16_FLOAT,
-                DXGI_FORMAT_R16G16B16A16_FLOAT,
-                DXGI_FORMAT_R16G16B16A16_FLOAT,
-                DXGI_FORMAT_R16G16B16A16_FLOAT,
-                DXGI_FORMAT_R16G16_FLOAT })
-            .SetDepthStencilFormat(DXGI_FORMAT_D32_FLOAT);
+		pipelineStateBuilder = pipelineStateBuilder
+								   .ConfigureFromDefault(ResourceManager::GetInstance().GetShader(m_VertexShaderName), ResourceManager::GetInstance().GetShader(m_PixelShaderName))
+								   .SetRenderTargets({ DXGI_FORMAT_R8G8B8A8_UNORM,
+													   DXGI_FORMAT_R16G16B16A16_FLOAT,
+													   DXGI_FORMAT_R16G16B16A16_FLOAT,
+													   DXGI_FORMAT_R16G16B16A16_FLOAT,
+													   DXGI_FORMAT_R16G16B16A16_FLOAT,
+													   DXGI_FORMAT_R16G16B16A16_FLOAT,
+													   DXGI_FORMAT_R16G16_FLOAT })
+								   .SetDepthStencilFormat(DXGI_FORMAT_D32_FLOAT);
 
-        DescriptorTableConfig config(6, D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 0);
-        rootSignatureBuilder = rootSignatureBuilder
-            .AddConstantBuffer(0)
-            .AddConstantBuffer(1)
-            .AddDescriptorTables({ config })
-            .AddSampler(0, D3D12_FILTER_ANISOTROPIC);
+		DescriptorTableConfig config(6, D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 0);
+		rootSignatureBuilder = rootSignatureBuilder
+								   .AddConstantBuffer(0)
+								   .AddConstantBuffer(1)
+								   .AddDescriptorTables({ config })
+								   .AddSampler(0, D3D12_FILTER_ANISOTROPIC);
 
-        m_RootSignature = ResourceManager::GetInstance().CreateRootSignature(rootSignatureBuilder.Build());
-        pipelineStateBuilder = pipelineStateBuilder.SetRootSignature(m_RootSignature.Get());
-        m_PipelineState = ResourceManager::GetInstance().CreatePipelineState(pipelineStateBuilder.Build());
-    }
+		m_RootSignature = ResourceManager::GetInstance().CreateRootSignature(rootSignatureBuilder.Build());
+		pipelineStateBuilder = pipelineStateBuilder.SetRootSignature(m_RootSignature.Get());
+		m_PipelineState = ResourceManager::GetInstance().CreatePipelineState(pipelineStateBuilder.Build());
+	}
 }

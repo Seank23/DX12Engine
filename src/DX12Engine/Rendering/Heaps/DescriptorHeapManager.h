@@ -5,14 +5,14 @@
 namespace DX12Engine
 {
 	// Capacity constants � increase these when adding more assets.
-	static constexpr UINT SRV_PERSISTENT_CAPACITY      = 1024;
+	static constexpr UINT SRV_PERSISTENT_CAPACITY = 1024;
 	static constexpr UINT SRV_TRANSIENT_CAPACITY_FRAME = 512;
-	static constexpr UINT DSV_CAPACITY                 = 128;
-	static constexpr UINT RTV_CAPACITY                 = 128;
+	static constexpr UINT DSV_CAPACITY = 128;
+	static constexpr UINT RTV_CAPACITY = 128;
 
 	// Warn at these fill fractions (checked via GetStats in debug builds).
-	static constexpr float HEAP_WARN_THRESHOLD_HIGH    = 0.95f;
-	static constexpr float HEAP_WARN_THRESHOLD_MED     = 0.80f;
+	static constexpr float HEAP_WARN_THRESHOLD_HIGH = 0.95f;
+	static constexpr float HEAP_WARN_THRESHOLD_MED = 0.80f;
 
 	class DescriptorHeapManager
 	{

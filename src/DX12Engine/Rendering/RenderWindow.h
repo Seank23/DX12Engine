@@ -24,12 +24,12 @@ namespace DX12Engine
 		void CreateRTVHeap(ID3D12Device* device);
 		void CreateDepthStencilBuffer();
 
-		CD3DX12_CPU_DESCRIPTOR_HANDLE GetRTVHandle() 
-		{ 
-			return CD3DX12_CPU_DESCRIPTOR_HANDLE(m_RTVHeap->GetCPUDescriptorHandleForHeapStart(), m_FrameIndex, m_RTVDescriptorSize); 
+		CD3DX12_CPU_DESCRIPTOR_HANDLE GetRTVHandle()
+		{
+			return CD3DX12_CPU_DESCRIPTOR_HANDLE(m_RTVHeap->GetCPUDescriptorHandleForHeapStart(), m_FrameIndex, m_RTVDescriptorSize);
 		}
 
-		D3D12_CPU_DESCRIPTOR_HANDLE GetDSVHandle() 
+		D3D12_CPU_DESCRIPTOR_HANDLE GetDSVHandle()
 		{
 			return m_DepthBuffer->GetTextureDescriptor().GetCPUHandle();
 		}
@@ -59,4 +59,3 @@ namespace DX12Engine
 		UINT m_RTVDescriptorSize;
 	};
 }
-

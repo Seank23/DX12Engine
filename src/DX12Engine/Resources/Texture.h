@@ -38,4 +38,3 @@ namespace DX12Engine
 		DirectX::ScratchImage* m_ScratchImage = nullptr;
 	};
 }
-

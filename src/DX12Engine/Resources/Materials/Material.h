@@ -2,7 +2,7 @@
 #include "d3d12.h"
 #include <wrl.h>
 #include <DirectXMath.h>
-#include "../../Rendering/PipelineStateBuilder.h" 
+#include "../../Rendering/PipelineStateBuilder.h"
 #include "../../Rendering/RootSignatureBuilder.h"
 #include "../../Rendering/Buffers/ConstantBuffer.h"
 #include "./MaterialData.h"
@@ -29,7 +29,11 @@ namespace DX12Engine
 
 		// Per-frame transient GPU handle for the material's texture table (set by the
 		// geometry pass before issuing draws so Bind() can call SetGraphicsRootDescriptorTable).
-		void SetTextureTableHandle(D3D12_GPU_DESCRIPTOR_HANDLE handle) { m_TextureTableHandle = handle; m_HasTextureTable = true; }
+		void SetTextureTableHandle(D3D12_GPU_DESCRIPTOR_HANDLE handle)
+		{
+			m_TextureTableHandle = handle;
+			m_HasTextureTable = true;
+		}
 		D3D12_GPU_DESCRIPTOR_HANDLE GetTextureTableHandle() const { return m_TextureTableHandle; }
 		bool HasTextureTable() const { return m_HasTextureTable; }
 		void ClearTextureTable() { m_HasTextureTable = false; }

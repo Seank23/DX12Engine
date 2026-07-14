@@ -44,5 +44,3 @@ namespace DX12Engine
 		bool m_IsReady;
 	};
 }
-
-

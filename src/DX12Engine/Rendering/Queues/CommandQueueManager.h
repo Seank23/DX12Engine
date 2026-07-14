@@ -26,4 +26,3 @@ namespace DX12Engine
 		std::unique_ptr<CommandQueue> m_CopyQueue;
 	};
 }
-

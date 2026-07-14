@@ -5,20 +5,21 @@
 
 namespace DX12Engine
 {
-    struct AABoundingBox
-    {
-        std::vector<DirectX::XMVECTOR> Vertices;
-        std::vector<UINT> Indices;
-        DirectX::XMFLOAT3 MaxPoint;
-        DirectX::XMFLOAT3 MinPoint;
+	struct AABoundingBox
+	{
+		std::vector<DirectX::XMVECTOR> Vertices;
+		std::vector<UINT> Indices;
+		DirectX::XMFLOAT3 MaxPoint;
+		DirectX::XMFLOAT3 MinPoint;
 		DirectX::XMFLOAT3 Dimensions;
 
 		bool Intersects(const AABoundingBox& other) const
 		{
-            if (Vertices.empty() || other.Vertices.empty()) return false;
-            return (MinPoint.x <= other.MaxPoint.x && MaxPoint.x >= other.MinPoint.x) &&
-                (MinPoint.y <= other.MaxPoint.y && MaxPoint.y >= other.MinPoint.y) &&
-                (MinPoint.z <= other.MaxPoint.z && MaxPoint.z >= other.MinPoint.z);
+			if (Vertices.empty() || other.Vertices.empty())
+				return false;
+			return (MinPoint.x <= other.MaxPoint.x && MaxPoint.x >= other.MinPoint.x) &&
+				   (MinPoint.y <= other.MaxPoint.y && MaxPoint.y >= other.MinPoint.y) &&
+				   (MinPoint.z <= other.MaxPoint.z && MaxPoint.z >= other.MinPoint.z);
 		}
-    };
+	};
 }

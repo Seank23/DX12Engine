@@ -100,62 +100,63 @@ namespace DX12Engine
 
 		void DrawTAASettings(TAASettings& settings)
 		{
-			#define TAA_FIELDS(X) \
-				X(float, BaseBlend) \
-				X(float, MinBlend) \
-				X(float, MaxBlend) \
-				X(float, VelocityRejection) \
-				X(float, DepthRejection) \
-				X(float, ClampGamma) \
-				X(float, Sharpness) \
-				X(float, DisocclusionDepthThreshold)
+#define TAA_FIELDS(X)           \
+	X(float, BaseBlend)         \
+	X(float, MinBlend)          \
+	X(float, MaxBlend)          \
+	X(float, VelocityRejection) \
+	X(float, DepthRejection)    \
+	X(float, ClampGamma)        \
+	X(float, Sharpness)         \
+	X(float, DisocclusionDepthThreshold)
 
-			#define DRAW_TAA_FIELD(type, field) DrawOptionValue(#field, settings.field);
+#define DRAW_TAA_FIELD(type, field) DrawOptionValue(#field, settings.field);
 			TAA_FIELDS(DRAW_TAA_FIELD)
-			#undef DRAW_TAA_FIELD
-			#undef TAA_FIELDS
+#undef DRAW_TAA_FIELD
+#undef TAA_FIELDS
 		}
 
 		void DrawCSMSettings(CSMSettings& settings)
 		{
-			#define CSM_FIELDS(X) \
-				X(int, CascadeCount) \
-				X(int, ShadowMapSize) \
-				X(float, MaxDistance) \
-				X(float, SplitLambda) \
-				X(float, CascadeBlend) \
-				X(float, ConstantBias) \
-				X(float, SlopeBias) \
-				X(float, NormalBias)
+#define CSM_FIELDS(X)      \
+	X(int, CascadeCount)   \
+	X(int, ShadowMapSize)  \
+	X(float, MaxDistance)  \
+	X(float, SplitLambda)  \
+	X(float, CascadeBlend) \
+	X(float, ConstantBias) \
+	X(float, SlopeBias)    \
+	X(float, NormalBias)
 
-			#define DRAW_CSM_FIELD(type, field) DrawOptionValue(#field, settings.field);
+#define DRAW_CSM_FIELD(type, field) DrawOptionValue(#field, settings.field);
 			CSM_FIELDS(DRAW_CSM_FIELD)
-			#undef DRAW_CSM_FIELD
-			#undef CSM_FIELDS
+#undef DRAW_CSM_FIELD
+#undef CSM_FIELDS
 		}
 
 		void DrawRendererOptions(RendererOptions& options)
 		{
-			#define RENDERER_SCALAR_FIELDS(X) \
-				X(float, RenderScale) \
-				X(AntiAliasingMode, AA_Mode) \
-				X(bool, EnableGammaCorrection) \
-				X(bool, EnableFrustumCulling)
+#define RENDERER_SCALAR_FIELDS(X)  \
+	X(float, RenderScale)          \
+	X(AntiAliasingMode, AA_Mode)   \
+	X(bool, EnableGammaCorrection) \
+	X(bool, EnableFrustumCulling)
 
-			#define RENDERER_NESTED_FIELDS(X) \
-				X(TAA, DrawTAASettings) \
-				X(CSM, DrawCSMSettings)
+#define RENDERER_NESTED_FIELDS(X) \
+	X(TAA, DrawTAASettings)       \
+	X(CSM, DrawCSMSettings)
 
-			#define DRAW_RENDERER_SCALAR(type, field) DrawOptionValue(#field, options.field);
+#define DRAW_RENDERER_SCALAR(type, field) DrawOptionValue(#field, options.field);
 			RENDERER_SCALAR_FIELDS(DRAW_RENDERER_SCALAR)
-			#undef DRAW_RENDERER_SCALAR
-			#undef RENDERER_SCALAR_FIELDS
+#undef DRAW_RENDERER_SCALAR
+#undef RENDERER_SCALAR_FIELDS
 
-			#define DRAW_RENDERER_NESTED(field, drawer) \
-				if (ImGui::CollapsingHeader(#field, ImGuiTreeNodeFlags_DefaultOpen)) drawer(options.field);
+#define DRAW_RENDERER_NESTED(field, drawer)                              \
+	if (ImGui::CollapsingHeader(#field, ImGuiTreeNodeFlags_DefaultOpen)) \
+		drawer(options.field);
 			RENDERER_NESTED_FIELDS(DRAW_RENDERER_NESTED)
-			#undef DRAW_RENDERER_NESTED
-			#undef RENDERER_NESTED_FIELDS
+#undef DRAW_RENDERER_NESTED
+#undef RENDERER_NESTED_FIELDS
 		}
 
 		UINT GetSrvDescriptorSize(ID3D12Device* device)
@@ -164,8 +165,8 @@ namespace DX12Engine
 		}
 
 		void ImGui_SrvAlloc(ImGui_ImplDX12_InitInfo* info,
-			D3D12_CPU_DESCRIPTOR_HANDLE* outCpu,
-			D3D12_GPU_DESCRIPTOR_HANDLE* outGpu)
+							D3D12_CPU_DESCRIPTOR_HANDLE* outCpu,
+							D3D12_GPU_DESCRIPTOR_HANDLE* outGpu)
 		{
 			if (!info || !outCpu || !outGpu || !info->Device || !info->SrvDescriptorHeap || !info->UserData)
 			{
@@ -199,8 +200,8 @@ namespace DX12Engine
 		}
 
 		void ImGui_SrvFree(ImGui_ImplDX12_InitInfo* info,
-			D3D12_CPU_DESCRIPTOR_HANDLE cpu,
-			D3D12_GPU_DESCRIPTOR_HANDLE)
+						   D3D12_CPU_DESCRIPTOR_HANDLE cpu,
+						   D3D12_GPU_DESCRIPTOR_HANDLE)
 		{
 			if (!info || !info->Device || !info->SrvDescriptorHeap || !info->UserData || cpu.ptr == 0)
 				return;
@@ -333,7 +334,8 @@ namespace DX12Engine
 
 	void ImGuiDebugBackend::BeginFrame(const UIFrameContext& context)
 	{
-		if (!m_Visible) return;
+		if (!m_Visible)
+			return;
 
 		m_FrameStarted = true;
 		m_FrameContext = &context;
@@ -369,7 +371,8 @@ namespace DX12Engine
 
 	void ImGuiDebugBackend::Render(const UIRenderContext& context)
 	{
-		if (!m_FrameStarted) return;
+		if (!m_FrameStarted)
+			return;
 
 		ImGui::Render();
 		ImDrawData* drawData = ImGui::GetDrawData();
@@ -395,7 +398,8 @@ namespace DX12Engine
 
 	void ImGuiDebugBackend::EndFrame()
 	{
-		if (!m_FrameStarted) return;
+		if (!m_FrameStarted)
+			return;
 
 		m_FrameStarted = false;
 		m_FrameContext->DebugSnapshot.ApplyRendererOptions(&m_LocalRendererOptions);
@@ -446,15 +450,15 @@ namespace DX12Engine
 
 	bool ImGuiDebugBackend::ProcessEngineInput(UINT msg, WPARAM wParam, LPARAM lParam)
 	{
-		InputController::IsNewKeyPress(msg, wParam, lParam, [this](WPARAM key) {
+		InputController::IsNewKeyPress(msg, wParam, lParam, [this](WPARAM key)
+									   {
 			switch (key)
 			{
 			case VK_F1:
 				m_Visible = !m_Visible;
 				std::cout << "Toggled debug panel visibility: " << (m_Visible ? "Visible" : "Hidden") << std::endl;
 				return true;
-			}
-		});
+			} });
 		return false;
 	}
 }

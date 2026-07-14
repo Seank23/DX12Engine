@@ -10,10 +10,10 @@ namespace DX12Engine
 		ConstantBuffer(ID3D12Resource* resource, D3D12_RESOURCE_STATES usageState, UINT bufferSize);
 		~ConstantBuffer() override;
 
-		void Update(void* data, UINT size);	
+		void Update(void* data, UINT size);
 
 	private:
 		void* m_MappedBuffer;
 		UINT m_BufferSize;
 	};
-}	
+}

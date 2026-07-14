@@ -20,8 +20,7 @@ namespace DX12Engine
 
 	private:
 		void CreatePSO() override;
-		
+
 		UISystem* m_UISystem;
 	};
 }
-

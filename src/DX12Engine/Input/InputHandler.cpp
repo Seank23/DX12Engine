@@ -9,14 +9,14 @@ namespace DX12Engine
 		: m_UISystem(uiSystem)
 	{
 		m_CommandMap = {
-			{ InputCommand::MoveForward,  'W'},
-			{ InputCommand::MoveBackward, 'S'},
-			{ InputCommand::MoveLeft,     'A'},
-			{ InputCommand::MoveRight,    'D'},
-			{ InputCommand::MoveUp,       'E'},
-			{ InputCommand::MoveDown,     'Q'},
-			{ InputCommand::Pan,		 VK_RBUTTON },
-			{ InputCommand::Interact,	 VK_LBUTTON },
+			{ InputCommand::MoveForward, 'W' },
+			{ InputCommand::MoveBackward, 'S' },
+			{ InputCommand::MoveLeft, 'A' },
+			{ InputCommand::MoveRight, 'D' },
+			{ InputCommand::MoveUp, 'E' },
+			{ InputCommand::MoveDown, 'Q' },
+			{ InputCommand::Pan, VK_RBUTTON },
+			{ InputCommand::Interact, VK_LBUTTON },
 		};
 	}
 
@@ -26,7 +26,8 @@ namespace DX12Engine
 
 	void InputHandler::ProcessInput(float deltaTime)
 	{
-		if (m_UISystem->WantsKeyboardCapture()) return;
+		if (m_UISystem->WantsKeyboardCapture())
+			return;
 		for (const auto& [command, key] : m_CommandMap)
 		{
 			if (InputController::IsKeyPressed(key))
@@ -42,7 +43,8 @@ namespace DX12Engine
 	void InputHandler::HandleMouseMovement(HWND hwnd, LPARAM lParam)
 	{
 		const bool isPanning = InputController::IsKeyPressed(VK_RBUTTON);
-		if (m_UISystem->WantsMouseCapture() && !isPanning) return;
+		if (m_UISystem->WantsMouseCapture() && !isPanning)
+			return;
 
 		int mouseX = GET_X_LPARAM(lParam);
 		int mouseY = GET_Y_LPARAM(lParam);

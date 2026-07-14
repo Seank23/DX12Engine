@@ -62,11 +62,13 @@ namespace DX12Engine
 		// Linear-only penetration correction via pseudo-velocities
 		for (auto& contact : contacts)
 		{
-			if (contact.Contacts.empty()) continue;
+			if (contact.Contacts.empty())
+				continue;
 			PhysicsComponent* a = contact.A;
 			PhysicsComponent* b = contact.B;
 			float totalInvMass = a->m_InvMass + b->m_InvMass;
-			if (totalInvMass <= 0.0f) continue;
+			if (totalInvMass <= 0.0f)
+				continue;
 
 			float maxPen = 0.0f;
 			for (const auto& cp : contact.Contacts)
@@ -79,10 +81,10 @@ namespace DX12Engine
 				DirectX::XMVECTOR biasVel = DirectX::XMVectorScale(contact.Normal, biasSpeed);
 				if (a->m_InvMass > 0.0f)
 					a->m_PseudoVelocity = DirectX::XMVectorSubtract(a->m_PseudoVelocity,
-						DirectX::XMVectorScale(biasVel, a->m_InvMass / totalInvMass));
+																	DirectX::XMVectorScale(biasVel, a->m_InvMass / totalInvMass));
 				if (b->m_InvMass > 0.0f)
 					b->m_PseudoVelocity = DirectX::XMVectorAdd(b->m_PseudoVelocity,
-						DirectX::XMVectorScale(biasVel, b->m_InvMass / totalInvMass));
+															   DirectX::XMVectorScale(biasVel, b->m_InvMass / totalInvMass));
 			}
 		}
 
@@ -132,14 +134,15 @@ namespace DX12Engine
 		PhysicsComponent* a = contact.A;
 		PhysicsComponent* b = contact.B;
 
-		float restitution     = std::min(a->m_Restitution,    b->m_Restitution);
-		float staticFriction  = std::sqrt(a->m_StaticFriction  * b->m_StaticFriction);
+		float restitution = std::min(a->m_Restitution, b->m_Restitution);
+		float staticFriction = std::sqrt(a->m_StaticFriction * b->m_StaticFriction);
 		float kineticFriction = std::sqrt(a->m_KineticFriction * b->m_KineticFriction);
 
 		constexpr float kRestitutionSlop = 0.5f;
 
 		const int numContacts = static_cast<int>(contact.Contacts.size());
-		if (numContacts == 0) return;
+		if (numContacts == 0)
+			return;
 
 		DirectX::XMVECTOR tangent0, tangent1;
 		ComputeFrictionBasis(contact.Normal, tangent0, tangent1);
@@ -171,7 +174,8 @@ namespace DX12Engine
 				float angTermB = DirectX::XMVectorGetX(DirectX::XMVector3Dot(
 					DirectX::XMVector3Cross(DirectX::XMVector3Transform(rbCrossN, b->m_InverseInertiaTensor), rb), contact.Normal));
 				float effMassN = a->m_InvMass + b->m_InvMass + angTermA + angTermB;
-				if (effMassN <= 0.0f) continue;
+				if (effMassN <= 0.0f)
+					continue;
 
 				float e = (iter == 0 && !isContinuingContact && vn < -kRestitutionSlop) ? restitution : 0.0f;
 
@@ -187,13 +191,13 @@ namespace DX12Engine
 					{
 						a->m_Velocity = DirectX::XMVectorSubtract(a->m_Velocity, DirectX::XMVectorScale(impulse, a->m_InvMass));
 						a->m_AngularVelocity = DirectX::XMVectorSubtract(a->m_AngularVelocity,
-							DirectX::XMVector3Transform(DirectX::XMVectorScale(raCrossN, jn), a->m_InverseInertiaTensor));
+																		 DirectX::XMVector3Transform(DirectX::XMVectorScale(raCrossN, jn), a->m_InverseInertiaTensor));
 					}
 					if (b->m_InvMass > 0.0f)
 					{
 						b->m_Velocity = DirectX::XMVectorAdd(b->m_Velocity, DirectX::XMVectorScale(impulse, b->m_InvMass));
 						b->m_AngularVelocity = DirectX::XMVectorAdd(b->m_AngularVelocity,
-							DirectX::XMVector3Transform(DirectX::XMVectorScale(rbCrossN, jn), b->m_InverseInertiaTensor));
+																	DirectX::XMVector3Transform(DirectX::XMVectorScale(rbCrossN, jn), b->m_InverseInertiaTensor));
 					}
 				}
 
@@ -227,13 +231,13 @@ namespace DX12Engine
 							{
 								a->m_Velocity = DirectX::XMVectorSubtract(a->m_Velocity, DirectX::XMVectorScale(imp, a->m_InvMass));
 								a->m_AngularVelocity = DirectX::XMVectorSubtract(a->m_AngularVelocity,
-									DirectX::XMVector3Transform(DirectX::XMVectorScale(raCrossT, lambda), a->m_InverseInertiaTensor));
+																				 DirectX::XMVector3Transform(DirectX::XMVectorScale(raCrossT, lambda), a->m_InverseInertiaTensor));
 							}
 							if (b->m_InvMass > 0.0f)
 							{
 								b->m_Velocity = DirectX::XMVectorAdd(b->m_Velocity, DirectX::XMVectorScale(imp, b->m_InvMass));
 								b->m_AngularVelocity = DirectX::XMVectorAdd(b->m_AngularVelocity,
-									DirectX::XMVector3Transform(DirectX::XMVectorScale(rbCrossT, lambda), b->m_InverseInertiaTensor));
+																			DirectX::XMVector3Transform(DirectX::XMVectorScale(rbCrossT, lambda), b->m_InverseInertiaTensor));
 							}
 						}
 					}
@@ -262,13 +266,13 @@ namespace DX12Engine
 							{
 								a->m_Velocity = DirectX::XMVectorSubtract(a->m_Velocity, DirectX::XMVectorScale(imp, a->m_InvMass));
 								a->m_AngularVelocity = DirectX::XMVectorSubtract(a->m_AngularVelocity,
-									DirectX::XMVector3Transform(DirectX::XMVectorScale(raCrossT, lambda), a->m_InverseInertiaTensor));
+																				 DirectX::XMVector3Transform(DirectX::XMVectorScale(raCrossT, lambda), a->m_InverseInertiaTensor));
 							}
 							if (b->m_InvMass > 0.0f)
 							{
 								b->m_Velocity = DirectX::XMVectorAdd(b->m_Velocity, DirectX::XMVectorScale(imp, b->m_InvMass));
 								b->m_AngularVelocity = DirectX::XMVectorAdd(b->m_AngularVelocity,
-									DirectX::XMVector3Transform(DirectX::XMVectorScale(rbCrossT, lambda), b->m_InverseInertiaTensor));
+																			DirectX::XMVector3Transform(DirectX::XMVectorScale(rbCrossT, lambda), b->m_InverseInertiaTensor));
 							}
 						}
 					}
@@ -282,24 +286,25 @@ namespace DX12Engine
 	void PhysicsEngine::ComputeFrictionBasis(DirectX::XMVECTOR normal, DirectX::XMVECTOR& outTangent0, DirectX::XMVECTOR& outTangent1)
 	{
 		DirectX::XMVECTOR ref = (std::abs(DirectX::XMVectorGetY(normal)) < 0.9f)
-			? DirectX::XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f)
-			: DirectX::XMVectorSet(1.0f, 0.0f, 0.0f, 0.0f);
+									? DirectX::XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f)
+									: DirectX::XMVectorSet(1.0f, 0.0f, 0.0f, 0.0f);
 		outTangent0 = DirectX::XMVector3Normalize(DirectX::XMVector3Cross(normal, ref));
 		outTangent1 = DirectX::XMVector3Cross(normal, outTangent0);
 	}
 
 	BodyPairKey PhysicsEngine::MakeKey(PhysicsComponent* a, PhysicsComponent* b)
 	{
-		if (a < b) return { a, b };
+		if (a < b)
+			return { a, b };
 		return { b, a };
 	}
 
-	bool PhysicsEngine::WarmStart(ContactManifold& contact, std::vector<float>& accJn, std::vector<float>& accJt0,
-		std::vector<float>& accJt1, DirectX::XMVECTOR tangent0, DirectX::XMVECTOR tangent1)
+	bool PhysicsEngine::WarmStart(ContactManifold& contact, std::vector<float>& accJn, std::vector<float>& accJt0, std::vector<float>& accJt1, DirectX::XMVECTOR tangent0, DirectX::XMVECTOR tangent1)
 	{
 		BodyPairKey key = MakeKey(contact.A, contact.B);
 		auto it = m_ContactCache.find(key);
-		if (it == m_ContactCache.end()) return false;
+		if (it == m_ContactCache.end())
+			return false;
 
 		CachedManifold& cached = it->second;
 		PhysicsComponent* a = contact.A;
@@ -315,18 +320,25 @@ namespace DX12Engine
 			{
 				float distSq = DirectX::XMVectorGetX(DirectX::XMVector3LengthSq(
 					DirectX::XMVectorSubtract(cp.Point, cached.Contacts[j].Point)));
-				if (distSq < bestDistSq) { bestDistSq = distSq; bestIdx = j; }
+				if (distSq < bestDistSq)
+				{
+					bestDistSq = distSq;
+					bestIdx = j;
+				}
 			}
-			if (bestIdx < 0) continue;
+			if (bestIdx < 0)
+				continue;
 
 			const CachedContact& cc = cached.Contacts[bestIdx];
 			DirectX::XMVECTOR oldTangentImpulse = DirectX::XMVectorAdd(
 				DirectX::XMVectorScale(cached.Tangent0, cc.AccJt0),
 				DirectX::XMVectorScale(cached.Tangent1, cc.AccJt1));
-			float warmJn  = cc.AccJn * WARM_START_FACTOR;
+			float warmJn = cc.AccJn * WARM_START_FACTOR;
 			float warmJt0 = DirectX::XMVectorGetX(DirectX::XMVector3Dot(oldTangentImpulse, tangent0)) * WARM_START_FACTOR;
 			float warmJt1 = DirectX::XMVectorGetX(DirectX::XMVector3Dot(oldTangentImpulse, tangent1)) * WARM_START_FACTOR;
-			accJn[ci] = warmJn; accJt0[ci] = warmJt0; accJt1[ci] = warmJt1;
+			accJn[ci] = warmJn;
+			accJt0[ci] = warmJt0;
+			accJt1[ci] = warmJt1;
 
 			DirectX::XMVECTOR ra = DirectX::XMVectorSubtract(cp.Point, a->GetPosition());
 			DirectX::XMVECTOR rb = DirectX::XMVectorSubtract(cp.Point, b->GetPosition());
@@ -358,9 +370,7 @@ namespace DX12Engine
 		return true;
 	}
 
-	void PhysicsEngine::StoreCache(const ContactManifold& contact, const std::vector<float>& accJn,
-		const std::vector<float>& accJt0, const std::vector<float>& accJt1,
-		DirectX::XMVECTOR tangent0, DirectX::XMVECTOR tangent1)
+	void PhysicsEngine::StoreCache(const ContactManifold& contact, const std::vector<float>& accJn, const std::vector<float>& accJt0, const std::vector<float>& accJt1, DirectX::XMVECTOR tangent0, DirectX::XMVECTOR tangent1)
 	{
 		BodyPairKey key = MakeKey(contact.A, contact.B);
 		CachedManifold cached;

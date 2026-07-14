@@ -9,7 +9,6 @@ namespace DX12Engine
 		GPUResource* GPUResource;
 		ID3D12Resource* UploadResource;
 		D3D12_RESOURCE_STATES UploadState;
-		D3D12_SUBRESOURCE_DATA  Data;
+		D3D12_SUBRESOURCE_DATA Data;
 	};
 }
-

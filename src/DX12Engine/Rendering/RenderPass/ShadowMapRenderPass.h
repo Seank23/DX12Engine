@@ -44,4 +44,3 @@ namespace DX12Engine
 		ShadowMapData m_ShadowMapData;
 	};
 }
-

@@ -6,7 +6,6 @@
 #include "../../UI/UISystem.h"
 #include "../../UI/UIContext.h"
 
-
 namespace DX12Engine
 {
 	DX12Engine::UIRenderPass::UIRenderPass(RenderContext& context)
@@ -23,7 +22,7 @@ namespace DX12Engine
 	{
 		RenderPass::Init();
 
-		DirectX::XMINT3 renderSize{m_RenderContext.GetRenderSize().x, m_RenderContext.GetRenderSize().y, 1};
+		DirectX::XMINT3 renderSize{ m_RenderContext.GetRenderSize().x, m_RenderContext.GetRenderSize().y, 1 };
 		DXGI_FORMAT targetFormat = DXGI_FORMAT_R16G16B16A16_FLOAT;
 		if (!m_InputResources.empty())
 		{
@@ -109,8 +108,7 @@ namespace DX12Engine
 		barriers.push_back(CD3DX12_RESOURCE_BARRIER::Transition(
 			renderTarget->GetResource(),
 			renderTarget->GetUsageState(),
-			D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE
-		));
+			D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE));
 		renderTarget->SetUsageState(D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
 		m_CommandList.ResourceBarrier(static_cast<UINT>(barriers.size()), barriers.data());
 

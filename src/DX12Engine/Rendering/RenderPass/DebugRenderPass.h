@@ -17,4 +17,3 @@ namespace DX12Engine
 		void CreatePSO() override;
 	};
 }
-

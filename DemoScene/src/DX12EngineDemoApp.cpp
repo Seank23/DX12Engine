@@ -239,7 +239,8 @@ namespace DX12EngineDemo
 		snapshot.ActiveAnimationCount = GetActiveAnimationCount();
 		snapshot.CameraPosition = m_Scene->GetCamera()->GetPosition();
 		snapshot.RendererOptions = &m_Renderer->GetOptions();
-		snapshot.ApplyRendererOptions = [this](DX12Engine::RendererOptions* options) { ApplyRendererOptions(options); };
+		snapshot.ApplyRendererOptions = [this](DX12Engine::RendererOptions* options)
+		{ ApplyRendererOptions(options); };
 		return snapshot;
 	}
 

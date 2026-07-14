@@ -28,4 +28,3 @@ namespace DX12Engine
 		std::unique_ptr<Texture> m_FallbackEnvMap;
 	};
 }
-

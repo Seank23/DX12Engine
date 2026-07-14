@@ -10,16 +10,16 @@ namespace DX12Engine
 {
 	PhysicsComponent::PhysicsComponent(GameObject* parent)
 		: Component(parent, ComponentType::Physics, true),
-		m_Velocity(DirectX::XMVectorZero()),
-		m_AngularVelocity(DirectX::XMVectorZero()),
-		m_PseudoVelocity(DirectX::XMVectorZero()),
-		m_Acceleration(DirectX::XMVectorZero()),
-		m_Torque(DirectX::XMVectorZero()),
-		m_InverseInertiaTensor(DirectX::XMMatrixIdentity()),
-		m_LocalInertiaTensor(DirectX::XMMatrixIdentity()),
-		m_Mass(1.0f),
-		m_InvMass(1.0f),
-		m_IsStatic(false)
+		  m_Velocity(DirectX::XMVectorZero()),
+		  m_AngularVelocity(DirectX::XMVectorZero()),
+		  m_PseudoVelocity(DirectX::XMVectorZero()),
+		  m_Acceleration(DirectX::XMVectorZero()),
+		  m_Torque(DirectX::XMVectorZero()),
+		  m_InverseInertiaTensor(DirectX::XMMatrixIdentity()),
+		  m_LocalInertiaTensor(DirectX::XMMatrixIdentity()),
+		  m_Mass(1.0f),
+		  m_InvMass(1.0f),
+		  m_IsStatic(false)
 	{
 		if (ColliderComponent* collider = parent->GetComponent<ColliderComponent>())
 			OnColliderChanged(collider);
@@ -60,8 +60,7 @@ namespace DX12Engine
 		{
 			m_Acceleration = DirectX::XMVectorAdd(
 				m_Acceleration,
-				DirectX::XMVectorSet(0.0f, -GRAVITY, 0.0f, 0.0f)
-			);
+				DirectX::XMVectorSet(0.0f, -GRAVITY, 0.0f, 0.0f));
 		}
 
 		EvaluateForces(ts);
@@ -159,11 +158,7 @@ namespace DX12Engine
 		if (isStatic)
 		{
 			m_InverseInertiaTensor = DirectX::XMMatrixSet(
-				0.0f, 0.0f, 0.0f, 0.0f,
-				0.0f, 0.0f, 0.0f, 0.0f,
-				0.0f, 0.0f, 0.0f, 0.0f,
-				0.0f, 0.0f, 0.0f, 0.0f
-			);
+				0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f);
 			m_InvMass = 0.0f;
 			m_Velocity = DirectX::XMVectorZero();
 			m_AngularVelocity = DirectX::XMVectorZero();
@@ -215,14 +210,16 @@ namespace DX12Engine
 					DirectX::XMVECTOR worldPoint = force.Point;
 					if (force.IsLocalSpace)
 						worldPoint = DirectX::XMVectorAdd(m_Parent->GetPosition(),
-							DirectX::XMVector3Rotate(force.Point, m_Parent->GetRotation()));
+														  DirectX::XMVector3Rotate(force.Point, m_Parent->GetRotation()));
 					DirectX::XMVECTOR leverArm = DirectX::XMVectorSubtract(worldPoint, m_Parent->GetPosition());
 					DirectX::XMVECTOR torque = DirectX::XMVector3Cross(leverArm, force.Magnitude);
 					m_Torque = DirectX::XMVectorAdd(m_Torque, torque);
 				}
 			}
 		}
-		m_Forces.erase(std::remove_if(m_Forces.begin(), m_Forces.end(), [](const Force& f) { return f.Duration <= 0.0f; }), m_Forces.end());
+		m_Forces.erase(std::remove_if(m_Forces.begin(), m_Forces.end(), [](const Force& f)
+									  { return f.Duration <= 0.0f; }),
+					   m_Forces.end());
 	}
 
 	void PhysicsComponent::RecomputeLocalInertiaTensor()
@@ -237,11 +234,7 @@ namespace DX12Engine
 		const float k = m_Mass / 12.0f;
 
 		m_LocalInertiaTensor = DirectX::XMMatrixSet(
-			k * (h * h + d * d), 0.0f, 0.0f, 0.0f,
-			0.0f, k * (w * w + d * d), 0.0f, 0.0f,
-			0.0f, 0.0f, k * (w * w + h * h), 0.0f,
-			0.0f, 0.0f, 0.0f, 1.0f
-		);
+			k * (h * h + d * d), 0.0f, 0.0f, 0.0f, 0.0f, k * (w * w + d * d), 0.0f, 0.0f, 0.0f, 0.0f, k * (w * w + h * h), 0.0f, 0.0f, 0.0f, 0.0f, 1.0f);
 	}
 
 	void PhysicsComponent::UpdateInertiaTensor()

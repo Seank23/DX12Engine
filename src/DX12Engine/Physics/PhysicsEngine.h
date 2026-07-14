@@ -34,14 +34,11 @@ namespace DX12Engine
 		void ComputeFrictionBasis(DirectX::XMVECTOR normal, DirectX::XMVECTOR& outTangent0, DirectX::XMVECTOR& outTangent1);
 
 		BodyPairKey MakeKey(PhysicsComponent* a, PhysicsComponent* b);
-		bool WarmStart(ContactManifold& contact, std::vector<float>& accJn, std::vector<float>& accJt0, std::vector<float>& accJt1,
-			DirectX::XMVECTOR tangent0, DirectX::XMVECTOR tangent1);
-		void StoreCache(const ContactManifold& contact, const std::vector<float>& accJn, const std::vector<float>& accJt0,
-			const std::vector<float>& accJt1, DirectX::XMVECTOR tangent0, DirectX::XMVECTOR tangent1);
+		bool WarmStart(ContactManifold& contact, std::vector<float>& accJn, std::vector<float>& accJt0, std::vector<float>& accJt1, DirectX::XMVECTOR tangent0, DirectX::XMVECTOR tangent1);
+		void StoreCache(const ContactManifold& contact, const std::vector<float>& accJn, const std::vector<float>& accJt0, const std::vector<float>& accJt1, DirectX::XMVECTOR tangent0, DirectX::XMVECTOR tangent1);
 
 		std::vector<PhysicsComponent*> m_Components;
 		std::unordered_map<BodyPairKey, CachedManifold, BodyPairHash> m_ContactCache;
 		float m_Accumulator = 0.0f;
 	};
 }
-

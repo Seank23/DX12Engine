@@ -126,7 +126,8 @@ namespace DX12Engine
 				errorText = "Shader compilation failed with no diagnostic text from DXC.";
 
 			std::ostringstream oss;
-			oss << "Shader compile failed for " << std::string(m_ShaderPath.begin(), m_ShaderPath.end()) << "\n" << errorText;
+			oss << "Shader compile failed for " << std::string(m_ShaderPath.begin(), m_ShaderPath.end()) << "\n"
+				<< errorText;
 			m_LastError = oss.str();
 			OutputDebugStringA(("[Shader] " + m_LastError + "\n").c_str());
 			return false;

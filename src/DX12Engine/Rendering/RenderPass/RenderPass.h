@@ -20,7 +20,8 @@ namespace DX12Engine
 	public:
 		RenderPass(RenderContext& context)
 			: m_RenderContext(context), m_QueueManager(context.GetQueueManager()), m_CommandList(*m_QueueManager.GetGraphicsQueue().GetCommandList()), m_Camera(nullptr)
-			{}
+		{
+		}
 		~RenderPass() = default;
 		virtual void Init();
 		virtual void Execute();

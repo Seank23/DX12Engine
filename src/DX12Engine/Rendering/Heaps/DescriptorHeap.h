@@ -3,39 +3,38 @@
 
 namespace DX12Engine
 {
-    struct DescriptorHeapStats
-    {
-        UINT persistentUsed;
-        UINT persistentCapacity;
-        UINT transientUsedThisFrame;
-        UINT transientPeakThisFrame;
-        UINT transientCapacityPerFrame;
-        UINT allocationFailures;
-    };
+	struct DescriptorHeapStats
+	{
+		UINT persistentUsed;
+		UINT persistentCapacity;
+		UINT transientUsedThisFrame;
+		UINT transientPeakThisFrame;
+		UINT transientCapacityPerFrame;
+		UINT allocationFailures;
+	};
 
 	class DescriptorHeap
 	{
 	public:
-        DescriptorHeap(ID3D12Device* device, D3D12_DESCRIPTOR_HEAP_TYPE heapType, UINT numDescriptors, bool isReferencedByShader);
-        virtual ~DescriptorHeap();
+		DescriptorHeap(ID3D12Device* device, D3D12_DESCRIPTOR_HEAP_TYPE heapType, UINT numDescriptors, bool isReferencedByShader);
+		virtual ~DescriptorHeap();
 
-        ID3D12DescriptorHeap* GetHeap() const { return m_DescriptorHeap; }
-        D3D12_DESCRIPTOR_HEAP_TYPE GetHeapType() const { return m_HeapType; }
-        D3D12_CPU_DESCRIPTOR_HANDLE GetHeapCPUStart() const { return m_DescriptorHeapCPUStart; }
-        D3D12_GPU_DESCRIPTOR_HANDLE GetHeapGPUStart() const { return m_DescriptorHeapGPUStart; }
-        UINT GetMaxDescriptors() const { return m_MaxDescriptors; }
-        UINT GetDescriptorSize() const { return m_DescriptorSize; }
+		ID3D12DescriptorHeap* GetHeap() const { return m_DescriptorHeap; }
+		D3D12_DESCRIPTOR_HEAP_TYPE GetHeapType() const { return m_HeapType; }
+		D3D12_CPU_DESCRIPTOR_HANDLE GetHeapCPUStart() const { return m_DescriptorHeapCPUStart; }
+		D3D12_GPU_DESCRIPTOR_HANDLE GetHeapGPUStart() const { return m_DescriptorHeapGPUStart; }
+		UINT GetMaxDescriptors() const { return m_MaxDescriptors; }
+		UINT GetDescriptorSize() const { return m_DescriptorSize; }
 
-        virtual DescriptorHeapStats GetStats() const = 0;
+		virtual DescriptorHeapStats GetStats() const = 0;
 
-    protected:
-        ID3D12DescriptorHeap* m_DescriptorHeap;
-        D3D12_DESCRIPTOR_HEAP_TYPE m_HeapType;
-        D3D12_CPU_DESCRIPTOR_HANDLE m_DescriptorHeapCPUStart;
-        D3D12_GPU_DESCRIPTOR_HANDLE m_DescriptorHeapGPUStart;
-        UINT m_MaxDescriptors;
-        UINT m_DescriptorSize;
-        bool m_IsReferencedByShader;
+	protected:
+		ID3D12DescriptorHeap* m_DescriptorHeap;
+		D3D12_DESCRIPTOR_HEAP_TYPE m_HeapType;
+		D3D12_CPU_DESCRIPTOR_HANDLE m_DescriptorHeapCPUStart;
+		D3D12_GPU_DESCRIPTOR_HANDLE m_DescriptorHeapGPUStart;
+		UINT m_MaxDescriptors;
+		UINT m_DescriptorSize;
+		bool m_IsReferencedByShader;
 	};
 }
-

@@ -5,7 +5,6 @@
 #include "../RootSignatureBuilder.h"
 #include "../../Utils/EngineUtils.h"
 
-
 namespace DX12Engine
 {
 	DX12Engine::DebugRenderPass::DebugRenderPass(RenderContext& context)
@@ -19,7 +18,7 @@ namespace DX12Engine
 
 	void DebugRenderPass::Init()
 	{
-		DirectX::XMINT3 renderSize{m_RenderContext.GetRenderSize().x, m_RenderContext.GetRenderSize().y, 1};
+		DirectX::XMINT3 renderSize{ m_RenderContext.GetRenderSize().x, m_RenderContext.GetRenderSize().y, 1 };
 		m_RenderTargets.emplace_back(ResourceManager::GetInstance().CreateRenderTargetTexture(RenderTextureConfig{ renderSize, DXGI_FORMAT_R8G8B8A8_UNORM }));
 
 		ResourceManager::GetInstance().UpdateSRVDescriptors(EngineUtils::VectorSharedPtrToPtrs(m_InputResources));
@@ -48,8 +47,7 @@ namespace DX12Engine
 		auto barrier = CD3DX12_RESOURCE_BARRIER::Transition(
 			renderTarget->GetResource(),
 			renderTarget->GetUsageState(),
-			D3D12_RESOURCE_STATE_RENDER_TARGET
-		);
+			D3D12_RESOURCE_STATE_RENDER_TARGET);
 		m_CommandList.ResourceBarrier(1, &barrier);
 		renderTarget->SetUsageState(D3D12_RESOURCE_STATE_RENDER_TARGET);
 
@@ -75,8 +73,7 @@ namespace DX12Engine
 		barrier = CD3DX12_RESOURCE_BARRIER::Transition(
 			renderTarget->GetResource(),
 			renderTarget->GetUsageState(),
-			D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE
-		);
+			D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
 		m_CommandList.ResourceBarrier(1, &barrier);
 		renderTarget->SetUsageState(D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
 

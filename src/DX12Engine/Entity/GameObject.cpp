@@ -4,9 +4,9 @@ namespace DX12Engine
 {
 	GameObject::GameObject()
 		: m_Position({ 0.0f, 0.0f, 0.0f }),
-		m_Scale({ 1.0f, 1.0f, 1.0f }),
-		m_Rotation(DirectX::XMQuaternionIdentity()),
-		m_ModelMatrix(DirectX::XMMatrixIdentity())
+		  m_Scale({ 1.0f, 1.0f, 1.0f }),
+		  m_Rotation(DirectX::XMQuaternionIdentity()),
+		  m_ModelMatrix(DirectX::XMMatrixIdentity())
 	{
 	}
 
@@ -43,7 +43,6 @@ namespace DX12Engine
 
 	void GameObject::Rotate(DirectX::XMFLOAT3 rotation)
 	{
-
 		DirectX::XMFLOAT3 toRadians({ DirectX::XMConvertToRadians(rotation.x), DirectX::XMConvertToRadians(rotation.y), DirectX::XMConvertToRadians(rotation.z) });
 		DirectX::XMVECTOR quaternion = DirectX::XMQuaternionRotationRollPitchYawFromVector(DirectX::XMLoadFloat3(&toRadians));
 		m_Rotation = DirectX::XMQuaternionMultiply(m_Rotation, quaternion);

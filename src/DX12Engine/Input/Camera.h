@@ -57,4 +57,3 @@ namespace DX12Engine
 		DirectX::BoundingFrustum m_Frustum;
 	};
 }
-

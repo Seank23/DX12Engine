@@ -58,4 +58,3 @@ namespace DX12Engine
 		std::unordered_map<int, bool> m_PreviousKeyStates;
 	};
 }
-

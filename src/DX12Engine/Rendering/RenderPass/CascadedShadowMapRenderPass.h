@@ -40,4 +40,3 @@ namespace DX12Engine
 		std::vector<DirectX::XMMATRIX> m_CascadeMatrices;
 	};
 }
-
