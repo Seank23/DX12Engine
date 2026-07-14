@@ -1,0 +1,34 @@
+# EditorConfig — https://editorconfig.org
+# House style for C++ projects (see CPP-STYLE-GUIDE.md).
+root = true
+
+# Defaults for every file: tabs (4 wide), CRLF, UTF-8, trim trailing whitespace.
+[*]
+charset = utf-8
+end_of_line = crlf
+insert_final_newline = false
+trim_trailing_whitespace = true
+indent_style = tab
+indent_size = 4
+tab_width = 4
+
+# C/C++ and HLSL sources — tabs (matches .clang-format).
+[*.{c,cc,cpp,cxx,h,hh,hpp,hxx,inl,ipp,hlsl,hlsli}]
+indent_style = tab
+indent_size = 4
+tab_width = 4
+
+# CMake — spaces.
+[{CMakeLists.txt,*.cmake}]
+indent_style = space
+indent_size = 4
+
+# Docs & data — spaces; don't trim trailing whitespace in Markdown (hard line breaks).
+[*.{md,markdown}]
+indent_style = space
+indent_size = 2
+trim_trailing_whitespace = false
+
+[*.{yml,yaml,json}]
+indent_style = space
+indent_size = 2

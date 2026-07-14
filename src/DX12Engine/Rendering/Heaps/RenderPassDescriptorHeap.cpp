@@ -6,10 +6,7 @@
 namespace DX12Engine
 {
 	RenderPassDescriptorHeap::RenderPassDescriptorHeap(ID3D12Device* device, D3D12_DESCRIPTOR_HEAP_TYPE heapType, UINT transientCapacityPerFrame)
-		: DescriptorHeap(device, heapType, transientCapacityPerFrame * FRAMES_IN_FLIGHT, true)
-		, m_TransientCapacityPerFrame(transientCapacityPerFrame)
-		, m_CurrentFrameIndex(0)
-		, m_AllocationFailures(0)
+		: DescriptorHeap(device, heapType, transientCapacityPerFrame * FRAMES_IN_FLIGHT, true), m_TransientCapacityPerFrame(transientCapacityPerFrame), m_CurrentFrameIndex(0), m_AllocationFailures(0)
 	{
 		for (UINT i = 0; i < FRAMES_IN_FLIGHT; i++)
 		{
@@ -71,4 +68,3 @@ namespace DX12Engine
 		return stats;
 	}
 }
-

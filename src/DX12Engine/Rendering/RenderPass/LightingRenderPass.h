@@ -27,4 +27,3 @@ namespace DX12Engine
 		std::unique_ptr<ConstantBuffer> m_FallbackCascadedShadowCB;
 	};
 }
-

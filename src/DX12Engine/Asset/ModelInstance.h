@@ -14,7 +14,7 @@ namespace DX12Engine
 	public:
 		ModelInstance();
 		explicit ModelInstance(std::shared_ptr<ModelAsset> modelAsset);
-		
+
 		void SetModelAsset(std::shared_ptr<ModelAsset> modelAsset);
 		std::shared_ptr<ModelAsset> GetModelAssetShared() const { return m_ModelAsset; }
 		ModelAsset* GetModelAsset() const { return m_ModelAsset.get(); }

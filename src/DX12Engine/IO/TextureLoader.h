@@ -25,5 +25,3 @@ namespace DX12Engine
 		}
 	};
 }
-
-

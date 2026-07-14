@@ -33,7 +33,8 @@ namespace DX12Engine
 	}
 
 	void AnimationComponent::OnTransformChanged(TransformType type)
-	{}
+	{
+	}
 
 	void AnimationComponent::PlayAnimation(const std::string& animationName, bool loop, bool reverse)
 	{
@@ -42,11 +43,8 @@ namespace DX12Engine
 
 		const AnimationClip& clip = m_ModelAsset->GetAnimation(animationName);
 
-		auto existingAnimation = std::find_if(m_ActiveAnimations.begin(), m_ActiveAnimations.end(),
-			[&clip](const ActiveAnimationState& activeAnimation)
-			{
-				return activeAnimation.Clip == &clip;
-			});
+		auto existingAnimation = std::find_if(m_ActiveAnimations.begin(), m_ActiveAnimations.end(), [&clip](const ActiveAnimationState& activeAnimation)
+											  { return activeAnimation.Clip == &clip; });
 
 		if (existingAnimation != m_ActiveAnimations.end())
 		{
@@ -110,8 +108,8 @@ namespace DX12Engine
 					++sampleIndex;
 
 				const std::size_t nextSampleIndex = sampleIndex + 1 < sampler.Times.size()
-					? sampleIndex + 1
-					: sampler.Times.size() - 1;
+														? sampleIndex + 1
+														: sampler.Times.size() - 1;
 				const bool useStepInterpolation = sampler.Interpolation == AnimationInterpolation::Step || sampleIndex == nextSampleIndex;
 
 				float blendFactor = 0.0f;
@@ -204,14 +202,13 @@ namespace DX12Engine
 					DirectX::XMLoadFloat3(&nodePose.Transform.Translation)));
 		}
 
-		m_ActiveAnimations.erase(std::remove_if(m_ActiveAnimations.begin(), m_ActiveAnimations.end(),
-			[](const ActiveAnimationState& activeAnimation)
-			{
+		m_ActiveAnimations.erase(std::remove_if(m_ActiveAnimations.begin(), m_ActiveAnimations.end(), [](const ActiveAnimationState& activeAnimation)
+												{
 				if (!activeAnimation.Clip || activeAnimation.Loop)
 					return false;
 
-				return activeAnimation.Time <= 0.0f || activeAnimation.Time >= activeAnimation.Clip->Duration;
-			}), m_ActiveAnimations.end());
+				return activeAnimation.Time <= 0.0f || activeAnimation.Time >= activeAnimation.Clip->Duration; }),
+								 m_ActiveAnimations.end());
 
 		m_ModelInstance->InvalidateNodeTransforms();
 	}

@@ -15,7 +15,7 @@ namespace DX12Engine
 		GameObject();
 		~GameObject() = default;
 
-		template<typename T, typename... Args>
+		template <typename T, typename... Args>
 		inline T* CreateComponent(Args&&... args)
 		{
 			static_assert(std::is_base_of<Component, T>::value, "T must derive from Component");
@@ -26,7 +26,7 @@ namespace DX12Engine
 			return createdComponent;
 		}
 
-		template<typename T>
+		template <typename T>
 		inline T* GetComponent()
 		{
 			static_assert(std::is_base_of<Component, T>::value, "T must derive from Component");
@@ -73,7 +73,7 @@ namespace DX12Engine
 
 	struct GameObjectContainer
 	{
-		template<typename T>
+		template <typename T>
 		std::vector<T*> GetAllComponents()
 		{
 			std::vector<T*> components;
@@ -129,4 +129,3 @@ namespace DX12Engine
 		std::unordered_map<std::string, std::shared_ptr<GameObject>> Objects;
 	};
 }
-

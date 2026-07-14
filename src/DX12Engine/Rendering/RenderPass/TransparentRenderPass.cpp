@@ -37,7 +37,7 @@ namespace DX12Engine
 		m_VertexShaderName = m_VertexShaderName.empty() ? "PBRTransparent_VS" : m_VertexShaderName;
 		m_PixelShaderName = m_PixelShaderName.empty() ? "PBRTransparent_PS" : m_PixelShaderName;
 
-		DirectX::XMINT3 renderSize{m_RenderContext.GetRenderSize().x, m_RenderContext.GetRenderSize().y, 1};
+		DirectX::XMINT3 renderSize{ m_RenderContext.GetRenderSize().x, m_RenderContext.GetRenderSize().y, 1 };
 		m_RenderTargets.emplace_back(ResourceManager::GetInstance().CreateRenderTargetTexture(RenderTextureConfig{ renderSize, DXGI_FORMAT_R16G16B16A16_FLOAT }));
 
 		m_Viewport = { 0.0f, 0.0f, (float)renderSize.x, (float)renderSize.y, 0.0f, 1.0f };
@@ -183,8 +183,7 @@ namespace DX12Engine
 		barriers.push_back(CD3DX12_RESOURCE_BARRIER::Transition(
 			renderTarget->GetResource(),
 			renderTarget->GetUsageState(),
-			D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE
-		));
+			D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE));
 		renderTarget->SetUsageState(D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
 		m_CommandList.ResourceBarrier(static_cast<UINT>(barriers.size()), barriers.data());
 
@@ -231,18 +230,18 @@ namespace DX12Engine
 		tables.emplace_back(1, D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 8);
 
 		pipelineStateBuilder = pipelineStateBuilder
-			.ConfigureFromDefault(ResourceManager::GetInstance().GetShader(m_VertexShaderName), ResourceManager::GetInstance().GetShader(m_PixelShaderName))
-			.SetBlendState(blendDesc)
-			.SetDepthStencilState(depthDesc)
-			.SetRenderTargets({ DXGI_FORMAT_R16G16B16A16_FLOAT });
+								   .ConfigureFromDefault(ResourceManager::GetInstance().GetShader(m_VertexShaderName), ResourceManager::GetInstance().GetShader(m_PixelShaderName))
+								   .SetBlendState(blendDesc)
+								   .SetDepthStencilState(depthDesc)
+								   .SetRenderTargets({ DXGI_FORMAT_R16G16B16A16_FLOAT });
 
 		rootSignatureBuilder = rootSignatureBuilder
-			.AddConstantBuffer(0)
-			.AddConstantBuffer(1)
-			.AddConstantBuffer(2)
-			.AddDescriptorTables(tables)
-			.AddSampler(0, D3D12_FILTER_ANISOTROPIC)
-			.AddSampler(1, D3D12_FILTER_ANISOTROPIC);
+								   .AddConstantBuffer(0)
+								   .AddConstantBuffer(1)
+								   .AddConstantBuffer(2)
+								   .AddDescriptorTables(tables)
+								   .AddSampler(0, D3D12_FILTER_ANISOTROPIC)
+								   .AddSampler(1, D3D12_FILTER_ANISOTROPIC);
 
 		m_RootSignature = ResourceManager::GetInstance().CreateRootSignature(rootSignatureBuilder.Build());
 		pipelineStateBuilder = pipelineStateBuilder.SetRootSignature(m_RootSignature.Get());

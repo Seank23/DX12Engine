@@ -29,7 +29,8 @@ namespace DX12Engine
 {
 	float ComputePrimitiveScreenMetric(const MeshPrimitive* primitive, DirectX::XMMATRIX modelMatrix, const Camera* camera)
 	{
-		if (!primitive || !camera) return 1.0f;
+		if (!primitive || !camera)
+			return 1.0f;
 
 		const MeshBounds& bounds = primitive->GetBounds();
 		const DirectX::XMFLOAT3 centerLocal = {
@@ -66,7 +67,8 @@ namespace DX12Engine
 
 	UINT SelectLodLevelWithHysteresis(UINT lodCount, float screenMetric, UINT currentLevel)
 	{
-		if (lodCount == 0) return 0;
+		if (lodCount == 0)
+			return 0;
 
 		constexpr std::array<float, 4> kEnterLowerThresholds = { 0.050f, 0.025f, 0.0125f, 0.0060f };
 		constexpr std::array<float, 4> kExitLowerThresholds = { 0.060f, 0.030f, 0.0150f, 0.0075f };
@@ -137,19 +139,19 @@ namespace DX12Engine
 		RootSignatureBuilder rootSignatureBuilder;
 
 		pipelineStateBuilder = pipelineStateBuilder.SetBlendState(CD3DX12_BLEND_DESC(D3D12_DEFAULT))
-			.SetRasterizerState(CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT))
-			.SetPrimitiveTopologyType(D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE)
-			.SetRenderTargets({ DXGI_FORMAT_R8G8B8A8_UNORM })
-			.SetSampleDesc(UINT_MAX, 1, 0)
-			.SetVertexShader(ResourceManager::GetInstance().GetShader("RenderTriangle_VS"))
-			.SetPixelShader(ResourceManager::GetInstance().GetShader("FinalRender_PS"));
+								   .SetRasterizerState(CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT))
+								   .SetPrimitiveTopologyType(D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE)
+								   .SetRenderTargets({ DXGI_FORMAT_R8G8B8A8_UNORM })
+								   .SetSampleDesc(UINT_MAX, 1, 0)
+								   .SetVertexShader(ResourceManager::GetInstance().GetShader("RenderTriangle_VS"))
+								   .SetPixelShader(ResourceManager::GetInstance().GetShader("FinalRender_PS"));
 
 		DescriptorTableConfig descriptorTable(1, D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 0);
 		rootSignatureBuilder = rootSignatureBuilder
-			.AddConstantBuffer(0, 0, D3D12_SHADER_VISIBILITY_PIXEL)
-			.AddConstantBuffer(1, 0, D3D12_SHADER_VISIBILITY_PIXEL)
-			.AddDescriptorTables({descriptorTable})
-			.AddSampler(0, D3D12_FILTER_ANISOTROPIC);
+								   .AddConstantBuffer(0, 0, D3D12_SHADER_VISIBILITY_PIXEL)
+								   .AddConstantBuffer(1, 0, D3D12_SHADER_VISIBILITY_PIXEL)
+								   .AddDescriptorTables({ descriptorTable })
+								   .AddSampler(0, D3D12_FILTER_ANISOTROPIC);
 
 		m_RootSignature = ResourceManager::GetInstance().CreateRootSignature(rootSignatureBuilder.Build());
 		pipelineStateBuilder = pipelineStateBuilder.SetRootSignature(m_RootSignature.Get());
@@ -161,10 +163,7 @@ namespace DX12Engine
 #ifdef _DEBUG
 		DescriptorHeapStats stats = m_RenderContext->GetHeapManager().GetStats();
 		char buf[256];
-		_snprintf_s(buf, sizeof(buf), "[Renderer] Shutdown stats: persistent=%u/%u, transientPeak=%u/%u, failures=%u\n",
-			stats.persistentUsed, stats.persistentCapacity,
-			stats.transientPeakThisFrame, stats.transientCapacityPerFrame,
-			stats.allocationFailures);
+		_snprintf_s(buf, sizeof(buf), "[Renderer] Shutdown stats: persistent=%u/%u, transientPeak=%u/%u, failures=%u\n", stats.persistentUsed, stats.persistentCapacity, stats.transientPeakThisFrame, stats.transientCapacityPerFrame, stats.allocationFailures);
 		OutputDebugStringA(buf);
 #endif
 	}
@@ -208,9 +207,9 @@ namespace DX12Engine
 		if (m_RenderContext->IsPendingResize())
 			OnResize(pipeline);
 		m_RenderContext->GetHeapManager().BeginFrame(m_FrameIndex++);
-		#ifdef _DEBUG
+#ifdef _DEBUG
 		ResourceManager::GetInstance().ReloadChangedShaders();
-		#endif
+#endif
 		SetSceneData(pipeline, frameTime);
 		auto projectionOverride = m_Options.AA_Mode == AntiAliasingMode::TAA ? &m_JitteredProjection : nullptr;
 		m_RenderContext->UpdateScreenData(m_CurrentScene ? m_CurrentScene->GetCamera() : nullptr, m_Jitter, m_PrevJitter, projectionOverride);
@@ -241,8 +240,8 @@ namespace DX12Engine
 				{
 					for (InputResourceType inputType : OrderedInputTypes)
 					{
-						auto bindingIt = std::find_if(passConfig.ResourceBindings.begin(), passConfig.ResourceBindings.end(),
-							[inputType](const ResourceBinding& binding) { return binding.InputType == inputType; });
+						auto bindingIt = std::find_if(passConfig.ResourceBindings.begin(), passConfig.ResourceBindings.end(), [inputType](const ResourceBinding& binding)
+													  { return binding.InputType == inputType; });
 						if (bindingIt != passConfig.ResourceBindings.end())
 						{
 							auto producerIt = resourceProducers.find(bindingIt->Resource);
@@ -266,8 +265,7 @@ namespace DX12Engine
 								renderPass->AddInputResources({ std::shared_ptr<Texture>(texture, [](Texture*) {}) });
 							renderPass->AddResourceBlock(
 								InputResourceType::EnvironmentMap,
-								static_cast<UINT>(static_cast<std::vector<Texture*>*>(inputResource)->size())
-							);
+								static_cast<UINT>(static_cast<std::vector<Texture*>*>(inputResource)->size()));
 							break;
 						case InputResourceType::VertexShader:
 							renderPass->SetVertexShader(*static_cast<std::string*>(inputResource));
@@ -435,21 +433,22 @@ namespace DX12Engine
 					tmpl->ResolvePSO();
 
 				DrawItem item{};
-				item.Primitive    = binding.Primitive;
-				item.Material     = material;
-				item.Template     = tmpl;
-				item.CBVAddress   = binding.CBVAddress;
-				item.IndexCount   = binding.Primitive->GetActiveIndexCount();
-				item.FirstIndex   = binding.Primitive->GetActiveFirstIndex();
-				item.BaseVertex   = binding.Primitive->GetActiveBaseVertex();
+				item.Primitive = binding.Primitive;
+				item.Material = material;
+				item.Template = tmpl;
+				item.CBVAddress = binding.CBVAddress;
+				item.IndexCount = binding.Primitive->GetActiveIndexCount();
+				item.FirstIndex = binding.Primitive->GetActiveFirstIndex();
+				item.BaseVertex = binding.Primitive->GetActiveBaseVertex();
 				item.ActiveLODLevel = selectedLodLevel;
-				item.ModelMatrix  = modelMatrix;
-				item.PipelineKey  = tmpl ? tmpl->GetPipelineKey() : 0;
-				item.MaterialKey  = reinterpret_cast<uint64_t>(material);
-				item.MeshKey      = reinterpret_cast<uint64_t>(binding.Primitive);
-				item.BlendMode    = tmpl ? tmpl->GetBlendPolicy() : AlphaMode::Opaque;
+				item.ModelMatrix = modelMatrix;
+				item.PipelineKey = tmpl ? tmpl->GetPipelineKey() : 0;
+				item.MaterialKey = reinterpret_cast<uint64_t>(material);
+				item.MeshKey = reinterpret_cast<uint64_t>(binding.Primitive);
+				item.BlendMode = tmpl ? tmpl->GetBlendPolicy() : AlphaMode::Opaque;
 
-				if (item.IndexCount == 0) continue;
+				if (item.IndexCount == 0)
+					continue;
 
 				for (int i = 0; i < 5; i++)
 				{
@@ -478,7 +477,7 @@ namespace DX12Engine
 			}
 		}
 
-		for (auto it = m_BindingActiveLods.begin(); it != m_BindingActiveLods.end(); )
+		for (auto it = m_BindingActiveLods.begin(); it != m_BindingActiveLods.end();)
 		{
 			if (liveBindings.find(it->first) == liveBindings.end())
 				it = m_BindingActiveLods.erase(it);
@@ -491,37 +490,35 @@ namespace DX12Engine
 
 		// primary key: PSO variant, secondary: material, tertiary: mesh, quaternary: CBV (object).
 		std::sort(geometryPassDrawItems.begin(), geometryPassDrawItems.end(), [](const DrawItem& a, const DrawItem& b)
-		{
+				  {
 			if (a.PipelineKey != b.PipelineKey) return a.PipelineKey < b.PipelineKey;
 			if (a.MaterialKey != b.MaterialKey) return a.MaterialKey < b.MaterialKey;
 			if (a.MeshKey != b.MeshKey) return a.MeshKey < b.MeshKey;
-			return a.CBVAddress < b.CBVAddress;
-		});
+			return a.CBVAddress < b.CBVAddress; });
 
 		std::sort(shadowPassDrawItems.begin(), shadowPassDrawItems.end(), [](const DrawItem& a, const DrawItem& b)
-		{
+				  {
 			if (a.PipelineKey != b.PipelineKey) return a.PipelineKey < b.PipelineKey;
 			if (a.MaterialKey != b.MaterialKey) return a.MaterialKey < b.MaterialKey;
 			if (a.MeshKey != b.MeshKey) return a.MeshKey < b.MeshKey;
-			return a.CBVAddress < b.CBVAddress;
-		});
+			return a.CBVAddress < b.CBVAddress; });
 
 		auto cameraPos = sceneCamera->GetPosition();
 		std::sort(transparentPassDrawItems.begin(), transparentPassDrawItems.end(), [cameraPos](const DrawItem& a, const DrawItem& b)
-		{
-			DirectX::XMVECTOR camVec = DirectX::XMLoadFloat3(&cameraPos);
+				  {
+					  DirectX::XMVECTOR camVec = DirectX::XMLoadFloat3(&cameraPos);
 
-			DirectX::XMVECTOR posA = a.ModelMatrix.r[3];
-			DirectX::XMVECTOR posB = b.ModelMatrix.r[3];
+					  DirectX::XMVECTOR posA = a.ModelMatrix.r[3];
+					  DirectX::XMVECTOR posB = b.ModelMatrix.r[3];
 
-			DirectX::XMVECTOR diffA = DirectX::XMVectorSubtract(posA, camVec);
-			DirectX::XMVECTOR diffB = DirectX::XMVectorSubtract(posB, camVec);
+					  DirectX::XMVECTOR diffA = DirectX::XMVectorSubtract(posA, camVec);
+					  DirectX::XMVECTOR diffB = DirectX::XMVectorSubtract(posB, camVec);
 
-			float distSqA = DirectX::XMVectorGetX(DirectX::XMVector3Dot(diffA, diffA));
-			float distSqB = DirectX::XMVectorGetX(DirectX::XMVector3Dot(diffB, diffB));
+					  float distSqA = DirectX::XMVectorGetX(DirectX::XMVector3Dot(diffA, diffA));
+					  float distSqB = DirectX::XMVectorGetX(DirectX::XMVector3Dot(diffB, diffB));
 
-			return distSqA > distSqB; // back-to-front
-		});
+					  return distSqA > distSqB; // back-to-front
+				  });
 
 		m_DrawnPrimitiveCount = static_cast<uint32_t>(geometryPassDrawItems.size() + transparentPassDrawItems.size());
 
@@ -529,7 +526,7 @@ namespace DX12Engine
 		{
 			renderPass->SetRenderObjects(renderComponents);
 			renderPass->SetCamera(sceneCamera);
-		switch (renderPass->GetType())
+			switch (renderPass->GetType())
 			{
 			case RenderPassType::Geometry:
 				static_cast<GeometryRenderPass*>(renderPass)->SetDrawItems(geometryPassDrawItems);
@@ -613,14 +610,7 @@ namespace DX12Engine
 		{
 			DescriptorHeapStats stats = m_RenderContext->GetHeapManager().GetStats();
 			char buf[256];
-			_snprintf_s(buf, sizeof(buf),
-				"[Renderer] Frame %u: persistent=%u/%u (%.0f%%), transient=%u/%u (%.0f%%), failures=%u\n",
-				m_FrameIndex,
-				stats.persistentUsed, stats.persistentCapacity,
-				100.0f * stats.persistentUsed / (stats.persistentCapacity ? stats.persistentCapacity : 1),
-				stats.transientUsedThisFrame, stats.transientCapacityPerFrame,
-				100.0f * stats.transientUsedThisFrame / (stats.transientCapacityPerFrame ? stats.transientCapacityPerFrame : 1),
-				stats.allocationFailures);
+			_snprintf_s(buf, sizeof(buf), "[Renderer] Frame %u: persistent=%u/%u (%.0f%%), transient=%u/%u (%.0f%%), failures=%u\n", m_FrameIndex, stats.persistentUsed, stats.persistentCapacity, 100.0f * stats.persistentUsed / (stats.persistentCapacity ? stats.persistentCapacity : 1), stats.transientUsedThisFrame, stats.transientCapacityPerFrame, 100.0f * stats.transientUsedThisFrame / (stats.transientCapacityPerFrame ? stats.transientCapacityPerFrame : 1), stats.allocationFailures);
 			OutputDebugStringA(buf);
 			if (stats.persistentUsed > static_cast<UINT>(stats.persistentCapacity * HEAP_WARN_THRESHOLD_HIGH))
 				OutputDebugStringA("[Renderer] WARNING: Persistent SRV heap above 95% capacity!\n");

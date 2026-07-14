@@ -133,7 +133,8 @@ namespace DX12Engine
 
 	bool UISystem::IsInitialized() const
 	{
-		if (!this) return false;
+		if (!this)
+			return false;
 		return m_Initialized;
 	}
 

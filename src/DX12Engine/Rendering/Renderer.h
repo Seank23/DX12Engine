@@ -93,4 +93,3 @@ namespace DX12Engine
 		uint32_t m_DrawnPrimitiveCount = 0;
 	};
 }
-

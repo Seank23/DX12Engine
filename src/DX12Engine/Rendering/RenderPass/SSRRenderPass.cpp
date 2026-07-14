@@ -34,7 +34,7 @@ namespace DX12Engine
 		m_VertexShaderName = m_VertexShaderName.empty() ? "RenderTriangle_VS" : m_VertexShaderName;
 		m_PixelShaderName = m_PixelShaderName.empty() ? "SSRPass_PS" : m_PixelShaderName;
 
-		DirectX::XMINT3 renderSize{m_RenderContext.GetRenderSize().x, m_RenderContext.GetRenderSize().y, 1};
+		DirectX::XMINT3 renderSize{ m_RenderContext.GetRenderSize().x, m_RenderContext.GetRenderSize().y, 1 };
 
 		// Current-frame composite output
 		m_RenderTargets.emplace_back(ResourceManager::GetInstance().CreateRenderTargetTexture(RenderTextureConfig{ renderSize, DXGI_FORMAT_R16G16B16A16_FLOAT }));
@@ -145,14 +145,14 @@ namespace DX12Engine
 		DescriptorHeapHandle historyBlock = ResourceManager::GetInstance().UpdateSRVDescriptors(historyVec);
 
 		auto bindPassInputTables = [this, historyBlock]()
-			{
-				m_CommandList.SetGraphicsRootConstantBufferView(0, m_RenderContext.GetScreenDataBuffer().GetGPUAddress());
-				m_CommandList.SetGraphicsRootConstantBufferView(1, m_TemporalCB->GetGPUAddress());
-				m_CommandList.SetGraphicsRootDescriptorTable(2, m_InputResourceBlockHandles[InputResourceType::EnvironmentMap].GetGPUHandle());
-				m_CommandList.SetGraphicsRootDescriptorTable(3, m_InputResourceBlockHandles[InputResourceType::GBuffer].GetGPUHandle());
-				m_CommandList.SetGraphicsRootDescriptorTable(4, m_InputResourceBlockHandles[InputResourceType::SceneColor].GetGPUHandle());
-				m_CommandList.SetGraphicsRootDescriptorTable(5, historyBlock.GetGPUHandle());
-			};
+		{
+			m_CommandList.SetGraphicsRootConstantBufferView(0, m_RenderContext.GetScreenDataBuffer().GetGPUAddress());
+			m_CommandList.SetGraphicsRootConstantBufferView(1, m_TemporalCB->GetGPUAddress());
+			m_CommandList.SetGraphicsRootDescriptorTable(2, m_InputResourceBlockHandles[InputResourceType::EnvironmentMap].GetGPUHandle());
+			m_CommandList.SetGraphicsRootDescriptorTable(3, m_InputResourceBlockHandles[InputResourceType::GBuffer].GetGPUHandle());
+			m_CommandList.SetGraphicsRootDescriptorTable(4, m_InputResourceBlockHandles[InputResourceType::SceneColor].GetGPUHandle());
+			m_CommandList.SetGraphicsRootDescriptorTable(5, historyBlock.GetGPUHandle());
+		};
 		bindPassInputTables();
 
 		m_CommandList.IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
@@ -227,12 +227,12 @@ namespace DX12Engine
 		// Three render targets: composite output (SV_TARGET0), history write buffer (SV_TARGET1)
 		// and the single-channel reactive mask (SV_TARGET2).
 		pipelineStateBuilder = pipelineStateBuilder.SetBlendState(CD3DX12_BLEND_DESC(D3D12_DEFAULT))
-			.SetRasterizerState(CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT))
-			.SetPrimitiveTopologyType(D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE)
-			.SetRenderTargets({ DXGI_FORMAT_R16G16B16A16_FLOAT, DXGI_FORMAT_R16G16B16A16_FLOAT, DXGI_FORMAT_R8_UNORM })
-			.SetSampleDesc(UINT_MAX, 1, 0)
-			.SetVertexShader(ResourceManager::GetInstance().GetShader(m_VertexShaderName))
-			.SetPixelShader(ResourceManager::GetInstance().GetShader(m_PixelShaderName));
+								   .SetRasterizerState(CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT))
+								   .SetPrimitiveTopologyType(D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE)
+								   .SetRenderTargets({ DXGI_FORMAT_R16G16B16A16_FLOAT, DXGI_FORMAT_R16G16B16A16_FLOAT, DXGI_FORMAT_R8_UNORM })
+								   .SetSampleDesc(UINT_MAX, 1, 0)
+								   .SetVertexShader(ResourceManager::GetInstance().GetShader(m_VertexShaderName))
+								   .SetPixelShader(ResourceManager::GetInstance().GetShader(m_PixelShaderName));
 
 		// b0 = ScreenData, b1 = SSRTemporalData
 		// then descriptor tables for G-buffer resources, then one extra table for history read
@@ -240,10 +240,10 @@ namespace DX12Engine
 		std::vector<DescriptorTableConfig> allTableConfigs = m_DescriptorTableConfigs;
 		allTableConfigs.push_back({ 1, D3D12_DESCRIPTOR_RANGE_TYPE_SRV, (UINT)m_InputResources.size() });
 		rootSignatureBuilder = rootSignatureBuilder
-			.AddConstantBuffer(0)
-			.AddConstantBuffer(1)
-			.AddDescriptorTables(allTableConfigs)
-			.AddSampler(0, D3D12_FILTER_ANISOTROPIC);
+								   .AddConstantBuffer(0)
+								   .AddConstantBuffer(1)
+								   .AddDescriptorTables(allTableConfigs)
+								   .AddSampler(0, D3D12_FILTER_ANISOTROPIC);
 
 		m_RootSignature = ResourceManager::GetInstance().CreateRootSignature(rootSignatureBuilder.Build());
 		pipelineStateBuilder = pipelineStateBuilder.SetRootSignature(m_RootSignature.Get());

@@ -22,4 +22,3 @@ namespace DX12Engine
 		std::shared_ptr<RenderContext> m_RenderContext;
 	};
 }
-

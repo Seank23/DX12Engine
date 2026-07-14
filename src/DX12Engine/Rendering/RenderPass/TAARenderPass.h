@@ -18,7 +18,11 @@ namespace DX12Engine
 		void OnResize(DirectX::XMINT2 newRenderSize) override;
 		std::shared_ptr<RenderTexture> GetRenderTarget(ResourceSlot type) override;
 
-		void SetJitterStates(const DirectX::XMFLOAT2& jitter, const DirectX::XMFLOAT2& prevJitter) { m_Jitter = jitter; m_PrevJitter = prevJitter; }
+		void SetJitterStates(const DirectX::XMFLOAT2& jitter, const DirectX::XMFLOAT2& prevJitter)
+		{
+			m_Jitter = jitter;
+			m_PrevJitter = prevJitter;
+		}
 		void SetSettings(const TAASettings& settings) { m_Settings = settings; }
 		void InvalidateHistory() { m_ForceHistoryReset = true; }
 
@@ -45,4 +49,3 @@ namespace DX12Engine
 		bool m_UsingFallbackReactiveMask = false;
 	};
 }
-

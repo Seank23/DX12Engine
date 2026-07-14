@@ -42,7 +42,7 @@ namespace DX12Engine
 
 	void TAARenderPass::Init()
 	{
-		DirectX::XMINT3 renderSize{m_RenderContext.GetRenderSize().x, m_RenderContext.GetRenderSize().y, 1};
+		DirectX::XMINT3 renderSize{ m_RenderContext.GetRenderSize().x, m_RenderContext.GetRenderSize().y, 1 };
 
 		const bool hasReactiveMask = m_ResourceBlocks.find(InputResourceType::ReactiveMask) != m_ResourceBlocks.end();
 		if (!hasReactiveMask)
@@ -89,9 +89,7 @@ namespace DX12Engine
 		const ScreenData currentScreenData = m_RenderContext.GetScreenData();
 		const float viewDelta = MatrixMaxAbsDelta(currentScreenData.ViewMatrix, m_PrevFrameScreenData.ViewMatrix);
 		const float projDelta = MatrixMaxAbsDelta(currentScreenData.ProjectionMatrix, m_PrevFrameScreenData.ProjectionMatrix);
-		const float cameraPosDelta = std::fabs(currentScreenData.CameraPosition.x - m_PrevFrameScreenData.CameraPosition.x)
-			+ std::fabs(currentScreenData.CameraPosition.y - m_PrevFrameScreenData.CameraPosition.y)
-			+ std::fabs(currentScreenData.CameraPosition.z - m_PrevFrameScreenData.CameraPosition.z);
+		const float cameraPosDelta = std::fabs(currentScreenData.CameraPosition.x - m_PrevFrameScreenData.CameraPosition.x) + std::fabs(currentScreenData.CameraPosition.y - m_PrevFrameScreenData.CameraPosition.y) + std::fabs(currentScreenData.CameraPosition.z - m_PrevFrameScreenData.CameraPosition.z);
 		const bool screenSizeChanged =
 			std::fabs(currentScreenData.ScreenSize.x - m_PrevFrameScreenData.ScreenSize.x) > 0.5f ||
 			std::fabs(currentScreenData.ScreenSize.y - m_PrevFrameScreenData.ScreenSize.y) > 0.5f;
@@ -192,15 +190,15 @@ namespace DX12Engine
 		DescriptorHeapHandle historyBlock = ResourceManager::GetInstance().UpdateSRVDescriptors(historyVec);
 
 		auto bindPassInputTables = [this, historyBlock]()
-			{
-				m_CommandList.SetGraphicsRootConstantBufferView(0, m_RenderContext.GetScreenDataBuffer().GetGPUAddress());
-				m_CommandList.SetGraphicsRootConstantBufferView(1, m_TemporalCB->GetGPUAddress());
-				m_CommandList.SetGraphicsRootDescriptorTable(2, m_InputResourceBlockHandles[InputResourceType::SceneColor].GetGPUHandle());
-				m_CommandList.SetGraphicsRootDescriptorTable(3, m_InputResourceBlockHandles[InputResourceType::Depth].GetGPUHandle());
-				m_CommandList.SetGraphicsRootDescriptorTable(4, m_InputResourceBlockHandles[InputResourceType::GBuffer].GetGPUHandle());
-				m_CommandList.SetGraphicsRootDescriptorTable(5, m_InputResourceBlockHandles[InputResourceType::ReactiveMask].GetGPUHandle());
-				m_CommandList.SetGraphicsRootDescriptorTable(6, historyBlock.GetGPUHandle());
-			};
+		{
+			m_CommandList.SetGraphicsRootConstantBufferView(0, m_RenderContext.GetScreenDataBuffer().GetGPUAddress());
+			m_CommandList.SetGraphicsRootConstantBufferView(1, m_TemporalCB->GetGPUAddress());
+			m_CommandList.SetGraphicsRootDescriptorTable(2, m_InputResourceBlockHandles[InputResourceType::SceneColor].GetGPUHandle());
+			m_CommandList.SetGraphicsRootDescriptorTable(3, m_InputResourceBlockHandles[InputResourceType::Depth].GetGPUHandle());
+			m_CommandList.SetGraphicsRootDescriptorTable(4, m_InputResourceBlockHandles[InputResourceType::GBuffer].GetGPUHandle());
+			m_CommandList.SetGraphicsRootDescriptorTable(5, m_InputResourceBlockHandles[InputResourceType::ReactiveMask].GetGPUHandle());
+			m_CommandList.SetGraphicsRootDescriptorTable(6, historyBlock.GetGPUHandle());
+		};
 		bindPassInputTables();
 
 		m_CommandList.IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
@@ -266,12 +264,12 @@ namespace DX12Engine
 		RootSignatureBuilder rootSignatureBuilder;
 
 		pipelineStateBuilder = pipelineStateBuilder.SetBlendState(CD3DX12_BLEND_DESC(D3D12_DEFAULT))
-			.SetRasterizerState(CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT))
-			.SetPrimitiveTopologyType(D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE)
-			.SetRenderTargets({ DXGI_FORMAT_R16G16B16A16_FLOAT, DXGI_FORMAT_R16G16B16A16_FLOAT })
-			.SetSampleDesc(UINT_MAX, 1, 0)
-			.SetVertexShader(ResourceManager::GetInstance().GetShader(m_VertexShaderName))
-			.SetPixelShader(ResourceManager::GetInstance().GetShader(m_PixelShaderName));
+								   .SetRasterizerState(CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT))
+								   .SetPrimitiveTopologyType(D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE)
+								   .SetRenderTargets({ DXGI_FORMAT_R16G16B16A16_FLOAT, DXGI_FORMAT_R16G16B16A16_FLOAT })
+								   .SetSampleDesc(UINT_MAX, 1, 0)
+								   .SetVertexShader(ResourceManager::GetInstance().GetShader(m_VertexShaderName))
+								   .SetPixelShader(ResourceManager::GetInstance().GetShader(m_PixelShaderName));
 
 		// b0 = ScreenData, b1 = TAATemporalData
 		// then descriptor tables for TAA inputs, then one extra table for history read
@@ -279,10 +277,10 @@ namespace DX12Engine
 		std::vector<DescriptorTableConfig> allTableConfigs = m_DescriptorTableConfigs;
 		allTableConfigs.push_back({ 1, D3D12_DESCRIPTOR_RANGE_TYPE_SRV, (UINT)m_InputResources.size() });
 		rootSignatureBuilder = rootSignatureBuilder
-			.AddConstantBuffer(0)
-			.AddConstantBuffer(1)
-			.AddDescriptorTables(allTableConfigs)
-			.AddSampler(0, D3D12_FILTER_ANISOTROPIC);
+								   .AddConstantBuffer(0)
+								   .AddConstantBuffer(1)
+								   .AddDescriptorTables(allTableConfigs)
+								   .AddSampler(0, D3D12_FILTER_ANISOTROPIC);
 
 		m_RootSignature = ResourceManager::GetInstance().CreateRootSignature(rootSignatureBuilder.Build());
 		pipelineStateBuilder = pipelineStateBuilder.SetRootSignature(m_RootSignature.Get());

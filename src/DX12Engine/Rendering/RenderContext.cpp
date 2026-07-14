@@ -43,14 +43,14 @@ namespace DX12Engine
 
 	void RenderContext::InitDevice(HWND hwnd)
 	{
-		#if defined(_DEBUG)
-			Microsoft::WRL::ComPtr<ID3D12Debug> debugController;
-			if (SUCCEEDED(D3D12GetDebugInterface(IID_PPV_ARGS(&debugController))))
-				debugController->EnableDebugLayer();
-		#endif
+#if defined(_DEBUG)
+		Microsoft::WRL::ComPtr<ID3D12Debug> debugController;
+		if (SUCCEEDED(D3D12GetDebugInterface(IID_PPV_ARGS(&debugController))))
+			debugController->EnableDebugLayer();
+#endif
 
 		HRESULT deviceResult = D3D12CreateDevice(nullptr, D3D_FEATURE_LEVEL_11_0, IID_PPV_ARGS(&m_Device));
-		if (FAILED(deviceResult)) 
+		if (FAILED(deviceResult))
 		{
 			MessageBox(hwnd, "Failed to create DirectX 12 device.", "Error", MB_OK);
 			exit(-1);
@@ -90,7 +90,6 @@ namespace DX12Engine
 			WaitForSingleObject(resizeFenceEvent, INFINITE);
 		}
 		CloseHandle(resizeFenceEvent);
-
 
 		m_WindowSize = m_PendingWindowSize;
 		m_RenderWindow->OnResize(m_WindowSize, m_Device.Get());

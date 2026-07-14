@@ -28,11 +28,11 @@ namespace DX12Engine
 {
 	class ResourceManager
 	{
-    public:
+	public:
 		static ResourceManager& GetInstance();
 		void Init(RenderContext& context);
 		static void Shutdown();
-		
+
 		ResourceManager(const ResourceManager&) = delete;
 		ResourceManager& operator=(const ResourceManager&) = delete;
 
@@ -87,4 +87,3 @@ namespace DX12Engine
 		uint64_t m_ShaderGeneration = 0; // Incremented each time a shader is reloaded so dependent PSOs can be invalidated
 	};
 }
-

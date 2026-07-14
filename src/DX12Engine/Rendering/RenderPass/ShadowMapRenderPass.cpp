@@ -50,8 +50,7 @@ namespace DX12Engine
 				auto barrierToWrite = CD3DX12_RESOURCE_BARRIER::Transition(
 					shadowMap->GetResource(),
 					shadowMap->GetUsageState(),
-					D3D12_RESOURCE_STATE_DEPTH_WRITE
-				);
+					D3D12_RESOURCE_STATE_DEPTH_WRITE);
 				m_CommandList.ResourceBarrier(1, &barrierToWrite);
 				shadowMap->SetUsageState(D3D12_RESOURCE_STATE_DEPTH_WRITE);
 
@@ -61,8 +60,7 @@ namespace DX12Engine
 				auto barrierToRead = CD3DX12_RESOURCE_BARRIER::Transition(
 					shadowMap->GetResource(),
 					D3D12_RESOURCE_STATE_DEPTH_WRITE,
-					D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE
-				);
+					D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
 				m_CommandList.ResourceBarrier(1, &barrierToRead);
 				shadowMap->SetUsageState(D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
 				m_QueueManager.GetGraphicsQueue().ExecuteCommandList();
@@ -107,8 +105,7 @@ namespace DX12Engine
 		auto barrier = CD3DX12_RESOURCE_BARRIER::Transition(
 			shadowMap->GetResource(),
 			shadowMap->GetUsageState(),
-			D3D12_RESOURCE_STATE_DEPTH_WRITE
-		);
+			D3D12_RESOURCE_STATE_DEPTH_WRITE);
 		m_CommandList.ResourceBarrier(1, &barrier);
 		shadowMap->SetUsageState(D3D12_RESOURCE_STATE_DEPTH_WRITE);
 
@@ -133,7 +130,7 @@ namespace DX12Engine
 			{
 				item.Primitive->SetActiveLOD(item.ActiveLODLevel);
 				auto vertexBufferView = item.Primitive->GetVertexBufferView();
-				auto indexBufferView  = item.Primitive->GetActiveIndexBufferView();
+				auto indexBufferView = item.Primitive->GetActiveIndexBufferView();
 				m_CommandList.IASetVertexBuffers(0, 1, &vertexBufferView);
 				m_CommandList.IASetIndexBuffer(&indexBufferView);
 				lastPrimitive = item.Primitive;
@@ -152,8 +149,7 @@ namespace DX12Engine
 		barrier = CD3DX12_RESOURCE_BARRIER::Transition(
 			shadowMap->GetResource(),
 			shadowMap->GetUsageState(),
-			D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE
-		);
+			D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
 		m_CommandList.ResourceBarrier(1, &barrier);
 		shadowMap->SetUsageState(D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
 
@@ -167,12 +163,12 @@ namespace DX12Engine
 		DirectX::XMVECTOR lightPos = DirectX::XMLoadFloat3(&m_Lights[lightIndex]->GetLightData().Position);
 		DirectX::XMMATRIX lightProj = m_Lights[lightIndex]->GetLightData().ViewProjMatrix;
 		DirectX::XMMATRIX shadowTransforms[6] = {
-			DirectX::XMMatrixLookAtLH(lightPos, DirectX::XMVectorAdd(lightPos, DirectX::XMVectorSet(1.0f, 0.0f, 0.0f, 0.0f)), DirectX::XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f)), // +X
-			DirectX::XMMatrixLookAtLH(lightPos, DirectX::XMVectorAdd(lightPos, DirectX::XMVectorSet(-1.0f,0.0f, 0.0f, 0.0f)), DirectX::XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f)), // -X
+			DirectX::XMMatrixLookAtLH(lightPos, DirectX::XMVectorAdd(lightPos, DirectX::XMVectorSet(1.0f, 0.0f, 0.0f, 0.0f)), DirectX::XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f)),  // +X
+			DirectX::XMMatrixLookAtLH(lightPos, DirectX::XMVectorAdd(lightPos, DirectX::XMVectorSet(-1.0f, 0.0f, 0.0f, 0.0f)), DirectX::XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f)), // -X
 			DirectX::XMMatrixLookAtLH(lightPos, DirectX::XMVectorAdd(lightPos, DirectX::XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f)), DirectX::XMVectorSet(0.0f, 0.0f, -1.0f, 0.0f)), // +Y
-			DirectX::XMMatrixLookAtLH(lightPos, DirectX::XMVectorAdd(lightPos, DirectX::XMVectorSet(0.0f,-1.0f, 0.0f, 0.0f)), DirectX::XMVectorSet(0.0f, 0.0f, 1.0f, 0.0f)), // -Y
-			DirectX::XMMatrixLookAtLH(lightPos, DirectX::XMVectorAdd(lightPos, DirectX::XMVectorSet(0.0f, 0.0f, 1.0f, 0.0f)), DirectX::XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f)), // +Z
-			DirectX::XMMatrixLookAtLH(lightPos, DirectX::XMVectorAdd(lightPos, DirectX::XMVectorSet(0.0f, 0.0f,-1.0f, 0.0f)), DirectX::XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f))  // -Z
+			DirectX::XMMatrixLookAtLH(lightPos, DirectX::XMVectorAdd(lightPos, DirectX::XMVectorSet(0.0f, -1.0f, 0.0f, 0.0f)), DirectX::XMVectorSet(0.0f, 0.0f, 1.0f, 0.0f)), // -Y
+			DirectX::XMMatrixLookAtLH(lightPos, DirectX::XMVectorAdd(lightPos, DirectX::XMVectorSet(0.0f, 0.0f, 1.0f, 0.0f)), DirectX::XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f)),  // +Z
+			DirectX::XMMatrixLookAtLH(lightPos, DirectX::XMVectorAdd(lightPos, DirectX::XMVectorSet(0.0f, 0.0f, -1.0f, 0.0f)), DirectX::XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f))  // -Z
 		};
 		m_ShadowMapData.FarPlane = m_Lights[lightIndex]->GetFarPlane();
 		for (int j = 0; j < 6; j++)
@@ -192,8 +188,7 @@ namespace DX12Engine
 			auto barrier = CD3DX12_RESOURCE_BARRIER::Transition(
 				shadowMap->GetResource(),
 				D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE,
-				D3D12_RESOURCE_STATE_DEPTH_WRITE
-			);
+				D3D12_RESOURCE_STATE_DEPTH_WRITE);
 			m_CommandList.ResourceBarrier(1, &barrier);
 			shadowMap->SetUsageState(D3D12_RESOURCE_STATE_DEPTH_WRITE);
 
@@ -240,8 +235,7 @@ namespace DX12Engine
 			barrier = CD3DX12_RESOURCE_BARRIER::Transition(
 				shadowMap->GetResource(),
 				D3D12_RESOURCE_STATE_DEPTH_WRITE,
-				D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE
-			);
+				D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
 			m_CommandList.ResourceBarrier(1, &barrier);
 			shadowMap->SetUsageState(D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
 
@@ -261,15 +255,15 @@ namespace DX12Engine
 		rasterizerDesc.CullMode = D3D12_CULL_MODE_NONE;
 
 		pipelineStateBuilder = pipelineStateBuilder.ConfigureFromDefault()
-			.SetRasterizerState(rasterizerDesc)
-			.SetRenderTargets({ DXGI_FORMAT_R8G8B8A8_UNORM })
-			.SetDepthStencilFormat(DXGI_FORMAT_D32_FLOAT);
+								   .SetRasterizerState(rasterizerDesc)
+								   .SetRenderTargets({ DXGI_FORMAT_R8G8B8A8_UNORM })
+								   .SetDepthStencilFormat(DXGI_FORMAT_D32_FLOAT);
 
 		if (m_IsCubeMap)
 		{
 			pipelineStateBuilder = pipelineStateBuilder
-				.SetVertexShader(ResourceManager::GetInstance().GetShader("ShadowCubeMap_VS"))
-				.SetPixelShader(ResourceManager::GetInstance().GetShader("ShadowCubeMap_PS"));
+									   .SetVertexShader(ResourceManager::GetInstance().GetShader("ShadowCubeMap_VS"))
+									   .SetPixelShader(ResourceManager::GetInstance().GetShader("ShadowCubeMap_PS"));
 		}
 		else
 		{

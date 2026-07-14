@@ -38,7 +38,7 @@ namespace DX12Engine
 
 		DirectX::XMINT3 renderSize{ m_Settings.ShadowMapSize, m_Settings.ShadowMapSize, m_Settings.CascadeCount };
 		m_RenderTargets.emplace_back(ResourceManager::GetInstance().CreateDepthMap(
-			RenderTextureConfig{ renderSize, DXGI_FORMAT_R32_FLOAT, DXGI_FORMAT_D32_FLOAT, 1, {0.0f, 0.0f, 0.0f, 1.0f}, false, false }));
+			RenderTextureConfig{ renderSize, DXGI_FORMAT_R32_FLOAT, DXGI_FORMAT_D32_FLOAT, 1, { 0.0f, 0.0f, 0.0f, 1.0f }, false, false }));
 
 		m_CascadedShadowCB = ResourceManager::GetInstance().CreateConstantBuffer(sizeof(CascadedShadowData));
 
@@ -58,8 +58,7 @@ namespace DX12Engine
 				auto barrierToWrite = CD3DX12_RESOURCE_BARRIER::Transition(
 					shadowMap->GetResource(),
 					shadowMap->GetUsageState(),
-					D3D12_RESOURCE_STATE_DEPTH_WRITE
-				);
+					D3D12_RESOURCE_STATE_DEPTH_WRITE);
 				m_CommandList.ResourceBarrier(1, &barrierToWrite);
 				shadowMap->SetUsageState(D3D12_RESOURCE_STATE_DEPTH_WRITE);
 
@@ -69,8 +68,7 @@ namespace DX12Engine
 				auto barrierToRead = CD3DX12_RESOURCE_BARRIER::Transition(
 					shadowMap->GetResource(),
 					D3D12_RESOURCE_STATE_DEPTH_WRITE,
-					D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE
-				);
+					D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
 				m_CommandList.ResourceBarrier(1, &barrierToRead);
 				shadowMap->SetUsageState(D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
 				m_QueueManager.GetGraphicsQueue().ExecuteCommandList();
@@ -99,8 +97,7 @@ namespace DX12Engine
 			auto barrier = CD3DX12_RESOURCE_BARRIER::Transition(
 				shadowMap->GetResource(),
 				shadowMap->GetUsageState(),
-				D3D12_RESOURCE_STATE_DEPTH_WRITE
-			);
+				D3D12_RESOURCE_STATE_DEPTH_WRITE);
 			m_CommandList.ResourceBarrier(1, &barrier);
 			shadowMap->SetUsageState(D3D12_RESOURCE_STATE_DEPTH_WRITE);
 
@@ -144,8 +141,7 @@ namespace DX12Engine
 			barrier = CD3DX12_RESOURCE_BARRIER::Transition(
 				shadowMap->GetResource(),
 				shadowMap->GetUsageState(),
-				D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE
-			);
+				D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
 			m_CommandList.ResourceBarrier(1, &barrier);
 			shadowMap->SetUsageState(D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
 
@@ -213,16 +209,15 @@ namespace DX12Engine
 			const float farY = cascadeFar * tanHalfFovY;
 			const float farX = cascadeFar * tanHalfFovX;
 
-			const DirectX::XMVECTOR cornersVS[8] =
-			{
-				DirectX::XMVectorSet(-nearX,  nearY, cascadeNear, 1.0f),
-				DirectX::XMVectorSet( nearX,  nearY, cascadeNear, 1.0f),
-				DirectX::XMVectorSet( nearX, -nearY, cascadeNear, 1.0f),
+			const DirectX::XMVECTOR cornersVS[8] = {
+				DirectX::XMVectorSet(-nearX, nearY, cascadeNear, 1.0f),
+				DirectX::XMVectorSet(nearX, nearY, cascadeNear, 1.0f),
+				DirectX::XMVectorSet(nearX, -nearY, cascadeNear, 1.0f),
 				DirectX::XMVectorSet(-nearX, -nearY, cascadeNear, 1.0f),
-				DirectX::XMVectorSet(-farX,   farY,  cascadeFar,  1.0f),
-				DirectX::XMVectorSet( farX,   farY,  cascadeFar,  1.0f),
-				DirectX::XMVectorSet( farX,  -farY,  cascadeFar,  1.0f),
-				DirectX::XMVectorSet(-farX,  -farY,  cascadeFar,  1.0f)
+				DirectX::XMVectorSet(-farX, farY, cascadeFar, 1.0f),
+				DirectX::XMVectorSet(farX, farY, cascadeFar, 1.0f),
+				DirectX::XMVectorSet(farX, -farY, cascadeFar, 1.0f),
+				DirectX::XMVectorSet(-farX, -farY, cascadeFar, 1.0f)
 			};
 
 			DirectX::XMVECTOR cornersWS[8];
@@ -252,8 +247,7 @@ namespace DX12Engine
 				std::floor(DirectX::XMVectorGetX(centerLS) / worldUnitsPerTexel) * worldUnitsPerTexel,
 				std::floor(DirectX::XMVectorGetY(centerLS) / worldUnitsPerTexel) * worldUnitsPerTexel,
 				DirectX::XMVectorGetZ(centerLS),
-				1.0f
-			);
+				1.0f);
 			const DirectX::XMMATRIX lightViewInv = DirectX::XMMatrixInverse(nullptr, lightView);
 			centerWS = DirectX::XMVector3TransformCoord(centerLS, lightViewInv);
 			eye = DirectX::XMVectorSubtract(centerWS, DirectX::XMVectorScale(lightDir, radius * 2.5f));
@@ -314,10 +308,10 @@ namespace DX12Engine
 		rasterizerDesc.CullMode = D3D12_CULL_MODE_NONE;
 
 		pipelineStateBuilder = pipelineStateBuilder.ConfigureFromDefault()
-			.SetRasterizerState(rasterizerDesc)
-			.SetRenderTargets({ DXGI_FORMAT_R8G8B8A8_UNORM })
-			.SetDepthStencilFormat(DXGI_FORMAT_D32_FLOAT)
-			.SetVertexShader(ResourceManager::GetInstance().GetShader("ShadowMap_VS"));
+								   .SetRasterizerState(rasterizerDesc)
+								   .SetRenderTargets({ DXGI_FORMAT_R8G8B8A8_UNORM })
+								   .SetDepthStencilFormat(DXGI_FORMAT_D32_FLOAT)
+								   .SetVertexShader(ResourceManager::GetInstance().GetShader("ShadowMap_VS"));
 
 		CD3DX12_ROOT_PARAMETER param;
 		param.InitAsConstants(sizeof(ShadowMapData) / 4, 0, 0, D3D12_SHADER_VISIBILITY_ALL);

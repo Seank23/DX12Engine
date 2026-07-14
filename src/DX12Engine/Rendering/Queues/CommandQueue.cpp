@@ -31,7 +31,7 @@ namespace DX12Engine
 		EngineUtils::ThrowIfFailed(device->CreateCommandList(0, commandType, m_CommandAllocator.Get(), nullptr, IID_PPV_ARGS(&m_CommandList)));
 		m_CommandList->Close();
 		ResetCommandAllocatorAndList();
-		
+
 		EngineUtils::ThrowIfFailed(device->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&m_Fence)));
 		m_Fence->Signal(m_LastCompletedFenceValue);
 
@@ -152,7 +152,8 @@ namespace DX12Engine
 		const UINT64 fenceSignalValue = ++m_NextFenceValue;
 		EngineUtils::ThrowIfFailed(m_CommandQueue->Signal(m_Fence.Get(), fenceSignalValue));
 
-		if (m_Fence->GetCompletedValue() < fenceSignalValue) {
+		if (m_Fence->GetCompletedValue() < fenceSignalValue)
+		{
 			EngineUtils::ThrowIfFailed(m_Fence->SetEventOnCompletion(fenceSignalValue, m_FenceEvent));
 			WaitForSingleObject(m_FenceEvent, INFINITE);
 		}

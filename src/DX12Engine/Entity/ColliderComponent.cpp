@@ -140,8 +140,8 @@ namespace DX12Engine
 		const float sizeY = maxBounds.y - minBounds.y;
 		const float sizeZ = maxBounds.z - minBounds.z;
 		const CollisionMeshType targetType = (m_CollisionMeshType == CollisionMeshType::None)
-			? CollisionMeshType::Box
-			: m_CollisionMeshType;
+												 ? CollisionMeshType::Box
+												 : m_CollisionMeshType;
 
 		switch (targetType)
 		{
@@ -312,12 +312,7 @@ namespace DX12Engine
 		if (m_BoundingBox.Indices.empty())
 		{
 			m_BoundingBox.Indices = {
-				0, 1, 2, 0, 2, 3,
-				4, 5, 6, 4, 6, 7,
-				0, 1, 5, 0, 5, 4,
-				2, 3, 7, 2, 7, 6,
-				0, 3, 7, 0, 7, 4,
-				1, 2, 6, 1, 6, 5
+				0, 1, 2, 0, 2, 3, 4, 5, 6, 4, 6, 7, 0, 1, 5, 0, 5, 4, 2, 3, 7, 2, 7, 6, 0, 3, 7, 0, 7, 4, 1, 2, 6, 1, 6, 5
 			};
 		}
 	}

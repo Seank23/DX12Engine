@@ -64,16 +64,16 @@ namespace DX12Engine
 	};
 
 	static std::vector<InputResourceType> OrderedInputTypes = {
-			InputResourceType::EnvironmentMap,
-			InputResourceType::GBuffer,
-			InputResourceType::ShadowMap,
-			InputResourceType::CubeShadowMap,
-			InputResourceType::CascadedShadowMap,
-			InputResourceType::SceneColor,
-			InputResourceType::Depth,
-			InputResourceType::ReactiveMask,
-			InputResourceType::VertexShader,
-			InputResourceType::PixelShader,
+		InputResourceType::EnvironmentMap,
+		InputResourceType::GBuffer,
+		InputResourceType::ShadowMap,
+		InputResourceType::CubeShadowMap,
+		InputResourceType::CascadedShadowMap,
+		InputResourceType::SceneColor,
+		InputResourceType::Depth,
+		InputResourceType::ReactiveMask,
+		InputResourceType::VertexShader,
+		InputResourceType::PixelShader,
 	};
 
 	class GPUResource;

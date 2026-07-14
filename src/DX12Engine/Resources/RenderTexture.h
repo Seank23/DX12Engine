@@ -37,4 +37,3 @@ namespace DX12Engine
 		bool m_IsDepth;
 	};
 }
-

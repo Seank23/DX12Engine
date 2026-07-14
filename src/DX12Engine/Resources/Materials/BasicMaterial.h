@@ -25,4 +25,3 @@ namespace DX12Engine
 		std::shared_ptr<Texture> m_Texture;
 	};
 }
-

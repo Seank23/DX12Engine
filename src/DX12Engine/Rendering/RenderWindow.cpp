@@ -19,7 +19,8 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 	}
 	else
 	{
-		if (app != nullptr) app->HandleWindowEvent(hwnd, uMsg, wParam, lParam);
+		if (app != nullptr)
+			app->HandleWindowEvent(hwnd, uMsg, wParam, lParam);
 	}
 	return DefWindowProc(hwnd, uMsg, wParam, lParam);
 }
@@ -28,7 +29,7 @@ namespace DX12Engine
 {
 	RenderWindow::RenderWindow()
 		: m_WindowHandle(nullptr), m_WindowInstance(nullptr), m_SwapChain(nullptr), m_RTVHeap(nullptr),
-		m_FrameIndex(0), m_RTVDescriptorSize(0), m_WindowSize(DirectX::XMINT2(0, 0))
+		  m_FrameIndex(0), m_RTVDescriptorSize(0), m_WindowSize(DirectX::XMINT2(0, 0))
 	{
 	}
 
@@ -89,7 +90,7 @@ namespace DX12Engine
 		m_RTVDescriptorSize = device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
 
 		CD3DX12_CPU_DESCRIPTOR_HANDLE rtvHandle(m_RTVHeap->GetCPUDescriptorHandleForHeapStart());
-		for (UINT i = 0; i < 2; i++) 
+		for (UINT i = 0; i < 2; i++)
 		{
 			m_SwapChain->GetBuffer(i, IID_PPV_ARGS(&m_RenderTargets[i]));
 			device->CreateRenderTargetView(m_RenderTargets[i].Get(), nullptr, rtvHandle);
@@ -99,8 +100,7 @@ namespace DX12Engine
 	void RenderWindow::CreateDepthStencilBuffer()
 	{
 		m_DepthBuffer = ResourceManager::GetInstance().CreateDepthMap(
-			RenderTextureConfig{ DirectX::XMINT3(m_WindowSize.x, m_WindowSize.y, 1), DXGI_FORMAT_R24_UNORM_X8_TYPELESS, DXGI_FORMAT_D24_UNORM_S8_UINT }
-		);
+			RenderTextureConfig{ DirectX::XMINT3(m_WindowSize.x, m_WindowSize.y, 1), DXGI_FORMAT_R24_UNORM_X8_TYPELESS, DXGI_FORMAT_D24_UNORM_S8_UINT });
 	}
 
 	CD3DX12_RESOURCE_BARRIER RenderWindow::TransitionRenderTarget(bool forward)
@@ -110,16 +110,14 @@ namespace DX12Engine
 			return CD3DX12_RESOURCE_BARRIER::Transition(
 				m_RenderTargets[m_FrameIndex].Get(),
 				D3D12_RESOURCE_STATE_PRESENT,
-				D3D12_RESOURCE_STATE_RENDER_TARGET
-			);
+				D3D12_RESOURCE_STATE_RENDER_TARGET);
 		}
 		else
 		{
 			return CD3DX12_RESOURCE_BARRIER::Transition(
 				m_RenderTargets[m_FrameIndex].Get(),
 				D3D12_RESOURCE_STATE_RENDER_TARGET,
-				D3D12_RESOURCE_STATE_PRESENT
-			);
+				D3D12_RESOURCE_STATE_PRESENT);
 		}
 	}
 
@@ -129,15 +127,15 @@ namespace DX12Engine
 		m_FrameIndex = m_SwapChain->GetCurrentBackBufferIndex();
 	}
 
-	bool RenderWindow::ProcessWindowMessages() 
+	bool RenderWindow::ProcessWindowMessages()
 	{
 		MSG msg = {};
-		while (PeekMessage(&msg, nullptr, 0, 0, PM_REMOVE)) 
+		while (PeekMessage(&msg, nullptr, 0, 0, PM_REMOVE))
 		{
 			TranslateMessage(&msg);
 			DispatchMessage(&msg);
 
-			if (msg.message == WM_QUIT) 
+			if (msg.message == WM_QUIT)
 			{
 				return false;
 			}

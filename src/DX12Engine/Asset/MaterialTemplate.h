@@ -12,24 +12,24 @@ namespace DX12Engine
 	// Rasterizer policy: fields that differ between template variants (e.g. glass vs opaque).
 	struct RasterizerPolicy
 	{
-		D3D12_CULL_MODE CullMode  = D3D12_CULL_MODE_BACK;
-		D3D12_FILL_MODE FillMode  = D3D12_FILL_MODE_SOLID;
-		int             DepthBias = 0;
-		float           SlopeScaledDepthBias = 0.0f;
+		D3D12_CULL_MODE CullMode = D3D12_CULL_MODE_BACK;
+		D3D12_FILL_MODE FillMode = D3D12_FILL_MODE_SOLID;
+		int DepthBias = 0;
+		float SlopeScaledDepthBias = 0.0f;
 	};
 
 	// Blend policy: maps to a D3D12 blend desc and controls transparency behaviour.
 	enum class AlphaMode : uint8_t
 	{
-		Opaque  = 0,
-		Masked  = 1,
-		Blend   = 2,
+		Opaque = 0,
+		Masked = 1,
+		Blend = 2,
 	};
 
 	// Output targets that the template is compiled against (drives RT formats in the PSO).
 	enum class PassTarget : uint8_t
 	{
-		Geometry = 0, // deferred GBuffer pass (5 MRT + depth)
+		Geometry = 0,	 // deferred GBuffer pass (5 MRT + depth)
 		Transparent = 1, // forward transparent composite pass (single RT + depth test)
 	};
 
@@ -43,19 +43,39 @@ namespace DX12Engine
 		~MaterialTemplate() = default;
 
 		// ----- Shader refs (names into ResourceManager's shader map) -----
-		void SetVertexShader(std::string name) { m_VertexShaderName = std::move(name); InvalidateCache(); }
-		void SetPixelShader(std::string name)  { m_PixelShaderName  = std::move(name); InvalidateCache(); }
+		void SetVertexShader(std::string name)
+		{
+			m_VertexShaderName = std::move(name);
+			InvalidateCache();
+		}
+		void SetPixelShader(std::string name)
+		{
+			m_PixelShaderName = std::move(name);
+			InvalidateCache();
+		}
 		const std::string& GetVertexShaderName() const { return m_VertexShaderName; }
-		const std::string& GetPixelShaderName()  const { return m_PixelShaderName;  }
+		const std::string& GetPixelShaderName() const { return m_PixelShaderName; }
 
 		// ----- PSO policy -----
-		void SetRasterizerPolicy(RasterizerPolicy policy) { m_RasterizerPolicy = policy; InvalidateCache(); }
-		void SetBlendPolicy(AlphaMode policy)           { m_BlendPolicy      = policy; InvalidateCache(); }
-		void SetPassTarget(PassTarget target)             { m_PassTarget       = target; InvalidateCache(); }
+		void SetRasterizerPolicy(RasterizerPolicy policy)
+		{
+			m_RasterizerPolicy = policy;
+			InvalidateCache();
+		}
+		void SetBlendPolicy(AlphaMode policy)
+		{
+			m_BlendPolicy = policy;
+			InvalidateCache();
+		}
+		void SetPassTarget(PassTarget target)
+		{
+			m_PassTarget = target;
+			InvalidateCache();
+		}
 
 		const RasterizerPolicy& GetRasterizerPolicy() const { return m_RasterizerPolicy; }
-		AlphaMode               GetBlendPolicy()      const { return m_BlendPolicy;      }
-		PassTarget              GetPassTarget()       const { return m_PassTarget;       }
+		AlphaMode GetBlendPolicy() const { return m_BlendPolicy; }
+		PassTarget GetPassTarget() const { return m_PassTarget; }
 
 		// A stable integer key that uniquely identifies this template's PSO variant.
 		// Used directly as DrawItem::PipelineKey to drive front-to-back PSO sorting.
@@ -67,22 +87,22 @@ namespace DX12Engine
 
 		bool HasResolvedPSO() const { return m_PipelineState != nullptr; }
 
-		ID3D12PipelineState*   GetPipelineState()   const { return m_PipelineState.Get();   }
-		ID3D12RootSignature*   GetRootSignature()   const { return m_RootSignature.Get();   }
+		ID3D12PipelineState* GetPipelineState() const { return m_PipelineState.Get(); }
+		ID3D12RootSignature* GetRootSignature() const { return m_RootSignature.Get(); }
 
 	private:
 		void InvalidateCache();
 		void RebuildPipelineKey();
 
 		D3D12_GRAPHICS_PIPELINE_STATE_DESC BuildPSODesc();
-		D3D12_ROOT_SIGNATURE_DESC           BuildRootSignatureDesc();
+		D3D12_ROOT_SIGNATURE_DESC BuildRootSignatureDesc();
 
-		std::string       m_VertexShaderName = "Geometry_VS";
-		std::string       m_PixelShaderName  = "Geometry_PS";
-		RasterizerPolicy  m_RasterizerPolicy;
-		AlphaMode         m_BlendPolicy = AlphaMode::Opaque;
-		PassTarget        m_PassTarget  = PassTarget::Geometry;
-		uint64_t          m_PipelineKey = 0;
+		std::string m_VertexShaderName = "Geometry_VS";
+		std::string m_PixelShaderName = "Geometry_PS";
+		RasterizerPolicy m_RasterizerPolicy;
+		AlphaMode m_BlendPolicy = AlphaMode::Opaque;
+		PassTarget m_PassTarget = PassTarget::Geometry;
+		uint64_t m_PipelineKey = 0;
 
 		// Cached resolved objects (null until ResolvePSO() is called).
 		Microsoft::WRL::ComPtr<ID3D12PipelineState> m_PipelineState;
@@ -90,7 +110,7 @@ namespace DX12Engine
 
 		// Root-signature ranges and input-layout elements must outlive the descs used
 		// during creation; keep the builders as members so their storage is stable.
-		RootSignatureBuilder  m_RootSignatureBuilder;
-		PipelineStateBuilder  m_PipelineStateBuilder;
+		RootSignatureBuilder m_RootSignatureBuilder;
+		PipelineStateBuilder m_PipelineStateBuilder;
 	};
 }

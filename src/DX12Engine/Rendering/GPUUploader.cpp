@@ -50,7 +50,8 @@ namespace DX12Engine
 		{
 			UpdateSubresources(m_CopyCommandList, texture->GetResource(), texture->m_UploadResource, 0, 0, static_cast<UINT>(texture->m_Data.size()), texture->m_Data.data());
 			auto barrier = CD3DX12_RESOURCE_BARRIER::Transition(texture->m_MainResource,
-				D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+																D3D12_RESOURCE_STATE_COPY_DEST,
+																D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
 			m_GraphicsCommandList->ResourceBarrier(1, &barrier);
 
 			// Write the SRV into the persistent non-shader-visible staging slot so it
@@ -89,7 +90,8 @@ namespace DX12Engine
 
 		UpdateSubresources(m_CopyCommandList, resourceWrapper.GPUResource->GetResource(), resourceWrapper.UploadResource, 0, 0, 1, &resourceWrapper.Data);
 		auto barrier = CD3DX12_RESOURCE_BARRIER::Transition(resourceWrapper.GPUResource->GetResource(),
-			resourceWrapper.GPUResource->GetUsageState(), resourceWrapper.UploadState);
+															resourceWrapper.GPUResource->GetUsageState(),
+															resourceWrapper.UploadState);
 		m_GraphicsCommandList->ResourceBarrier(1, &barrier);
 		resourceWrapper.GPUResource->SetUsageState(resourceWrapper.UploadState);
 		resourceWrapper.GPUResource->SetIsReady(true);

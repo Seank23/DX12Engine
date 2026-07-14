@@ -27,4 +27,3 @@ namespace DX12Engine
 		UINT m_AllocationFailures;
 	};
 }
-

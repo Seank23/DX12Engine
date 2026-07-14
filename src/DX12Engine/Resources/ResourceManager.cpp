@@ -211,8 +211,7 @@ namespace DX12Engine
 			&constantBufferDesc,
 			D3D12_RESOURCE_STATE_GENERIC_READ,
 			nullptr,
-			IID_PPV_ARGS(&constantBufferResource)
-		));
+			IID_PPV_ARGS(&constantBufferResource)));
 
 		std::unique_ptr<ConstantBuffer> constantBuffer = std::make_unique<ConstantBuffer>(constantBufferResource, D3D12_RESOURCE_STATE_GENERIC_READ, alignedSize);
 		constantBuffer->SetIsReady(true);
@@ -248,8 +247,7 @@ namespace DX12Engine
 			&textureDesc,
 			D3D12_RESOURCE_STATE_COPY_DEST,
 			nullptr,
-			IID_PPV_ARGS(&textureResource)
-		));
+			IID_PPV_ARGS(&textureResource)));
 
 		D3D12_HEAP_PROPERTIES uploadHeapProperties;
 		uploadHeapProperties.Type = D3D12_HEAP_TYPE_UPLOAD;
@@ -270,8 +268,7 @@ namespace DX12Engine
 			&resourceDesc,
 			D3D12_RESOURCE_STATE_GENERIC_READ,
 			nullptr,
-			IID_PPV_ARGS(&textureUploadResource)
-		));
+			IID_PPV_ARGS(&textureUploadResource)));
 
 		D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
 		srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
@@ -292,7 +289,7 @@ namespace DX12Engine
 		textureDesc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
 		textureDesc.Width = static_cast<UINT>(metadata.width);
 		textureDesc.Height = static_cast<UINT>(metadata.height);
-		textureDesc.DepthOrArraySize = static_cast<UINT16>(metadata.arraySize);  // 6 for a cubemap
+		textureDesc.DepthOrArraySize = static_cast<UINT16>(metadata.arraySize); // 6 for a cubemap
 		textureDesc.MipLevels = static_cast<UINT16>(metadata.mipLevels);
 		textureDesc.Format = metadata.format;
 		textureDesc.SampleDesc.Count = 1;
@@ -313,8 +310,7 @@ namespace DX12Engine
 			&textureDesc,
 			D3D12_RESOURCE_STATE_COPY_DEST,
 			nullptr,
-			IID_PPV_ARGS(&textureResource)
-		));
+			IID_PPV_ARGS(&textureResource)));
 
 		D3D12_HEAP_PROPERTIES uploadHeapProperties;
 		uploadHeapProperties.Type = D3D12_HEAP_TYPE_UPLOAD;
@@ -332,8 +328,7 @@ namespace DX12Engine
 			&resourceDesc,
 			D3D12_RESOURCE_STATE_GENERIC_READ,
 			nullptr,
-			IID_PPV_ARGS(&textureUploadResource)
-		));
+			IID_PPV_ARGS(&textureUploadResource)));
 
 		std::vector<D3D12_SUBRESOURCE_DATA> cubemapData;
 		DirectX::PrepareUpload(m_Device.Get(), imageData->GetImages(), imageData->GetImageCount(), metadata, cubemapData);
@@ -477,9 +472,11 @@ namespace DX12Engine
 		D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
 		srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
 		srvDesc.Format = config.Format;
-		srvDesc.ViewDimension = config.IsCubeMap ? D3D12_SRV_DIMENSION_TEXTURECUBE : isSingleMap ? D3D12_SRV_DIMENSION_TEXTURE2D : D3D12_SRV_DIMENSION_TEXTURE2DARRAY;
+		srvDesc.ViewDimension = config.IsCubeMap ? D3D12_SRV_DIMENSION_TEXTURECUBE : isSingleMap ? D3D12_SRV_DIMENSION_TEXTURE2D
+																								 : D3D12_SRV_DIMENSION_TEXTURE2DARRAY;
 		srvDesc.Texture2D.MipLevels = 1;
-		if (!isSingleMap) srvDesc.Texture2DArray.ArraySize = arraySize;
+		if (!isSingleMap)
+			srvDesc.Texture2DArray.ArraySize = arraySize;
 
 		DescriptorHeapHandle srvHandle = m_HeapManager->AllocatePersistentSRV();
 		m_Device->CreateShaderResourceView(depthMapResource, &srvDesc, srvHandle.GetCPUHandle());
@@ -595,9 +592,9 @@ namespace DX12Engine
 
 	bool ResourceManager::ReloadChangedShaders()
 	{
-		#ifndef _DEBUG
+#ifndef _DEBUG
 		return false;
-		#else
+#else
 		for (auto& [name, shader] : m_Shaders)
 		{
 			if (shader->ReloadIfChanged())
@@ -608,6 +605,6 @@ namespace DX12Engine
 			}
 		}
 		return false;
-		#endif
+#endif
 	}
 }

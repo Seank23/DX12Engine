@@ -66,7 +66,7 @@ namespace DX12Engine
 			return alignmentCount * placement;
 		}
 
-		template<typename T>
+		template <typename T>
 		static std::vector<T*> VectorSharedPtrToPtrs(const std::vector<std::shared_ptr<T>>& vec)
 		{
 			std::vector<T*> result;

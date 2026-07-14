@@ -64,21 +64,21 @@ namespace DX12Engine
 		Shader* ps = ResourceManager::GetInstance().GetShader(m_PixelShaderName);
 
 		D3D12_RASTERIZER_DESC rastDesc = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
-		rastDesc.CullMode             = m_RasterizerPolicy.CullMode;
-		rastDesc.FillMode             = m_RasterizerPolicy.FillMode;
-		rastDesc.DepthBias            = m_RasterizerPolicy.DepthBias;
+		rastDesc.CullMode = m_RasterizerPolicy.CullMode;
+		rastDesc.FillMode = m_RasterizerPolicy.FillMode;
+		rastDesc.DepthBias = m_RasterizerPolicy.DepthBias;
 		rastDesc.SlopeScaledDepthBias = m_RasterizerPolicy.SlopeScaledDepthBias;
 
 		D3D12_BLEND_DESC blendDesc = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
 		if (m_BlendPolicy == AlphaMode::Blend)
 		{
-			blendDesc.RenderTarget[0].BlendEnable           = TRUE;
-			blendDesc.RenderTarget[0].SrcBlend              = D3D12_BLEND_SRC_ALPHA;
-			blendDesc.RenderTarget[0].DestBlend             = D3D12_BLEND_INV_SRC_ALPHA;
-			blendDesc.RenderTarget[0].BlendOp               = D3D12_BLEND_OP_ADD;
-			blendDesc.RenderTarget[0].SrcBlendAlpha         = D3D12_BLEND_ONE;
-			blendDesc.RenderTarget[0].DestBlendAlpha        = D3D12_BLEND_ZERO;
-			blendDesc.RenderTarget[0].BlendOpAlpha          = D3D12_BLEND_OP_ADD;
+			blendDesc.RenderTarget[0].BlendEnable = TRUE;
+			blendDesc.RenderTarget[0].SrcBlend = D3D12_BLEND_SRC_ALPHA;
+			blendDesc.RenderTarget[0].DestBlend = D3D12_BLEND_INV_SRC_ALPHA;
+			blendDesc.RenderTarget[0].BlendOp = D3D12_BLEND_OP_ADD;
+			blendDesc.RenderTarget[0].SrcBlendAlpha = D3D12_BLEND_ONE;
+			blendDesc.RenderTarget[0].DestBlendAlpha = D3D12_BLEND_ZERO;
+			blendDesc.RenderTarget[0].BlendOpAlpha = D3D12_BLEND_OP_ADD;
 			blendDesc.RenderTarget[0].RenderTargetWriteMask = D3D12_COLOR_WRITE_ENABLE_ALL;
 		}
 
@@ -102,15 +102,14 @@ namespace DX12Engine
 		}
 		else
 		{
-			m_PipelineStateBuilder.SetRenderTargets({
-				DXGI_FORMAT_R8G8B8A8_UNORM,
-				DXGI_FORMAT_R16G16B16A16_FLOAT,
-				DXGI_FORMAT_R16G16B16A16_FLOAT,
-				DXGI_FORMAT_R16G16B16A16_FLOAT,
-				DXGI_FORMAT_R16G16B16A16_FLOAT,
-				DXGI_FORMAT_R16G16B16A16_FLOAT,
-				DXGI_FORMAT_R16G16_FLOAT })
-			.SetDepthStencilFormat(DXGI_FORMAT_D32_FLOAT);
+			m_PipelineStateBuilder.SetRenderTargets({ DXGI_FORMAT_R8G8B8A8_UNORM,
+													  DXGI_FORMAT_R16G16B16A16_FLOAT,
+													  DXGI_FORMAT_R16G16B16A16_FLOAT,
+													  DXGI_FORMAT_R16G16B16A16_FLOAT,
+													  DXGI_FORMAT_R16G16B16A16_FLOAT,
+													  DXGI_FORMAT_R16G16B16A16_FLOAT,
+													  DXGI_FORMAT_R16G16_FLOAT })
+				.SetDepthStencilFormat(DXGI_FORMAT_D32_FLOAT);
 		}
 
 		return m_PipelineStateBuilder.Build();

@@ -30,9 +30,7 @@ namespace DX12Engine
 		std::string ToLower(std::string value)
 		{
 			std::transform(value.begin(), value.end(), value.begin(), [](unsigned char c)
-			{
-				return static_cast<char>(std::tolower(c));
-			});
+						   { return static_cast<char>(std::tolower(c)); });
 			return value;
 		}
 
@@ -210,15 +208,13 @@ namespace DX12Engine
 		if (m_RenderContext)
 			completedFence = static_cast<uint64_t>(m_RenderContext->GetQueueManager().GetGraphicsQueue().PollCurrentFenceValue());
 
-		auto releaseIt = std::remove_if(m_PendingUploadReleases.begin(), m_PendingUploadReleases.end(),
-			[completedFence](const PendingUploadRelease& pending)
-			{
+		auto releaseIt = std::remove_if(m_PendingUploadReleases.begin(), m_PendingUploadReleases.end(), [completedFence](const PendingUploadRelease& pending)
+										{
 				if (!pending.Resource)
 					return true;
 				if (pending.FenceValue == 0)
 					return true;
-				return pending.FenceValue <= completedFence;
-			});
+				return pending.FenceValue <= completedFence; });
 
 		m_PendingUploadReleases.erase(releaseIt, m_PendingUploadReleases.end());
 	}
@@ -496,12 +492,12 @@ namespace DX12Engine
 			auto uploadHeap = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD);
 			auto bufferDesc = CD3DX12_RESOURCE_DESC::Buffer(m_TransientVertexBufferSize);
 			if (FAILED(m_Device->CreateCommittedResource(
-				&uploadHeap,
-				D3D12_HEAP_FLAG_NONE,
-				&bufferDesc,
-				D3D12_RESOURCE_STATE_GENERIC_READ,
-				nullptr,
-				IID_PPV_ARGS(&m_TransientVertexBuffer))))
+					&uploadHeap,
+					D3D12_HEAP_FLAG_NONE,
+					&bufferDesc,
+					D3D12_RESOURCE_STATE_GENERIC_READ,
+					nullptr,
+					IID_PPV_ARGS(&m_TransientVertexBuffer))))
 			{
 				return false;
 			}
@@ -523,12 +519,12 @@ namespace DX12Engine
 			auto uploadHeap = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD);
 			auto bufferDesc = CD3DX12_RESOURCE_DESC::Buffer(m_TransientIndexBufferSize);
 			if (FAILED(m_Device->CreateCommittedResource(
-				&uploadHeap,
-				D3D12_HEAP_FLAG_NONE,
-				&bufferDesc,
-				D3D12_RESOURCE_STATE_GENERIC_READ,
-				nullptr,
-				IID_PPV_ARGS(&m_TransientIndexBuffer))))
+					&uploadHeap,
+					D3D12_HEAP_FLAG_NONE,
+					&bufferDesc,
+					D3D12_RESOURCE_STATE_GENERIC_READ,
+					nullptr,
+					IID_PPV_ARGS(&m_TransientIndexBuffer))))
 			{
 				return false;
 			}
@@ -716,12 +712,12 @@ namespace DX12Engine
 		auto heapDefault = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);
 		auto textureDesc = CD3DX12_RESOURCE_DESC::Tex2D(DXGI_FORMAT_R8G8B8A8_UNORM, static_cast<UINT>(dimensions.x), static_cast<UINT>(dimensions.y));
 		if (FAILED(m_Device->CreateCommittedResource(
-			&heapDefault,
-			D3D12_HEAP_FLAG_NONE,
-			&textureDesc,
-			D3D12_RESOURCE_STATE_COPY_DEST,
-			nullptr,
-			IID_PPV_ARGS(&outRecord.Resource))))
+				&heapDefault,
+				D3D12_HEAP_FLAG_NONE,
+				&textureDesc,
+				D3D12_RESOURCE_STATE_COPY_DEST,
+				nullptr,
+				IID_PPV_ARGS(&outRecord.Resource))))
 		{
 			return false;
 		}
@@ -730,12 +726,12 @@ namespace DX12Engine
 		auto heapUpload = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD);
 		auto uploadDesc = CD3DX12_RESOURCE_DESC::Buffer(uploadBufferSize);
 		if (FAILED(m_Device->CreateCommittedResource(
-			&heapUpload,
-			D3D12_HEAP_FLAG_NONE,
-			&uploadDesc,
-			D3D12_RESOURCE_STATE_GENERIC_READ,
-			nullptr,
-			IID_PPV_ARGS(&outRecord.UploadResource))))
+				&heapUpload,
+				D3D12_HEAP_FLAG_NONE,
+				&uploadDesc,
+				D3D12_RESOURCE_STATE_GENERIC_READ,
+				nullptr,
+				IID_PPV_ARGS(&outRecord.UploadResource))))
 		{
 			return false;
 		}
@@ -797,8 +793,8 @@ namespace DX12Engine
 		const std::wstring path = filePath.wstring();
 		const std::string ext = ToLower(filePath.extension().string());
 		HRESULT hr = (ext == ".dds")
-			? DirectX::LoadFromDDSFile(path.c_str(), DirectX::DDS_FLAGS_NONE, nullptr, image)
-			: DirectX::LoadFromWICFile(path.c_str(), DirectX::WIC_FLAGS_NONE, nullptr, image);
+						 ? DirectX::LoadFromDDSFile(path.c_str(), DirectX::DDS_FLAGS_NONE, nullptr, image)
+						 : DirectX::LoadFromWICFile(path.c_str(), DirectX::WIC_FLAGS_NONE, nullptr, image);
 
 		if (FAILED(hr))
 			return false;

@@ -31,4 +31,3 @@ namespace DX12Engine
 		void TryApplyCookedMeshLods(const std::string& modelName, ModelAsset& modelAsset);
 	};
 }
-

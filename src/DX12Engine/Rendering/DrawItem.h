@@ -12,14 +12,14 @@ namespace DX12Engine
 
 	struct DrawItem
 	{
-		MeshPrimitive*    Primitive;
-		Material*         Material;
+		MeshPrimitive* Primitive;
+		Material* Material;
 		MaterialTemplate* Template;
 		D3D12_GPU_VIRTUAL_ADDRESS CBVAddress;
 
 		UINT IndexCount;
 		UINT FirstIndex;
-		INT  BaseVertex;
+		INT BaseVertex;
 		UINT ActiveLODLevel;
 
 		DirectX::XMMATRIX ModelMatrix;

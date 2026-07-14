@@ -16,4 +16,3 @@ namespace DX12Engine
 		D3D12_VERTEX_BUFFER_VIEW m_VertexBufferView;
 	};
 }
-

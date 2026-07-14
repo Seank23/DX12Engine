@@ -11,7 +11,6 @@ namespace DX12Engine
 
 	struct BasicMaterialData : MaterialData
 	{
-		
 	};
 
 	struct alignas(16) PBRMaterialData
@@ -35,11 +34,11 @@ namespace DX12Engine
 		int AlphaMode = 0; // 0=Opaque, 1=Masked, 2=Blend
 		float AlphaCutoff = 0.5f;
 
-		int HasAlbedoMap    = 0;
-		int HasNormalMap    = 0;
-		int HasMetallicMap  = 0;
+		int HasAlbedoMap = 0;
+		int HasNormalMap = 0;
+		int HasMetallicMap = 0;
 		int HasRoughnessMap = 0;
-		int HasAOMap        = 0;
-		int HasEmissiveMap  = 0;
+		int HasAOMap = 0;
+		int HasEmissiveMap = 0;
 	};
 }

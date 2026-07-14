@@ -47,4 +47,3 @@ namespace DX12Engine
 		bool m_DoubleSided = false;
 	};
 }
-

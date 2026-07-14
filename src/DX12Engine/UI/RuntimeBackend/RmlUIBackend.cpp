@@ -475,11 +475,10 @@ namespace DX12Engine
 	{
 		std::string result = key;
 		std::transform(result.begin(), result.end(), result.begin(), [](unsigned char ch)
-		{
+					   {
 			if (ch == '\\')
 				return '/';
-			return static_cast<char>(std::tolower(ch));
-		});
+			return static_cast<char>(std::tolower(ch)); });
 		return result;
 	}
 

@@ -25,4 +25,3 @@ namespace DX12Engine
 		std::vector<UINT> m_FreeDescriptorIndices;
 	};
 }
-

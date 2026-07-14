@@ -1,0 +1,53 @@
+# .clang-format — house C++ style (see CPP-STYLE-GUIDE.md)
+# Requires clang-format 14+. Applies to C/C++/HLSL.
+---
+Language:        Cpp
+Standard:        c++20
+
+# --- Indentation: tabs, 4 wide ---
+UseTab:          Always
+IndentWidth:     4
+TabWidth:        4
+ContinuationIndentWidth: 4
+NamespaceIndentation: All          # namespace bodies are indented one level
+AccessModifierOffset: -4           # public:/private: align with `class`; members sit one level in
+IndentCaseLabels: false            # case labels align with their switch
+IndentPPDirectives: None           # #include / #pragma / #if stay at column 0
+
+# --- Braces: Allman (opening brace on its own line) ---
+# The Allman preset already keeps empty function/record bodies split across lines.
+BreakBeforeBraces: Allman
+
+# --- Line breaking: no hard limit, honor the author's own breaks ---
+# ColumnLimit: 0 means clang-format will NOT auto-wrap and WILL preserve the
+# input's line-break decisions within a statement. Long single lines and
+# hand-wrapped multi-parameter signatures are both left intact.
+ColumnLimit:     0
+BinPackParameters: false
+BinPackArguments: false
+ReflowComments:  false
+MaxEmptyLinesToKeep: 1
+KeepEmptyLinesAtTheStartOfBlocks: false
+
+# --- Short constructs: only in-class one-liners stay on a single line ---
+AllowShortFunctionsOnASingleLine: Inline   # e.g. GetUsageState() const { return m_UsageState; }
+AllowShortBlocksOnASingleLine: Never
+AllowShortIfStatementsOnASingleLine: Never
+AllowShortLoopsOnASingleLine: false
+AllowShortCaseLabelsOnASingleLine: false
+
+# --- Pointers & spacing ---
+PointerAlignment: Left             # Type* ptr, Type& ref
+DerivePointerAlignment: false
+SpaceBeforeParens: ControlStatements   # `if (`, `for (` — but `Foo(`
+Cpp11BracedListStyle: false        # spaces inside braced lists: { 1.0f, 2.0f, 3.0f }
+SpacesInParentheses: false
+SpacesInAngles:  false
+SpaceAfterTemplateKeyword: true
+
+# --- Includes: keep the manual grouping (own header, project, system) ---
+SortIncludes:    false
+
+# --- Do not inject `// namespace X` comments after closing braces ---
+FixNamespaceComments: false
+...

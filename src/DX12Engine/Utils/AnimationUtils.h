@@ -33,8 +33,8 @@ namespace DX12Engine
 		{
 			DirectX::XMFLOAT4 result;
 			DirectX::XMStoreFloat4(&result,
-				DirectX::XMQuaternionNormalize(
-					DirectX::XMQuaternionSlerp(DirectX::XMLoadFloat4(&from), DirectX::XMLoadFloat4(&to), t)));
+								   DirectX::XMQuaternionNormalize(
+									   DirectX::XMQuaternionSlerp(DirectX::XMLoadFloat4(&from), DirectX::XMLoadFloat4(&to), t)));
 			return result;
 		}
 
@@ -76,8 +76,8 @@ namespace DX12Engine
 				++sampleIndex;
 
 			nextSampleIndex = sampleIndex + 1 < sampler.Times.size()
-				? sampleIndex + 1
-				: sampler.Times.size() - 1;
+								  ? sampleIndex + 1
+								  : sampler.Times.size() - 1;
 
 			const bool useStepInterpolation = sampler.Interpolation == AnimationInterpolation::Step || sampleIndex == nextSampleIndex;
 			blendFactor = 0.0f;
