@@ -9,6 +9,12 @@ namespace DX12Engine
 		TAA
 	};
 
+	enum class ToneMappingMode
+	{
+		None,
+		ACES
+	};
+
 	struct TAASettings
 	{
 		// Baseline history contribution before adaptive rejection terms are applied.
@@ -41,16 +47,21 @@ namespace DX12Engine
 		float NormalBias = 0.5f;
 	};
 
+	// Mirrors the b1 cbuffer layout in FinalRender_PS.hlsl (four 4-byte fields = one 16-byte vector).
 	struct PostProcessingData
 	{
 		int EnableGammaCorrection = 1;
 		int EnableFXAA = 0;
+		int EnableToneMapping = 1;
+		float Exposure = 1.5f;
 	};
 
 	struct RendererOptions
 	{
 		float RenderScale = 1.0f;
 		AntiAliasingMode AA_Mode = AntiAliasingMode::None;
+		ToneMappingMode ToneMapping = ToneMappingMode::ACES;
+		float Exposure = 1.5f;
 		TAASettings TAA;
 		CSMSettings CSM;
 		bool EnableGammaCorrection = true;

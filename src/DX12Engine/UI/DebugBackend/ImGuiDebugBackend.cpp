@@ -96,6 +96,13 @@ namespace DX12Engine
 				if (ImGui::Combo(name, &currentMode, aaModes, IM_ARRAYSIZE(aaModes)))
 					value = static_cast<AntiAliasingMode>(currentMode);
 			}
+			else if constexpr (std::is_same_v<T, ToneMappingMode>)
+			{
+				const char* tmModes[] = { "None", "ACES" };
+				int currentMode = static_cast<int>(value);
+				if (ImGui::Combo(name, &currentMode, tmModes, IM_ARRAYSIZE(tmModes)))
+					value = static_cast<ToneMappingMode>(currentMode);
+			}
 		}
 
 		void DrawTAASettings(TAASettings& settings)
@@ -136,10 +143,12 @@ namespace DX12Engine
 
 		void DrawRendererOptions(RendererOptions& options)
 		{
-#define RENDERER_SCALAR_FIELDS(X)  \
-	X(float, RenderScale)          \
-	X(AntiAliasingMode, AA_Mode)   \
-	X(bool, EnableGammaCorrection) \
+#define RENDERER_SCALAR_FIELDS(X)     \
+	X(float, RenderScale)             \
+	X(AntiAliasingMode, AA_Mode)      \
+	X(ToneMappingMode, ToneMapping)   \
+	X(float, Exposure)                \
+	X(bool, EnableGammaCorrection)    \
 	X(bool, EnableFrustumCulling)
 
 #define RENDERER_NESTED_FIELDS(X) \

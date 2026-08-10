@@ -14,6 +14,7 @@ namespace DX12Engine
 		DirectX::XMFLOAT4 ClearColor = { 0.0f, 0.0f, 0.0f, 1.0f };
 		bool IsCubeMap = false;
 		bool ShouldResize = true;
+		float ClearDepth = 1.0f; // Last field so positional initializers stay valid; 0.0f for reverse-Z.
 	};
 
 	class RenderTexture : public GPUResource

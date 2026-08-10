@@ -411,8 +411,13 @@ namespace DX12Engine
 	{
 		int arraySize = config.Dimensions.z;
 		bool isSingleMap = arraySize == 1 && !config.IsCubeMap;
+		int cubeCount = 1;
 		if (config.IsCubeMap)
-			arraySize = 6;
+		{
+			// One cube (6 faces) per shadow-casting point light; Dimensions.z carries the light count.
+			cubeCount = arraySize > 0 ? arraySize : 1;
+			arraySize = 6 * cubeCount;
+		}
 
 		D3D12_RESOURCE_DESC depthMapDesc = {};
 		depthMapDesc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
@@ -427,7 +432,7 @@ namespace DX12Engine
 
 		D3D12_CLEAR_VALUE depthOptimizedClearValue = {};
 		depthOptimizedClearValue.Format = config.DSVFormat;
-		depthOptimizedClearValue.DepthStencil.Depth = 1.0f;
+		depthOptimizedClearValue.DepthStencil.Depth = config.ClearDepth;
 		depthOptimizedClearValue.DepthStencil.Stencil = 0;
 
 		ID3D12Resource* depthMapResource = nullptr;
@@ -472,11 +477,26 @@ namespace DX12Engine
 		D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
 		srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
 		srvDesc.Format = config.Format;
-		srvDesc.ViewDimension = config.IsCubeMap ? D3D12_SRV_DIMENSION_TEXTURECUBE : isSingleMap ? D3D12_SRV_DIMENSION_TEXTURE2D
-																								 : D3D12_SRV_DIMENSION_TEXTURE2DARRAY;
-		srvDesc.Texture2D.MipLevels = 1;
-		if (!isSingleMap)
+		if (config.IsCubeMap)
+		{
+			// Bind as a cube array so the lighting shader can index a cube per point light.
+			srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURECUBEARRAY;
+			srvDesc.TextureCubeArray.MostDetailedMip = 0;
+			srvDesc.TextureCubeArray.MipLevels = 1;
+			srvDesc.TextureCubeArray.First2DArrayFace = 0;
+			srvDesc.TextureCubeArray.NumCubes = cubeCount;
+		}
+		else if (isSingleMap)
+		{
+			srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+			srvDesc.Texture2D.MipLevels = 1;
+		}
+		else
+		{
+			srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2DARRAY;
+			srvDesc.Texture2DArray.MipLevels = 1;
 			srvDesc.Texture2DArray.ArraySize = arraySize;
+		}
 
 		DescriptorHeapHandle srvHandle = m_HeapManager->AllocatePersistentSRV();
 		m_Device->CreateShaderResourceView(depthMapResource, &srvDesc, srvHandle.GetCPUHandle());

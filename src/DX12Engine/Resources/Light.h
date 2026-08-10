@@ -21,6 +21,7 @@ namespace DX12Engine
 		float SpotAngle = 0.01f;
 		DirectX::XMFLOAT3 Padding = { 0.0f, 0.0f, 0.0f };
 		DirectX::XMMATRIX ViewProjMatrix;
+		int ShadowMapIndex = -1;
 	};
 
 	class Light
@@ -36,6 +37,7 @@ namespace DX12Engine
 		void SetPosition(DirectX::XMFLOAT3 position);
 		void SetDirection(DirectX::XMFLOAT3 direction);
 		void SetSpotAngle(float angle);
+		void SetShadowMapIndex(int index) { m_LightData.ShadowMapIndex = index; }
 
 		LightType GetType() { return (LightType)m_LightData.Type; }
 		LightData& GetLightData() { return m_LightData; }

@@ -73,7 +73,7 @@ float4 main(PSInput i, bool isFrontFace : SV_IsFrontFace) : SV_TARGET
     // SV_POSITION.z is already the window-space depth in [MinDepth, MaxDepth]
     // that the hardware writes to the depth buffer, so no w-divide is needed.
     float fragDepth = i.positionCS.z;
-    if (fragDepth > opaqueDepth)
+    if (fragDepth < opaqueDepth) // Reverse-Z: smaller depth == behind opaque
         discard;
     float4 baseSample = HasAlbedoMap ? albedoMap.Sample(sampWrap, i.uv) : float4(1, 1, 1, 1);
     float3 baseColor = sRGBToLinear(baseSample.rgb * Albedo);

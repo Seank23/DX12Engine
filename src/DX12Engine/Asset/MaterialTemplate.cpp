@@ -102,6 +102,10 @@ namespace DX12Engine
 		}
 		else
 		{
+			// Opaque variants render in the geometry pass (reverse-Z, GREATER test).
+			D3D12_DEPTH_STENCIL_DESC depthDesc = CD3DX12_DEPTH_STENCIL_DESC(D3D12_DEFAULT);
+			depthDesc.DepthFunc = D3D12_COMPARISON_FUNC_GREATER;
+
 			m_PipelineStateBuilder.SetRenderTargets({ DXGI_FORMAT_R8G8B8A8_UNORM,
 													  DXGI_FORMAT_R16G16B16A16_FLOAT,
 													  DXGI_FORMAT_R16G16B16A16_FLOAT,
@@ -109,6 +113,7 @@ namespace DX12Engine
 													  DXGI_FORMAT_R16G16B16A16_FLOAT,
 													  DXGI_FORMAT_R16G16B16A16_FLOAT,
 													  DXGI_FORMAT_R16G16_FLOAT })
+				.SetDepthStencilState(depthDesc)
 				.SetDepthStencilFormat(DXGI_FORMAT_D32_FLOAT);
 		}
 

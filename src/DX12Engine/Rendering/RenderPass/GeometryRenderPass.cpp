@@ -33,7 +33,9 @@ namespace DX12Engine
 		m_RenderTargets.emplace_back(ResourceManager::GetInstance().CreateRenderTargetTexture(RenderTextureConfig{ renderSize, DXGI_FORMAT_R16G16B16A16_FLOAT }));	  // Position
 		m_RenderTargets.emplace_back(ResourceManager::GetInstance().CreateRenderTargetTexture(RenderTextureConfig{ renderSize, DXGI_FORMAT_R16G16B16A16_FLOAT }));	  // Emissive
 		m_RenderTargets.emplace_back(ResourceManager::GetInstance().CreateRenderTargetTexture(RenderTextureConfig{ renderSize, DXGI_FORMAT_R16G16_FLOAT }));		  // Velocity
-		m_RenderTargets.emplace_back(ResourceManager::GetInstance().CreateDepthMap(RenderTextureConfig{ renderSize, DXGI_FORMAT_R32_FLOAT, DXGI_FORMAT_D32_FLOAT })); // Depth
+		RenderTextureConfig depthConfig{ renderSize, DXGI_FORMAT_R32_FLOAT, DXGI_FORMAT_D32_FLOAT };
+		depthConfig.ClearDepth = 0.0f; // Reverse-Z: far plane is 0.0
+		m_RenderTargets.emplace_back(ResourceManager::GetInstance().CreateDepthMap(depthConfig)); // Depth
 
 		m_Viewport = { 0.0f, 0.0f, (float)renderSize.x, (float)renderSize.y, 0.0f, 1.0f };
 		m_ScissorRect = { 0, 0, (LONG)renderSize.x, (LONG)renderSize.y };
@@ -74,7 +76,7 @@ namespace DX12Engine
 		for (int i = 0; i < 7; i++)
 			m_CommandList.ClearRenderTargetView(rtvHandles[i], m_RenderTargets[i]->GetClearColorArray(), 0, nullptr);
 
-		m_CommandList.ClearDepthStencilView(dsvHandle, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
+		m_CommandList.ClearDepthStencilView(dsvHandle, D3D12_CLEAR_FLAG_DEPTH, 0.0f, 0, 0, nullptr); // Reverse-Z: clear to the far value (0.0)
 
 		m_CommandList.IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
@@ -192,6 +194,10 @@ namespace DX12Engine
 		PipelineStateBuilder pipelineStateBuilder;
 		RootSignatureBuilder rootSignatureBuilder;
 
+		// Reverse-Z: keep the fragment with the GREATER depth value.
+		D3D12_DEPTH_STENCIL_DESC depthDesc = CD3DX12_DEPTH_STENCIL_DESC(D3D12_DEFAULT);
+		depthDesc.DepthFunc = D3D12_COMPARISON_FUNC_GREATER;
+
 		pipelineStateBuilder = pipelineStateBuilder
 								   .ConfigureFromDefault(ResourceManager::GetInstance().GetShader(m_VertexShaderName), ResourceManager::GetInstance().GetShader(m_PixelShaderName))
 								   .SetRenderTargets({ DXGI_FORMAT_R8G8B8A8_UNORM,
@@ -201,6 +207,7 @@ namespace DX12Engine
 													   DXGI_FORMAT_R16G16B16A16_FLOAT,
 													   DXGI_FORMAT_R16G16B16A16_FLOAT,
 													   DXGI_FORMAT_R16G16_FLOAT })
+								   .SetDepthStencilState(depthDesc)
 								   .SetDepthStencilFormat(DXGI_FORMAT_D32_FLOAT);
 
 		DescriptorTableConfig config(6, D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 0);

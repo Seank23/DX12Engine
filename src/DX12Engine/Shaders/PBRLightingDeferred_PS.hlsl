@@ -46,7 +46,7 @@ Texture2D positionMap : register(t6);
 Texture2D emissiveMap : register(t7);
 Texture2D depthMap : register(t8);
 Texture2DArray shadowMaps : register(t9);
-TextureCube shadowCubeMap : register(t10);
+TextureCubeArray shadowCubeMaps : register(t10);
 Texture2DArray cascadedShadowMaps : register(t11);
 
 SamplerState samp : register(s0);
@@ -85,7 +85,7 @@ float4 main(PSInput input) : SV_TARGET
     float aoFactor = 0.02;
     float ambientShadow = 1.0;
     
-    if (depth >= 0.999f)
+    if (depth <= 0.001f) // Reverse-Z: the far plane / sky sits at depth 0.0
     {
         float3 viewRay = GetViewRay(input.texCoord);
         float3 worldDir = mul((float3x3)InvViewMatrix, viewRay);
@@ -134,7 +134,7 @@ float4 main(PSInput input) : SV_TARGET
             float window = saturate(1.0 - distOverRange * distOverRange * distOverRange * distOverRange);
             float attenuation = (window * window) / (dist * dist + 1.0);
             lightContribution = PBRLighting(albedo, metallic, roughness, clearcoat, clearcoatRoughness, worldNormal, V, lightDir, Lights[i]) * attenuation;
-            shadowFactor = PointLightShadowPCF(worldPos, Lights[i].Position, 3.0, worldNormal, Lights[i].Padding.x);
+            shadowFactor = PointLightShadowPCF(worldPos, Lights[i].Position, 3.0, worldNormal, Lights[i].Padding.x, Lights[i].ShadowMapIndex);
         }
         else if (Lights[i].Type == 2) // Spot Light
         {
@@ -144,7 +144,7 @@ float4 main(PSInput input) : SV_TARGET
             float dist = length(Lights[i].Position - worldPos);
             float attenuation = saturate(1.0 - (dist * dist) / (Lights[i].Range * Lights[i].Range));
             lightContribution = PBRLighting(albedo, metallic, roughness, clearcoat, clearcoatRoughness, worldNormal, V, lightDir, Lights[i]) * intensity * attenuation;
-            shadowFactor = ShadowPCF(i, lightSpacePosition, 2.0);
+            shadowFactor = ShadowPCF(Lights[i].ShadowMapIndex, lightSpacePosition, 2.0);
             ambientShadow = min(ambientShadow, shadowFactor);
         }
         finalColor += lightContribution * shadowFactor;

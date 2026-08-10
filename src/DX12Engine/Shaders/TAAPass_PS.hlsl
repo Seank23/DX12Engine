@@ -130,7 +130,9 @@ float2 JitterDeltaUV()
 float2 DilatedVelocity(float2 uv)
 {
     float2 texel = 1.0 / ScreenSize;
-    float bestDepth = 1.0;
+    // Reverse-Z: larger depth == closer, so the closest neighbour is the one
+    // with the maximum depth value.
+    float bestDepth = 0.0;
     float2 bestUV = uv;
 
     [unroll]
@@ -141,7 +143,7 @@ float2 DilatedVelocity(float2 uv)
         {
             float2 tapUV = uv + float2((float) x, (float) y) * texel;
             float d = depthMap.SampleLevel(samp, tapUV, 0).r;
-            if (d < bestDepth)
+            if (d > bestDepth)
             {
                 bestDepth = d;
                 bestUV = tapUV;

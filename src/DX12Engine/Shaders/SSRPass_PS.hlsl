@@ -162,7 +162,9 @@ float FindIntersection(
     for (int i = 1; i < traceSteps; i++)
     {
         float sceneDepth = depthMap.Sample(samp, rayPos.xy).r;
-        float thickness = rayPos.z - sceneDepth;
+        // Reverse-Z: larger depth == closer, so the ray is behind the stored
+        // surface when its depth is smaller than the scene depth.
+        float thickness = sceneDepth - rayPos.z;
         float adaptiveThickness = baseThickness * (1.0 + abs(rayPos.z) * 4.0);
         if (thickness > 0.0 && thickness < adaptiveThickness)
         {
@@ -187,7 +189,8 @@ float FindIntersection(
     {
         float3 mid = (lo + hi) * 0.5;
         float sceneD = depthMap.Sample(samp, mid.xy).r;
-        float thickness = mid.z - sceneD;
+        // Reverse-Z: behind the surface means a smaller depth than the scene.
+        float thickness = sceneD - mid.z;
         float adaptiveT = baseThickness * (1.0 + abs(mid.z) * 4.0);
         if (thickness > 0.0 && thickness < adaptiveT)
             hi = mid;
@@ -467,7 +470,7 @@ PSOutput main(PSInput input)
     float ao = saturate(emissiveAo.a);
     float depth = depthMap.Sample(samp, texCoord).r;
 
-    if (depth >= 0.999)
+    if (depth <= 0.001) // Reverse-Z: the far plane / sky sits at depth 0.0
     {
         output.color = float4(sceneColor, 1.0);
         output.history = float4(sceneColor, 0.0);

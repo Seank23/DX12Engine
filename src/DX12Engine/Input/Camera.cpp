@@ -112,11 +112,12 @@ namespace DX12Engine
 
 	void Camera::UpdateProjectionMatrix()
 	{
+		// Reverse-Z: near/far swapped so near maps to NDC 1.0, far to 0.0.
 		m_ProjectionMatrix = DirectX::XMMatrixPerspectiveFovLH(
 			DirectX::XMConvertToRadians(m_FOV),
 			m_AspectRatio,
-			m_ZNear,
-			m_ZFar);
+			m_ZFar,
+			m_ZNear);
 	}
 
 	void Camera::UpdateViewMatrix()

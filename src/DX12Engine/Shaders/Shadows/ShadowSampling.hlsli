@@ -44,24 +44,25 @@ float ShadowPCF(int lightIndex, float4 lightSpacePos, float softRadius)
     return shadow / 16.0;
 }
 
-float PointLightShadowPCF(float3 worldPos, float3 lightPos, float softRadius, float3 normal, float farPlane)
+float PointLightShadowPCF(float3 worldPos, float3 lightPos, float softRadius, float3 normal, float farPlane, float cubeIndex)
 {
     float3 texSize;
-    shadowCubeMap.GetDimensions(0, texSize.x, texSize.y, texSize.z);
+    shadowCubeMaps.GetDimensions(texSize.x, texSize.y, texSize.z); // width, height, cube count
     float texelSize = 1.0 / texSize.x;
     float radius = texelSize * softRadius;
-    
+
     float3 lightToFrag = worldPos - lightPos;
     float currentDepth = length(lightToFrag) / farPlane;
     float shadowBias = 0.005 / farPlane;
     float shadowFactor = 0.0;
-    
+
     for (int y = -1; y <= 1; y++)
     {
         for (int x = -1; x <= 1; x++)
         {
             float3 sampleDir = normalize(lightToFrag) + float3(x, y, 0) * radius;
-            float closestDepth = shadowCubeMap.Sample(samp, sampleDir).x;
+            // .w selects the cube (this point light's slot) within the cube array.
+            float closestDepth = shadowCubeMaps.Sample(samp, float4(sampleDir, cubeIndex)).x;
             shadowFactor += (currentDepth - shadowBias > closestDepth) ? 0.0 : 1.0;
         }
     }

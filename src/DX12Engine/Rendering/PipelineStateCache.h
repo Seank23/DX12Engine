@@ -47,6 +47,13 @@ namespace DX12Engine
 		{
 			std::size_t seed = 0;
 
+			auto hashBytes = [&](const void* p, size_t n)
+			{
+				const auto* b = static_cast<const unsigned char*>(p);
+				for (size_t i = 0; i < n; ++i)
+					HashCombine(seed, b[i]);
+			};
+
 			// Shaders
 			if (desc.VS.pShaderBytecode)
 				HashCombine(seed, std::hash<std::string_view>()(std::string_view((const char*)desc.VS.pShaderBytecode, desc.VS.BytecodeLength)));
@@ -66,9 +73,10 @@ namespace DX12Engine
 			HashCombine(seed, desc.SampleDesc.Quality);
 
 			// Rasterizer, blend, and depth-stencil states (can also hash raw memory if structs are POD)
-			HashCombine(seed, std::hash<uint64_t>()(*(const uint64_t*)&desc.RasterizerState));
-			HashCombine(seed, std::hash<uint64_t>()(*(const uint64_t*)&desc.BlendState));
-			HashCombine(seed, std::hash<uint64_t>()(*(const uint64_t*)&desc.DepthStencilState));
+			hashBytes(&desc.RasterizerState, sizeof(desc.RasterizerState));
+			hashBytes(&desc.BlendState, sizeof(desc.BlendState));
+			hashBytes(&desc.DepthStencilState, sizeof(desc.DepthStencilState));
+			HashCombine(seed, reinterpret_cast<uintptr_t>(desc.pRootSignature));
 
 			// Topology, node mask, etc.
 			HashCombine(seed, desc.PrimitiveTopologyType);

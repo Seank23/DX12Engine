@@ -648,6 +648,8 @@ namespace DX12Engine
 		PostProcessingData data{};
 		data.EnableGammaCorrection = m_Options.EnableGammaCorrection ? 1 : 0;
 		data.EnableFXAA = m_Options.AA_Mode == AntiAliasingMode::FXAA ? 1 : 0;
+		data.EnableToneMapping = m_Options.ToneMapping == ToneMappingMode::ACES ? 1 : 0;
+		data.Exposure = m_Options.Exposure;
 		m_PostProcessingCB->Update(&data, sizeof(PostProcessingData));
 	}
 

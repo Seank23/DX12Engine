@@ -1,4 +1,5 @@
 #include "FrustumCulling.h"
+#include <utility>
 
 namespace DX12Engine
 {
@@ -13,6 +14,9 @@ namespace DX12Engine
 	{
 		DirectX::BoundingFrustum frustum;
 		DirectX::BoundingFrustum::CreateFromMatrix(frustum, projectionMatrix);
+		// CreateFromMatrix assumes standard-Z; our reverse-Z projection makes it
+		// read Near/Far swapped (Near > Far), so swap them back.
+		std::swap(frustum.Near, frustum.Far);
 		return frustum;
 	}
 
