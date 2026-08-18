@@ -13,7 +13,7 @@ namespace DX12Engine
 		GPUResource(ID3D12Resource* resource, D3D12_RESOURCE_STATES usageState);
 		virtual ~GPUResource();
 
-		D3D12_GPU_VIRTUAL_ADDRESS GetGPUAddress() const { return m_GPUAddress; }
+		virtual D3D12_GPU_VIRTUAL_ADDRESS GetGPUAddress() const { return m_GPUAddress; }
 		D3D12_RESOURCE_STATES GetUsageState() const { return m_UsageState; }
 		void SetUsageState(D3D12_RESOURCE_STATES usageState) { m_UsageState = usageState; }
 

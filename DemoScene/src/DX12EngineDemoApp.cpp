@@ -175,7 +175,6 @@ namespace DX12EngineDemo
 		m_InputHandler->ProcessInput(ts);
 		m_PhysicsEngine->Update(ts, elapsed);
 		m_Scene->Update(ts, elapsed);
-		m_Scene->GetLightBuffer()->Update();
 		m_Renderer->ExecutePipeline(m_RenderPipeline, ts);
 
 		m_UISystem->EndFrame();

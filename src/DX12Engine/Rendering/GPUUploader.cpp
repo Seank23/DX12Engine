@@ -25,8 +25,14 @@ namespace DX12Engine
 
 	GPUUploader::~GPUUploader()
 	{
-		ReleasePendingUploadResources();
-		ReleasePendingReferencedResources();
+		m_QueueManager.GetGraphicsQueue().WaitForIdle();
+		ProcessRetiredResources();
+		for (ID3D12Resource* uploadResource : m_PendingUploadResources)
+			SafeRelease(uploadResource);
+		for (ID3D12Resource* referencedResource : m_PendingReferencedResources)
+			SafeRelease(referencedResource);
+		m_PendingUploadResources.clear();
+		m_PendingReferencedResources.clear();
 	}
 
 	void GPUUploader::UploadTextureBatch(std::vector<Texture*> textures)
@@ -65,12 +71,16 @@ namespace DX12Engine
 
 			texture->SetUsageState(D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
 			texture->SetIsReady(true);
+			if (texture->m_UploadResource)
+			{
+				m_PendingUploadResources.push_back(texture->m_UploadResource);
+				texture->m_UploadResource = nullptr; // ownership moves to the retire list
+			}
 		}
 		ExecuteUpload();
 
 		for (Texture* texture : texturesToUpload)
 		{
-			SafeRelease(texture->m_UploadResource);
 			texture->m_Data.clear();
 			texture->m_Data.shrink_to_fit();
 			texture->m_IsUploaded = true;
@@ -108,16 +118,15 @@ namespace DX12Engine
 	{
 		if (!m_UploadListsRecording)
 			return;
-
-		UINT copyFenceVal = m_QueueManager.GetCopyQueue().ExecuteCommandList();
-		m_QueueManager.GetCopyQueue().WaitForFenceCPUBlocking(copyFenceVal);
-
-		UINT graphicsFenceVal = m_QueueManager.GetGraphicsQueue().ExecuteCommandList();
-		m_QueueManager.GetGraphicsQueue().WaitForFenceCPUBlocking(graphicsFenceVal);
+		auto& copyQueue = m_QueueManager.GetCopyQueue();
+		auto& graphicsQueue = m_QueueManager.GetGraphicsQueue();
+		UINT copyFenceVal = copyQueue.ExecuteCommandList();
+		graphicsQueue.InsertWaitForQueueFence(&copyQueue, copyFenceVal);
+		UINT graphicsFenceVal = graphicsQueue.ExecuteCommandList();
 
 		m_UploadListsRecording = false;
-		ReleasePendingUploadResources();
-		ReleasePendingReferencedResources();
+		QueuePendingReleases(graphicsFenceVal);
+		ProcessRetiredResources();
 	}
 
 	bool GPUUploader::UploadAllPending()
@@ -128,21 +137,37 @@ namespace DX12Engine
 			m_UploadCount = 0;
 			return true;
 		}
+		else
+		{
+			ProcessRetiredResources();
+		}
 		return false;
 	}
 
-	void GPUUploader::ReleasePendingUploadResources()
+	void GPUUploader::QueuePendingReleases(UINT fenceValue)
 	{
 		for (ID3D12Resource* uploadResource : m_PendingUploadResources)
-			SafeRelease(uploadResource);
+			m_RetiringResources.push_back({ uploadResource, fenceValue });
+		for (ID3D12Resource* referencedResource : m_PendingReferencedResources)
+			m_RetiringResources.push_back({ referencedResource, fenceValue });
 		m_PendingUploadResources.clear();
+		m_PendingReferencedResources.clear();
 	}
 
-	void GPUUploader::ReleasePendingReferencedResources()
+	void GPUUploader::ProcessRetiredResources()
 	{
-		for (ID3D12Resource* referencedResource : m_PendingReferencedResources)
-			SafeRelease(referencedResource);
-		m_PendingReferencedResources.clear();
+		UINT currentFenceValue = m_QueueManager.GetGraphicsQueue().PollCurrentFenceValue();
+		size_t keep = 0;
+		for (auto& resource : m_RetiringResources)
+		{
+			if (!resource.Resource || currentFenceValue >= resource.FenceValue)
+			{
+				SafeRelease(resource.Resource);
+				continue;
+			}
+			m_RetiringResources[keep++] = resource;
+		}
+		m_RetiringResources.resize(keep);
 	}
 
 	void GPUUploader::EnsureUploadListsRecording()

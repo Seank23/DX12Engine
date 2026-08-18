@@ -1,16 +1,13 @@
 #define NOMINMAX
 #include "CommandQueue.h"
 #include "../../Utils/EngineUtils.h"
+#include "../../Utils/Constants.h"
+
 #include <math.h>
 #include <iostream>
 
 namespace DX12Engine
 {
-	namespace
-	{
-		constexpr size_t kCommandAllocatorPoolSize = 8;
-	}
-
 	CommandQueue::CommandQueue(ID3D12Device* device, D3D12_COMMAND_LIST_TYPE commandType)
 		: m_QueueType(commandType), m_CommandQueue(nullptr), m_Fence(nullptr)
 	{
@@ -22,7 +19,7 @@ namespace DX12Engine
 		queueDesc.NodeMask = 0;
 		EngineUtils::ThrowIfFailed(device->CreateCommandQueue(&queueDesc, IID_PPV_ARGS(&m_CommandQueue)));
 
-		m_CommandAllocatorSlots.resize(kCommandAllocatorPoolSize);
+		m_CommandAllocatorSlots.resize(COMMAND_ALLOCATOR_POOL_SIZE);
 		for (CommandAllocatorSlot& slot : m_CommandAllocatorSlots)
 			EngineUtils::ThrowIfFailed(device->CreateCommandAllocator(commandType, IID_PPV_ARGS(&slot.Allocator)));
 
@@ -70,7 +67,7 @@ namespace DX12Engine
 		m_CommandQueue->Wait(otherQueue->GetFence().Get(), otherQueue->GetNextFenceValue() - 1);
 	}
 
-	void CommandQueue::WaitForFenceCPUBlocking(UINT fenceValue)
+	void CommandQueue::WaitForFenceCPUBlocking(UINT64 fenceValue)
 	{
 		if (!IsFenceComplete(fenceValue))
 		{
@@ -81,14 +78,14 @@ namespace DX12Engine
 		}
 	}
 
-	UINT CommandQueue::PollCurrentFenceValue()
+	UINT64 CommandQueue::PollCurrentFenceValue()
 	{
 		UINT64 value = m_Fence->GetCompletedValue();
 		m_LastCompletedFenceValue = std::max(m_LastCompletedFenceValue, value);
 		return m_LastCompletedFenceValue;
 	}
 
-	UINT CommandQueue::ExecuteCommandList()
+	UINT64 CommandQueue::ExecuteCommandList()
 	{
 		EngineUtils::ThrowIfFailed(m_CommandList->Close());
 		auto commandList = (ID3D12CommandList*)m_CommandList.Get();

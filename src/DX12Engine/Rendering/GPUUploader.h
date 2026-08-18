@@ -8,6 +8,12 @@ namespace DX12Engine
 {
 	class RenderContext;
 
+	struct PendingRelease
+	{
+		ID3D12Resource* Resource;
+		UINT64 FenceValue;
+	};
+
 	class GPUUploader
 	{
 	public:
@@ -26,8 +32,8 @@ namespace DX12Engine
 
 	private:
 		void EnsureUploadListsRecording();
-		void ReleasePendingUploadResources();
-		void ReleasePendingReferencedResources();
+		void QueuePendingReleases(UINT fenceValue);
+		void ProcessRetiredResources();
 
 		CommandQueueManager& m_QueueManager;
 		RenderContext& m_RenderContext;
@@ -39,5 +45,6 @@ namespace DX12Engine
 		bool m_UploadListsRecording = false;
 		std::vector<ID3D12Resource*> m_PendingUploadResources;
 		std::vector<ID3D12Resource*> m_PendingReferencedResources;
+		std::vector<PendingRelease> m_RetiringResources;
 	};
 }

@@ -2,11 +2,10 @@
 #include "d3dx12.h"
 #include "DescriptorHeap.h"
 #include "DescriptorHeapHandle.h"
+#include "../../Utils/Constants.h"
 
 namespace DX12Engine
 {
-	static constexpr UINT FRAMES_IN_FLIGHT = 2;
-
 	class RenderPassDescriptorHeap : public DescriptorHeap
 	{
 	public:

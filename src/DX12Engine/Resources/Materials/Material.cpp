@@ -24,6 +24,6 @@ namespace DX12Engine
 
 	void Material::UpdateConstantBufferData(const void* data, UINT size)
 	{
-		m_ConstantBuffer->Update(const_cast<void*>(data), size);
+		m_ConstantBuffer->UpdateAllFrames(const_cast<void*>(data), size);
 	}
 }

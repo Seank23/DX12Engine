@@ -131,7 +131,7 @@ namespace DX12Engine
 		: m_RenderContext(context), m_RenderHeap(context->GetHeapManager().GetRenderPassHeap()), m_QueueManager(context->GetQueueManager()), m_JitteredProjection(DirectX::XMMatrixIdentity())
 	{
 		m_PostProcessingCB = ResourceManager::GetInstance().CreateConstantBuffer(sizeof(PostProcessingData));
-		UpdatePostProcessingCB();
+		m_OptionsDirtyFrames = FRAMES_IN_FLIGHT;
 
 		m_CommandList = m_QueueManager.GetGraphicsQueue().GetCommandList();
 
@@ -204,12 +204,24 @@ namespace DX12Engine
 
 	void Renderer::ExecutePipeline(RenderPipeline pipeline, float frameTime)
 	{
+		UINT currentSlot = m_FrameIndex % FRAMES_IN_FLIGHT;
+		if (m_FrameFenceValues[currentSlot] != 0)
+			m_QueueManager.GetGraphicsQueue().WaitForFenceCPUBlocking(m_FrameFenceValues[currentSlot]);
+
 		if (m_RenderContext->IsPendingResize())
 			OnResize(pipeline);
-		m_RenderContext->GetHeapManager().BeginFrame(m_FrameIndex++);
+
+		m_RenderContext->GetHeapManager().BeginFrame(m_FrameIndex);
+		ResourceManager::GetInstance().BeginFrame(currentSlot);
+
 #ifdef _DEBUG
 		ResourceManager::GetInstance().ReloadChangedShaders();
 #endif
+		if (m_OptionsDirtyFrames > 0)
+		{
+			UpdatePostProcessingCB();
+			m_OptionsDirtyFrames--;
+		}
 		SetSceneData(pipeline, frameTime);
 		auto projectionOverride = m_Options.AA_Mode == AntiAliasingMode::TAA ? &m_JitteredProjection : nullptr;
 		m_RenderContext->UpdateScreenData(m_CurrentScene ? m_CurrentScene->GetCamera() : nullptr, m_Jitter, m_PrevJitter, projectionOverride);
@@ -367,10 +379,12 @@ namespace DX12Engine
 		Texture* skyboxCubemap = m_CurrentScene->GetSkyboxCubemap();
 		if (skyboxCubemap && !skyboxCubemap->GetIsReady())
 			m_RenderContext->GetUploader().UploadTextureBatch({ skyboxCubemap, m_CurrentScene->GetSkyboxIrradiance() });
-		std::vector<RenderComponent*> renderComponents = m_CurrentScene->GetSceneObjects().GetAllComponents<RenderComponent>();
-		Camera* sceneCamera = m_CurrentScene->GetCamera();
-		LightBuffer* lightBuffer = m_CurrentScene->GetLightBuffer();
 
+		LightBuffer* lightBuffer = m_CurrentScene->GetLightBuffer();
+		if (lightBuffer)
+			lightBuffer->Update();
+
+		Camera* sceneCamera = m_CurrentScene->GetCamera();
 		DirectX::XMMATRIX cameraView = sceneCamera->GetViewMatrix();
 		DirectX::XMMATRIX cameraProj = sceneCamera->GetProjectionMatrix();
 		sceneCamera->SetFrustum(FrustumCulling::BuildFrustum(cameraProj, cameraView));
@@ -383,6 +397,7 @@ namespace DX12Engine
 			m_Jitter.y *= jitterScale;
 		}
 
+		std::vector<RenderComponent*> renderComponents = m_CurrentScene->GetSceneObjects().GetAllComponents<RenderComponent>();
 		std::vector<DrawItem> geometryPassDrawItems;
 		std::vector<DrawItem> transparentPassDrawItems;
 		std::vector<DrawItem> shadowPassDrawItems;
@@ -398,7 +413,7 @@ namespace DX12Engine
 
 				MaterialTemplate* tmpl = binding.MaterialAsset ? binding.MaterialAsset->GetTemplate() : nullptr;
 				Material* material = binding.MaterialAsset ? binding.MaterialAsset->GetMaterial() : nullptr;
-				if (!material || !binding.PrimitiveConstantBuffer || !binding.Primitive)
+				if (!material || !binding.Primitive)
 					continue;
 
 				DirectX::XMMATRIX nodeWorldTransform = DirectX::XMMatrixIdentity();
@@ -601,9 +616,10 @@ namespace DX12Engine
 		m_CommandList->ResourceBarrier(1, &barrier);
 
 		UINT fenceVal = m_QueueManager.GetGraphicsQueue().ExecuteCommandList();
+		m_FrameFenceValues[m_FrameIndex % FRAMES_IN_FLIGHT] = fenceVal;
+		m_FrameIndex++;
 
 		m_RenderContext->PresentFrame();
-		m_QueueManager.GetGraphicsQueue().WaitForFenceCPUBlocking(fenceVal);
 
 #ifdef _DEBUG
 		if (m_FrameIndex % 60 == 0)
@@ -640,7 +656,7 @@ namespace DX12Engine
 		{
 			m_RequestTAAHistoryReset = true;
 		}
-		UpdatePostProcessingCB();
+		m_OptionsDirtyFrames = FRAMES_IN_FLIGHT;
 	}
 
 	void Renderer::UpdatePostProcessingCB()

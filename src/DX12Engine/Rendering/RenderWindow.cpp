@@ -62,7 +62,7 @@ namespace DX12Engine
 		CreateDXGIFactory1(IID_PPV_ARGS(&factory));
 
 		DXGI_SWAP_CHAIN_DESC swapChainDesc = {};
-		swapChainDesc.BufferCount = 2; // Double buffering
+		swapChainDesc.BufferCount = FRAMES_IN_FLIGHT;
 		swapChainDesc.BufferDesc.Width = m_WindowSize.x;
 		swapChainDesc.BufferDesc.Height = m_WindowSize.y;
 		swapChainDesc.BufferDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
@@ -82,7 +82,7 @@ namespace DX12Engine
 	void RenderWindow::CreateRTVHeap(ID3D12Device* device)
 	{
 		D3D12_DESCRIPTOR_HEAP_DESC rtvHeapDesc = {};
-		rtvHeapDesc.NumDescriptors = 2; // Number of descriptors (one for each buffer)
+		rtvHeapDesc.NumDescriptors = FRAMES_IN_FLIGHT; // Number of descriptors (one for each buffer)
 		rtvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_RTV;
 		rtvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
 
@@ -90,7 +90,7 @@ namespace DX12Engine
 		m_RTVDescriptorSize = device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
 
 		CD3DX12_CPU_DESCRIPTOR_HANDLE rtvHandle(m_RTVHeap->GetCPUDescriptorHandleForHeapStart());
-		for (UINT i = 0; i < 2; i++)
+		for (UINT i = 0; i < FRAMES_IN_FLIGHT; i++)
 		{
 			m_SwapChain->GetBuffer(i, IID_PPV_ARGS(&m_RenderTargets[i]));
 			device->CreateRenderTargetView(m_RenderTargets[i].Get(), nullptr, rtvHandle);

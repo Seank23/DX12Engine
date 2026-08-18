@@ -62,6 +62,7 @@ namespace DX12Engine
 		m_GPUUploader = &(context.GetUploader());
 		m_PipelineStateCache = std::make_unique<PipelineStateCache>(m_Device.Get());
 		m_RootSignatureCache = std::make_unique<RootSignatureCache>(m_Device.Get());
+		m_FrameConstantAllocator = std::make_unique<FrameConstantAllocator>(m_Device.Get(), CONSTANT_RING_BYTES_PER_FRAME);
 		m_DefaultMaterial = std::make_unique<PBRMaterial>();
 		m_DefaultMaterial->SetAlbedo({ 1.0f, 0.0f, 1.0f });
 		m_DefaultMaterial->SetMetallic(0.0f);
@@ -188,7 +189,7 @@ namespace DX12Engine
 		D3D12_RESOURCE_DESC constantBufferDesc;
 		constantBufferDesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
 		constantBufferDesc.Alignment = 0;
-		constantBufferDesc.Width = alignedSize;
+		constantBufferDesc.Width = alignedSize * FRAMES_IN_FLIGHT;
 		constantBufferDesc.Height = 1;
 		constantBufferDesc.DepthOrArraySize = 1;
 		constantBufferDesc.MipLevels = 1;
@@ -626,5 +627,11 @@ namespace DX12Engine
 		}
 		return false;
 #endif
+	}
+
+	void ResourceManager::BeginFrame(UINT slot)
+	{
+		ConstantBuffer::SetFrameSlot(slot);
+		m_FrameConstantAllocator->BeginFrame(slot);
 	}
 }

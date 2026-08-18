@@ -33,7 +33,6 @@ namespace DX12Engine
 		MeshPrimitive* Primitive = nullptr;
 		MaterialAsset* MaterialAsset = nullptr;
 		int NodeIndex = -1;
-		std::unique_ptr<ConstantBuffer> PrimitiveConstantBuffer;
 		D3D12_GPU_VIRTUAL_ADDRESS CBVAddress = 0;
 		DirectX::XMMATRIX PrevUnjitteredMVPMatrix = DirectX::XMMatrixIdentity();
 		bool HasValidPrevUnjitteredMVP = false;

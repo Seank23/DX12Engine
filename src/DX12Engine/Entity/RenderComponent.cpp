@@ -26,8 +26,6 @@ namespace DX12Engine
 	{
 		for (ResolvedPrimitiveBinding& binding : m_ResolvedPrimitiveBindings)
 		{
-			binding.PrimitiveConstantBuffer = ResourceManager::GetInstance().CreateConstantBuffer(sizeof(RenderComponentData));
-			binding.CBVAddress = binding.PrimitiveConstantBuffer->GetGPUAddress();
 			binding.PrevUnjitteredMVPMatrix = DirectX::XMMatrixIdentity();
 			binding.HasValidPrevUnjitteredMVP = false;
 		}
@@ -134,8 +132,6 @@ namespace DX12Engine
 		DirectX::XMMATRIX unjitteredProjectionMatrix,
 		DirectX::XMFLOAT3 cameraPosition)
 	{
-		if (!binding.PrimitiveConstantBuffer)
-			return;
 
 		const DirectX::XMMATRIX currentMVP = modelMatrix * viewMatrix * projectionMatrix;
 		const DirectX::XMMATRIX currentUnjitteredMVP = modelMatrix * viewMatrix * unjitteredProjectionMatrix;
@@ -148,7 +144,7 @@ namespace DX12Engine
 		m_RenderObjectData.MVPMatrix = currentMVP;
 		m_RenderObjectData.UnjitteredMVPMatrix = currentUnjitteredMVP;
 		m_RenderObjectData.CameraPosition = cameraPosition;
-		binding.PrimitiveConstantBuffer->Update(&m_RenderObjectData, sizeof(RenderComponentData));
+		binding.CBVAddress = ResourceManager::GetInstance().AllocateFrameConstants(&m_RenderObjectData, sizeof(RenderComponentData));
 
 		binding.PrevUnjitteredMVPMatrix = currentUnjitteredMVP;
 		binding.HasValidPrevUnjitteredMVP = true;

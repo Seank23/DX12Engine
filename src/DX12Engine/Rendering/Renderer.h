@@ -91,5 +91,10 @@ namespace DX12Engine
 		std::unordered_map<const ResolvedPrimitiveBinding*, UINT> m_BindingActiveLods;
 
 		uint32_t m_DrawnPrimitiveCount = 0;
+
+		// Counts down one slot per frame: a changed value must be written into every slot, each
+		// during the frame that owns it, or slots that never see an update keep stale/zeroed data.
+		UINT m_OptionsDirtyFrames = 0;
+		UINT m_FrameFenceValues[FRAMES_IN_FLIGHT] = {};
 	};
 }

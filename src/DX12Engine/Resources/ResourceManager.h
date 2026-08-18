@@ -23,6 +23,7 @@
 #include "../Rendering/RootSignatureCache.h"
 #include "../IO/TextureLoader.h"
 #include "Materials/PBRMaterial.h"
+#include "../Rendering/Buffers/FrameConstantAllocator.h"
 
 namespace DX12Engine
 {
@@ -75,6 +76,9 @@ namespace DX12Engine
 		bool ReloadChangedShaders();
 		uint64_t GetShaderGeneration() const { return m_ShaderGeneration; }
 
+		void BeginFrame(UINT slot);
+		D3D12_GPU_VIRTUAL_ADDRESS AllocateFrameConstants(const void* data, UINT size) { return m_FrameConstantAllocator->Allocate(data, size); }
+
 	private:
 		Microsoft::WRL::ComPtr<ID3D12Device> m_Device;
 		DescriptorHeapManager* m_HeapManager;
@@ -83,6 +87,7 @@ namespace DX12Engine
 		std::unique_ptr<RootSignatureCache> m_RootSignatureCache;
 		std::unordered_map<std::string, std::unique_ptr<Shader>> m_Shaders;
 		std::unique_ptr<PBRMaterial> m_DefaultMaterial;
+		std::unique_ptr<FrameConstantAllocator> m_FrameConstantAllocator;
 
 		uint64_t m_ShaderGeneration = 0; // Incremented each time a shader is reloaded so dependent PSOs can be invalidated
 	};

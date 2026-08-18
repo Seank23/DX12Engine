@@ -47,10 +47,12 @@ FetchContent_MakeAvailable(tinyobjloader)
 
 set(TINYGLTF_HEADER_ONLY ON CACHE INTERNAL "" FORCE)
 set(TINYGLTF_INSTALL OFF CACHE INTERNAL "" FORCE)
+# Pinned to the last v2 tag: upstream's `release` branch moved to the v3 rewrite,
+# which renames the header to tiny_gltf_v3.h and drops the C++ tinygltf:: API.
 FetchContent_Declare(
   tinygltf
   GIT_REPOSITORY https://github.com/syoyo/tinygltf.git
-  GIT_TAG        release
+  GIT_TAG        v2.9.7
 )
 FetchContent_MakeAvailable(tinygltf)
 

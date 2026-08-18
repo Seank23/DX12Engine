@@ -1,4 +1,8 @@
 #pragma once
+#include "../Application.h"
+#include "../Resources/RenderTexture.h"
+#include "../Utils/Constants.h"
+
 #include <d3d12.h>
 #include <dxgi1_4.h>
 #include <wrl.h>
@@ -6,8 +10,6 @@
 #include <DirectXMath.h>
 #include <d3dcompiler.h>
 #include "d3dx12.h"
-#include "../Application.h"
-#include "../Resources/RenderTexture.h"
 
 namespace DX12Engine
 {
@@ -51,7 +53,7 @@ namespace DX12Engine
 
 		Microsoft::WRL::ComPtr<IDXGISwapChain3> m_SwapChain;
 		Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> m_RTVHeap;
-		Microsoft::WRL::ComPtr<ID3D12Resource> m_RenderTargets[2];
+		Microsoft::WRL::ComPtr<ID3D12Resource> m_RenderTargets[FRAMES_IN_FLIGHT];
 
 		std::unique_ptr<RenderTexture> m_DepthBuffer;
 
