@@ -6,6 +6,7 @@
 #include "../../Resources/Shader.h"
 #include "../../UI/UIContext.h"
 #include "../../Utils/EngineUtils.h"
+#include "../../Resources/GPUResource.h"
 #include "d3dx12.h"
 
 #include <DirectXTex.h>
@@ -14,7 +15,6 @@
 #include <array>
 #include <cctype>
 #include <cstring>
-#include <limits>
 #include <string>
 #include <vector>
 
@@ -82,8 +82,6 @@ namespace DX12Engine
 			m_RenderContext->GetQueueManager().GetGraphicsQueue().WaitForIdle();
 		}
 
-		ProcessPendingUploadReleases();
-
 		if (m_RenderContext)
 		{
 			for (auto& [handle, record] : m_TextureMap)
@@ -95,7 +93,6 @@ namespace DX12Engine
 
 		m_GeometryMap.clear();
 		m_TextureMap.clear();
-		m_PendingUploadReleases.clear();
 		m_WhiteTextureHandle = 0;
 		m_NextGeometryHandle = 1;
 		m_NextTextureHandle = 1;
@@ -144,8 +141,6 @@ namespace DX12Engine
 		if (!m_IsInitialized)
 			return;
 
-		ProcessPendingUploadReleases();
-
 		m_Device = context.Device;
 		m_CommandList = context.CommandList;
 		m_CurrentViewport = context.Viewport;
@@ -174,49 +169,7 @@ namespace DX12Engine
 
 	void RmlRenderInterfaceDX12::EndFrame()
 	{
-		for (auto& [handle, record] : m_TextureMap)
-		{
-			if (record.Ready && record.UploadResource)
-				QueueUploadResourceRelease(record.UploadResource);
-		}
-
-		ProcessPendingUploadReleases();
-
 		m_CommandList = nullptr;
-	}
-
-	void RmlRenderInterfaceDX12::QueueUploadResourceRelease(Microsoft::WRL::ComPtr<ID3D12Resource>& uploadResource)
-	{
-		if (!uploadResource)
-			return;
-
-		PendingUploadRelease pending;
-		pending.Resource = std::move(uploadResource);
-
-		if (m_RenderContext)
-			pending.FenceValue = static_cast<uint64_t>(m_RenderContext->GetQueueManager().GetGraphicsQueue().GetNextFenceValue());
-
-		m_PendingUploadReleases.emplace_back(std::move(pending));
-	}
-
-	void RmlRenderInterfaceDX12::ProcessPendingUploadReleases()
-	{
-		if (m_PendingUploadReleases.empty())
-			return;
-
-		uint64_t completedFence = (std::numeric_limits<uint64_t>::max)();
-		if (m_RenderContext)
-			completedFence = static_cast<uint64_t>(m_RenderContext->GetQueueManager().GetGraphicsQueue().PollCurrentFenceValue());
-
-		auto releaseIt = std::remove_if(m_PendingUploadReleases.begin(), m_PendingUploadReleases.end(), [completedFence](const PendingUploadRelease& pending)
-										{
-				if (!pending.Resource)
-					return true;
-				if (pending.FenceValue == 0)
-					return true;
-				return pending.FenceValue <= completedFence; });
-
-		m_PendingUploadReleases.erase(releaseIt, m_PendingUploadReleases.end());
 	}
 
 	Rml::CompiledGeometryHandle RmlRenderInterfaceDX12::CompileGeometry(Rml::Span<const Rml::Vertex> vertices, Rml::Span<const int> indices)
@@ -711,27 +664,29 @@ namespace DX12Engine
 
 		auto heapDefault = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);
 		auto textureDesc = CD3DX12_RESOURCE_DESC::Tex2D(DXGI_FORMAT_R8G8B8A8_UNORM, static_cast<UINT>(dimensions.x), static_cast<UINT>(dimensions.y));
+		Microsoft::WRL::ComPtr<ID3D12Resource> textureResource;
 		if (FAILED(m_Device->CreateCommittedResource(
 				&heapDefault,
 				D3D12_HEAP_FLAG_NONE,
 				&textureDesc,
 				D3D12_RESOURCE_STATE_COPY_DEST,
 				nullptr,
-				IID_PPV_ARGS(&outRecord.Resource))))
+				IID_PPV_ARGS(&textureResource))))
 		{
 			return false;
 		}
 
-		const UINT64 uploadBufferSize = GetRequiredIntermediateSize(outRecord.Resource.Get(), 0, 1);
+		const UINT64 uploadBufferSize = GetRequiredIntermediateSize(textureResource.Get(), 0, 1);
 		auto heapUpload = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD);
 		auto uploadDesc = CD3DX12_RESOURCE_DESC::Buffer(uploadBufferSize);
+		Microsoft::WRL::ComPtr<ID3D12Resource> uploadResource;
 		if (FAILED(m_Device->CreateCommittedResource(
 				&heapUpload,
 				D3D12_HEAP_FLAG_NONE,
 				&uploadDesc,
 				D3D12_RESOURCE_STATE_GENERIC_READ,
 				nullptr,
-				IID_PPV_ARGS(&outRecord.UploadResource))))
+				IID_PPV_ARGS(&uploadResource))))
 		{
 			return false;
 		}
@@ -741,38 +696,18 @@ namespace DX12Engine
 		subresource.RowPitch = static_cast<LONG_PTR>(dimensions.x) * 4;
 		subresource.SlicePitch = subresource.RowPitch * static_cast<LONG_PTR>(dimensions.y);
 
-		if (m_CommandList)
-		{
-			UpdateSubresources(m_CommandList, outRecord.Resource.Get(), outRecord.UploadResource.Get(), 0, 0, 1, &subresource);
-			auto barrier = CD3DX12_RESOURCE_BARRIER::Transition(
-				outRecord.Resource.Get(),
-				D3D12_RESOURCE_STATE_COPY_DEST,
-				D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
-			m_CommandList->ResourceBarrier(1, &barrier);
-			outRecord.Ready = true;
-		}
-		else
-		{
-			auto& queueManager = m_RenderContext->GetQueueManager();
-			auto& copyQueue = queueManager.GetCopyQueue();
-			auto& graphicsQueue = queueManager.GetGraphicsQueue();
-			copyQueue.ResetCommandAllocatorAndList();
-			graphicsQueue.ResetCommandAllocatorAndList();
+		// GPUResource owns the reference it is handed and releases it in its destructor,
+		// so hand ownership over instead of sharing the pointer with a ComPtr.
+		outRecord.Resource = std::make_unique<GPUResource>(textureResource.Detach(), D3D12_RESOURCE_STATE_COPY_DEST);
 
-			UpdateSubresources(copyQueue.GetCommandList(), outRecord.Resource.Get(), outRecord.UploadResource.Get(), 0, 0, 1, &subresource);
-			const UINT copyFence = copyQueue.ExecuteCommandList();
-			graphicsQueue.InsertWaitForQueueFence(&copyQueue, copyFence);
+		UploadResourceWrapper uploadWrapper;
+		uploadWrapper.GPUResource = outRecord.Resource.get();
+		// GPUUploader takes ownership of the upload heap and retires it once the copy has run.
+		uploadWrapper.UploadResource = uploadResource.Detach();
+		uploadWrapper.UploadState = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+		uploadWrapper.Data = subresource;
 
-			auto barrier = CD3DX12_RESOURCE_BARRIER::Transition(
-				outRecord.Resource.Get(),
-				D3D12_RESOURCE_STATE_COPY_DEST,
-				D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
-			graphicsQueue.GetCommandList()->ResourceBarrier(1, &barrier);
-			const UINT graphicsFence = graphicsQueue.ExecuteCommandList();
-			graphicsQueue.WaitForFenceCPUBlocking(graphicsFence);
-			outRecord.Ready = true;
-			outRecord.UploadResource.Reset();
-		}
+		m_RenderContext->GetUploader().UploadResource(uploadWrapper);
 
 		outRecord.PersistentSrv = m_RenderContext->GetHeapManager().AllocatePersistentSRV();
 		D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
@@ -780,7 +715,7 @@ namespace DX12Engine
 		srvDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
 		srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
 		srvDesc.Texture2D.MipLevels = 1;
-		m_Device->CreateShaderResourceView(outRecord.Resource.Get(), &srvDesc, outRecord.PersistentSrv.GetCPUHandle());
+		m_Device->CreateShaderResourceView(outRecord.Resource->GetResource(), &srvDesc, outRecord.PersistentSrv.GetCPUHandle());
 
 		outRecord.Width = static_cast<uint32_t>(dimensions.x);
 		outRecord.Height = static_cast<uint32_t>(dimensions.y);
@@ -855,11 +790,6 @@ namespace DX12Engine
 		}
 
 		return {};
-	}
-
-	bool RmlRenderInterfaceDX12::UploadTextureRecord(TextureRecord& record)
-	{
-		return record.Ready;
 	}
 
 	DescriptorHeapHandle RmlRenderInterfaceDX12::BuildTransientTextureDescriptor(const TextureRecord& textureRecord)

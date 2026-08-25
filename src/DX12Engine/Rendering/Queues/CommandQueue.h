@@ -33,6 +33,8 @@ namespace DX12Engine
 		Microsoft::WRL::ComPtr<ID3D12Fence> GetFence() { return m_Fence; }
 
 		UINT64 ExecuteCommandList();
+		UINT64 SubmitCommandList(ID3D12GraphicsCommandList* commandList);
+
 		ID3D12GraphicsCommandList* GetCommandList() { return m_CommandList.Get(); }
 		void ResetCommandAllocatorAndList();
 		void ResetCommandList();
@@ -54,5 +56,7 @@ namespace DX12Engine
 
 		std::mutex m_FenceMutex;
 		std::mutex m_EventMutex;
+
+		bool m_ListIsRecording = false;
 	};
 }

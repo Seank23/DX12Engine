@@ -2,6 +2,7 @@
 #include <RmlUi/Core.h>
 
 #include "../../Rendering/Heaps/DescriptorHeapHandle.h"
+#include "../../Resources/GPUResource.h"
 #include <d3d12.h>
 #include <wrl/client.h>
 
@@ -9,6 +10,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <filesystem>
+#include <memory>
 #include <unordered_map>
 #include <vector>
 
@@ -58,12 +60,10 @@ namespace DX12Engine
 
 		struct TextureRecord
 		{
-			Microsoft::WRL::ComPtr<ID3D12Resource> Resource;
-			Microsoft::WRL::ComPtr<ID3D12Resource> UploadResource;
+			std::unique_ptr<GPUResource> Resource;
 			DescriptorHeapHandle PersistentSrv;
 			uint32_t Width = 0;
 			uint32_t Height = 0;
-			bool Ready = false;
 		};
 
 		struct Constants
@@ -71,12 +71,6 @@ namespace DX12Engine
 			std::array<float, 16> Transform{};
 			std::array<float, 2> Translation{};
 			std::array<float, 2> Padding{};
-		};
-
-		struct PendingUploadRelease
-		{
-			Microsoft::WRL::ComPtr<ID3D12Resource> Resource;
-			uint64_t FenceValue = 0;
 		};
 
 		bool EnsurePipelineResources();
@@ -91,10 +85,7 @@ namespace DX12Engine
 		bool CreateTextureFromPixels(Rml::Span<const Rml::byte> source, Rml::Vector2i dimensions, TextureRecord& outRecord);
 		bool CreateTextureFromFile(const std::filesystem::path& filePath, TextureRecord& outRecord, Rml::Vector2i* outDimensions = nullptr);
 		std::filesystem::path ResolveTexturePath(const Rml::String& source) const;
-		bool UploadTextureRecord(TextureRecord& record);
 		DescriptorHeapHandle BuildTransientTextureDescriptor(const TextureRecord& textureRecord);
-		void QueueUploadResourceRelease(Microsoft::WRL::ComPtr<ID3D12Resource>& uploadResource);
-		void ProcessPendingUploadReleases();
 
 		RenderContext* m_RenderContext = nullptr;
 		ID3D12Device* m_Device = nullptr;
@@ -128,7 +119,6 @@ namespace DX12Engine
 		std::unordered_map<Rml::CompiledGeometryHandle, CompiledGeometryRecord> m_GeometryMap;
 		std::unordered_map<Rml::TextureHandle, TextureRecord> m_TextureMap;
 		std::unordered_map<Rml::TextureHandle, DescriptorHeapHandle> m_FrameTextureTableCache;
-		std::vector<PendingUploadRelease> m_PendingUploadReleases;
 		Rml::CompiledGeometryHandle m_NextGeometryHandle = 1;
 		Rml::TextureHandle m_NextTextureHandle = 1;
 		Rml::TextureHandle m_WhiteTextureHandle = 0;

@@ -1,6 +1,7 @@
 #include "GPUUploader.h"
 #include "../Utils/Constants.h"
 #include "./RenderContext.h"
+#include "../Utils/EngineUtils.h"
 
 namespace DX12Engine
 {
@@ -19,8 +20,8 @@ namespace DX12Engine
 	GPUUploader::GPUUploader(RenderContext& context)
 		: m_RenderContext(context), m_QueueManager(context.GetQueueManager())
 	{
-		m_GraphicsCommandList = m_QueueManager.GetGraphicsQueue().GetCommandList();
-		m_CopyCommandList = m_QueueManager.GetCopyQueue().GetCommandList();
+		m_GraphicsUploadList.Init(context.GetDevice().Get(), D3D12_COMMAND_LIST_TYPE_DIRECT, FRAMES_IN_FLIGHT * 4);
+		m_CopyUploadList.Init(context.GetDevice().Get(), D3D12_COMMAND_LIST_TYPE_COPY, FRAMES_IN_FLIGHT * 4);
 	}
 
 	GPUUploader::~GPUUploader()
@@ -54,11 +55,11 @@ namespace DX12Engine
 		ID3D12Device* device = m_RenderContext.GetDevice().Get();
 		for (Texture* texture : texturesToUpload)
 		{
-			UpdateSubresources(m_CopyCommandList, texture->GetResource(), texture->m_UploadResource, 0, 0, static_cast<UINT>(texture->m_Data.size()), texture->m_Data.data());
+			UpdateSubresources(m_CopyUploadList.GetCommandList(), texture->GetResource(), texture->m_UploadResource, 0, 0, static_cast<UINT>(texture->m_Data.size()), texture->m_Data.data());
 			auto barrier = CD3DX12_RESOURCE_BARRIER::Transition(texture->m_MainResource,
 																D3D12_RESOURCE_STATE_COPY_DEST,
 																D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
-			m_GraphicsCommandList->ResourceBarrier(1, &barrier);
+			m_GraphicsUploadList.GetCommandList()->ResourceBarrier(1, &barrier);
 
 			// Write the SRV into the persistent non-shader-visible staging slot so it
 			// can be used as a CopyDescriptorsSimple source every frame.
@@ -98,11 +99,11 @@ namespace DX12Engine
 			m_PendingReferencedResources.push_back(referencedResource);
 		}
 
-		UpdateSubresources(m_CopyCommandList, resourceWrapper.GPUResource->GetResource(), resourceWrapper.UploadResource, 0, 0, 1, &resourceWrapper.Data);
+		UpdateSubresources(m_CopyUploadList.GetCommandList(), resourceWrapper.GPUResource->GetResource(), resourceWrapper.UploadResource, 0, 0, 1, &resourceWrapper.Data);
 		auto barrier = CD3DX12_RESOURCE_BARRIER::Transition(resourceWrapper.GPUResource->GetResource(),
 															resourceWrapper.GPUResource->GetUsageState(),
 															resourceWrapper.UploadState);
-		m_GraphicsCommandList->ResourceBarrier(1, &barrier);
+		m_GraphicsUploadList.GetCommandList()->ResourceBarrier(1, &barrier);
 		resourceWrapper.GPUResource->SetUsageState(resourceWrapper.UploadState);
 		resourceWrapper.GPUResource->SetIsReady(true);
 		if (resourceWrapper.UploadResource)
@@ -120,9 +121,10 @@ namespace DX12Engine
 			return;
 		auto& copyQueue = m_QueueManager.GetCopyQueue();
 		auto& graphicsQueue = m_QueueManager.GetGraphicsQueue();
-		UINT copyFenceVal = copyQueue.ExecuteCommandList();
+
+		UINT copyFenceVal = m_CopyUploadList.Submit(copyQueue);
 		graphicsQueue.InsertWaitForQueueFence(&copyQueue, copyFenceVal);
-		UINT graphicsFenceVal = graphicsQueue.ExecuteCommandList();
+		UINT graphicsFenceVal = m_GraphicsUploadList.Submit(graphicsQueue);
 
 		m_UploadListsRecording = false;
 		QueuePendingReleases(graphicsFenceVal);
@@ -175,8 +177,47 @@ namespace DX12Engine
 		if (m_UploadListsRecording)
 			return;
 
-		m_QueueManager.GetCopyQueue().ResetCommandAllocatorAndList();
-		m_QueueManager.GetGraphicsQueue().ResetCommandAllocatorAndList();
+		m_CopyUploadList.Begin(m_QueueManager.GetCopyQueue());
+		m_GraphicsUploadList.Begin(m_QueueManager.GetGraphicsQueue());
 		m_UploadListsRecording = true;
+	}
+
+	void UploadCommandList::Init(ID3D12Device* device, D3D12_COMMAND_LIST_TYPE commandType, UINT slotCount)
+	{
+		m_Slots.resize(slotCount);
+		for (Slot& slot : m_Slots)
+			EngineUtils::ThrowIfFailed(device->CreateCommandAllocator(commandType, IID_PPV_ARGS(&slot.Allocator)));
+		EngineUtils::ThrowIfFailed(device->CreateCommandList(0, commandType, m_Slots[0].Allocator.Get(), nullptr, IID_PPV_ARGS(&m_CommandList)));
+		EngineUtils::ThrowIfFailed(m_CommandList->Close());
+	}
+
+	void UploadCommandList::Begin(CommandQueue& queue)
+	{
+		const size_t oldest = (m_CurrentSlot + 1) % m_Slots.size();
+		size_t selected = oldest;
+		bool found = false;
+		for (size_t i = 0; i < m_Slots.size() && !found; i++)
+		{
+			const size_t candidate = (oldest + i) % m_Slots.size();
+			if (m_Slots[candidate].FenceValue == 0 || queue.IsFenceComplete(static_cast<UINT>(m_Slots[candidate].FenceValue)))
+			{
+				selected = candidate;
+				found = true;
+			}
+		}
+		if (!found)
+			queue.WaitForFenceCPUBlocking(static_cast<UINT>(m_Slots[oldest].FenceValue));
+
+		m_CurrentSlot = selected;
+		m_Slots[m_CurrentSlot].FenceValue = 0;
+		EngineUtils::ThrowIfFailed(m_Slots[m_CurrentSlot].Allocator->Reset());
+		EngineUtils::ThrowIfFailed(m_CommandList->Reset(m_Slots[m_CurrentSlot].Allocator.Get(), nullptr));
+	}
+
+	UINT UploadCommandList::Submit(CommandQueue& queue)
+	{
+		const UINT fenceValue = queue.SubmitCommandList(m_CommandList.Get());
+		m_Slots[m_CurrentSlot].FenceValue = fenceValue;
+		return fenceValue;
 	}
 }

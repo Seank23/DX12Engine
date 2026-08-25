@@ -37,9 +37,10 @@ namespace DX12Engine
 
 	void UIRenderPass::Execute()
 	{
-		RenderPass::Execute();
 		if (m_RenderTargets.empty())
 			return;
+
+		RenderPass::Execute();
 
 		RenderTexture* renderTarget = m_RenderTargets[0].get();
 		RenderTexture* sceneSource = nullptr;
@@ -103,6 +104,11 @@ namespace DX12Engine
 		uiContext.LogicalHeight = static_cast<uint32_t>(windowSize.y);
 		if (m_UISystem)
 			m_UISystem->Render(uiContext);
+
+		// Rml creates its font atlas and other textures lazily during Render. Flush them
+		// now so the copy and the COPY_DEST -> PIXEL_SHADER_RESOURCE barrier are submitted
+		// ahead of this pass's command list, which samples them.
+		m_RenderContext.GetUploader().UploadAllPending();
 
 		barriers.clear();
 		barriers.push_back(CD3DX12_RESOURCE_BARRIER::Transition(

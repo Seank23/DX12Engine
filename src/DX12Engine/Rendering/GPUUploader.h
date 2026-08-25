@@ -14,6 +14,25 @@ namespace DX12Engine
 		UINT64 FenceValue;
 	};
 
+	class UploadCommandList
+	{
+	public:
+		void Init(ID3D12Device* device, D3D12_COMMAND_LIST_TYPE commandType, UINT slotCount);
+		void Begin(CommandQueue& queue);
+		UINT Submit(CommandQueue& queue);
+		ID3D12GraphicsCommandList* GetCommandList() { return m_CommandList.Get(); }
+
+	private:
+		struct Slot
+		{
+			Microsoft::WRL::ComPtr<ID3D12CommandAllocator> Allocator;
+			UINT64 FenceValue = 0;
+		};
+		Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList> m_CommandList;
+		std::vector<Slot> m_Slots;
+		UINT m_CurrentSlot = 0;
+	};
+
 	class GPUUploader
 	{
 	public:
@@ -38,8 +57,7 @@ namespace DX12Engine
 		CommandQueueManager& m_QueueManager;
 		RenderContext& m_RenderContext;
 
-		ID3D12GraphicsCommandList* m_GraphicsCommandList;
-		ID3D12GraphicsCommandList* m_CopyCommandList;
+		UploadCommandList m_GraphicsUploadList, m_CopyUploadList;
 
 		int m_UploadCount = 0;
 		bool m_UploadListsRecording = false;

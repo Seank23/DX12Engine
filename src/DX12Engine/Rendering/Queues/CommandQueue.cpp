@@ -27,7 +27,6 @@ namespace DX12Engine
 		m_CommandAllocator = m_CommandAllocatorSlots[m_CurrentAllocatorSlot].Allocator;
 		EngineUtils::ThrowIfFailed(device->CreateCommandList(0, commandType, m_CommandAllocator.Get(), nullptr, IID_PPV_ARGS(&m_CommandList)));
 		m_CommandList->Close();
-		ResetCommandAllocatorAndList();
 
 		EngineUtils::ThrowIfFailed(device->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&m_Fence)));
 		m_Fence->Signal(m_LastCompletedFenceValue);
@@ -97,6 +96,19 @@ namespace DX12Engine
 		std::lock_guard<std::mutex> lockGuard(m_EventMutex);
 		m_CommandQueue->Signal(m_Fence.Get(), fenceValue);
 		m_NextFenceValue++;
+		m_ListIsRecording = false;
+		return static_cast<UINT>(fenceValue);
+	}
+
+	UINT64 CommandQueue::SubmitCommandList(ID3D12GraphicsCommandList* commandList)
+	{
+		EngineUtils::ThrowIfFailed(commandList->Close());
+		auto list = (ID3D12CommandList*)commandList;
+		m_CommandQueue->ExecuteCommandLists(1, &list);
+
+		std::lock_guard<std::mutex> lockGuard(m_EventMutex);
+		UINT64 fenceValue = m_NextFenceValue++;
+		m_CommandQueue->Signal(m_Fence.Get(), fenceValue);
 		return static_cast<UINT>(fenceValue);
 	}
 
@@ -104,6 +116,9 @@ namespace DX12Engine
 	{
 		if (m_CommandAllocatorSlots.empty())
 			return;
+
+		EngineUtils::Assert(!m_ListIsRecording);
+		m_ListIsRecording = true;
 
 		size_t selectedSlot = m_CurrentAllocatorSlot;
 		bool foundReadySlot = false;
