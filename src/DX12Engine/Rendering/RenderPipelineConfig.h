@@ -8,10 +8,8 @@ namespace DX12Engine
 	enum class ResourceSlot
 	{
 		Albedo,
-		WorldNormal,
-		ObjectNormal,
+		Normals,
 		Material,
-		Position,
 		Depth,
 		Composite,
 		Emissive,

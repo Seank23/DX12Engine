@@ -91,10 +91,8 @@ namespace DX12EngineDemo
 		geometryConfig.Writes.push_back({ DX12Engine::PipelineResource::Depth });
 		std::vector<DX12Engine::ResourceSlot> gBufferTypes{
 			DX12Engine::ResourceSlot::Albedo,
-			DX12Engine::ResourceSlot::WorldNormal,
-			DX12Engine::ResourceSlot::ObjectNormal,
+			DX12Engine::ResourceSlot::Normals,
 			DX12Engine::ResourceSlot::Material,
-			DX12Engine::ResourceSlot::Position,
 			DX12Engine::ResourceSlot::Emissive,
 			DX12Engine::ResourceSlot::Depth
 		};
@@ -114,10 +112,8 @@ namespace DX12EngineDemo
 		std::vector<DX12Engine::ResourceSlot> reactiveMaskType{ DX12Engine::ResourceSlot::ReactiveMask };
 		std::vector<DX12Engine::ResourceSlot> ssrGBufferTypes{
 			DX12Engine::ResourceSlot::Albedo,
-			DX12Engine::ResourceSlot::WorldNormal,
-			DX12Engine::ResourceSlot::ObjectNormal,
+			DX12Engine::ResourceSlot::Normals,
 			DX12Engine::ResourceSlot::Material,
-			DX12Engine::ResourceSlot::Position,
 			DX12Engine::ResourceSlot::Emissive,
 			DX12Engine::ResourceSlot::Depth
 		};

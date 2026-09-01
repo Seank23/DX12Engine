@@ -1,12 +1,5 @@
-cbuffer ScreenData : register(b1)
-{
-    float4 CameraPosition;
-    float4x4 ViewMatrix;
-    float4x4 ProjectionMatrix;
-    float4x4 InvViewMatrix;
-    float4x4 InvProjectionMatrix;
-    float2 ScreenSize;
-};
+#define SCREEN_DATA_REGISTER b1
+#include "Common/ScreenData.hlsli"
 
 cbuffer MaterialData : register(b2)
 {

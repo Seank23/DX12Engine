@@ -82,26 +82,28 @@ There is a second, subtler consequence: the full-frame stall is currently **load
 ## 4. Geometry pass and the G-buffer
 
 ### 4.1 Layout
-`GeometryRenderPass::Init` (`GeometryRenderPass.cpp:29`) creates **seven color render targets plus a depth target**:
+`GeometryRenderPass::Init` (`GeometryRenderPass.cpp:29`) creates **five color render targets plus a depth target**:
 
 | Slot | Format | Bytes/px | Contents |
 |------|--------|---------:|----------|
 | Albedo | `R8G8B8A8_UNORM` | 4 | base color (linearized), alpha |
-| WorldNormal | `R16G16B16A16_FLOAT` | 8 | normal-mapped world normal |
-| ObjectNormal | `R16G16B16A16_FLOAT` | 8 | geometric world normal (no normal map) |
-| Material | `R16G16B16A16_FLOAT` | 8 | roughness, metallic, clearcoat, clearcoatRoughness |
-| Position | `R16G16B16A16_FLOAT` | 8 | world-space position |
+| Normals | `R16G16B16A16_UNORM` | 8 | octahedral world normal in `.xy`, geometric normal in `.zw` |
+| Material | `R8G8B8A8_UNORM` | 4 | roughness, metallic, clearcoat, clearcoatRoughness |
 | Emissive | `R16G16B16A16_FLOAT` | 8 | emissive rgb + **AO in alpha** |
 | Velocity | `R16G16_FLOAT` | 4 | screen-space motion vector |
 | Depth | `D32_FLOAT` | 4 | hardware depth |
 
-**Total ≈ 52 bytes/pixel.** At 1080p that is **~107 MB** for the G-buffer alone, before SceneColor, two SSR history buffers, two TAA history buffers, the reactive mask, and the transparent scene copy — all full-resolution `R16G16B16A16_FLOAT`.
+**Total ≈ 32 bytes/pixel.** At 1080p that is **~66 MB** for the G-buffer, before SceneColor, two SSR history buffers, two TAA history buffers, the reactive mask, and the transparent scene copy — all full-resolution `R16G16B16A16_FLOAT`.
 
-Two of these targets are redundant:
-- **Position** is fully reconstructable from depth + inverse-projection (the SSR and TAA passes already do exactly this reconstruction). Storing it costs 8 bytes/pixel for nothing.
-- **World+Object normals** are two 8-byte targets where octahedral encoding would fit each in `R16G16` (4 bytes) or even `R8G8B8A8`. That is ~8–12 bytes/pixel recoverable.
+This layout is the result of the slimming pass described in `docs/GBuffer-Slimming-Guide.md`, which took it from 8 targets at 52 bytes/pixel (~107 MB at 1080p):
 
-A modern packed G-buffer for the same data would be ~20–24 bytes/pixel — less than half.
+- **Position was deleted.** World position is reconstructed from depth and the inverse projection by `ReconstructWorldPos` in `Shaders/Common/GBufferUtils.hlsli`, shared by the lighting and SSR passes. This is also a *precision* win: half-float world coordinates quantise to worse than a unit past a few thousand units from the origin, while `D32_FLOAT` run back through the inverse projection stays sub-millimetre.
+- **The two normal targets became one.** Both normals are octahedral-encoded to two channels (`PackNormal`/`UnpackNormal`, same header) and share a single `R16G16B16A16_UNORM` target. `UNORM` rather than `FLOAT16` because octahedral mapping wants uniform precision across its range, not exponent range it will never use; angular error is ~0.1° at 16 bits.
+- **Material narrowed to `RGBA8`.** All four channels are `[0,1]` and every consumer already `saturate()`s them on read.
+
+Because oct pairs must not be filtered — interpolating them across a silhouette or the fold decodes to a direction belonging to neither surface — G-buffer normal fetches go through the `LoadMap`/`LoadWorldNormal` point-load helpers rather than the pass's anisotropic sampler.
+
+Each render-target format is declared in **three** places that must agree: the `RenderTextureConfig` in `GeometryRenderPass::Init`, the `SetRenderTargets` list in `GeometryRenderPass::CreatePSO`, and a duplicate of that list in `MaterialTemplate::BuildPSODesc` (`MaterialTemplate.cpp:109`). A mismatch in the third fails per-material and reads as a material bug.
 
 ### 4.2 Vertex path and motion vectors
 `Geometry_VS` (`Shaders/Geometry_VS.hlsl`) transforms with a jittered `MVPMatrix` for rasterization but carries **both** an *unjittered* current clip and the previous-frame unjittered clip. `Geometry_PS` computes the velocity from the **unjittered** current/previous NDC (`Geometry_PS.hlsl:101`). This is the correct way to avoid baking TAA jitter into motion vectors — a genuinely nice detail. The previous-MVP is tracked per primitive binding, and reset when the object was frustum-culled last frame (`Renderer.cpp:476`) so re-appearing objects don't emit a bogus velocity spike.
@@ -252,7 +254,7 @@ Both are single-threaded and per-object on the CPU. There is **no occlusion cull
 1. **No CPU/GPU frame overlap** (§3.2). Biggest performance ceiling; ~2× throughput left on the table.
 2. **≤4 lights, no clustering** (§5). Biggest capability ceiling.
 3. **No tone mapping / exposure / bloom** (§9). Biggest *visual* deficit; cheapest to fix.
-4. **Fat 52-byte G-buffer** with redundant position + dual full-fat normals (§4.1). Bandwidth and memory.
+4. ~~**Fat 52-byte G-buffer** with redundant position + dual full-fat normals.~~ **Done** — slimmed to 32 bytes/pixel (§4.1).
 5. **Per-primitive committed constant buffers** (§10.3). Memory + allocation overhead; blocks pipelining.
 6. **Synchronous, CPU-blocking uploads** (§3.3). Streaming hitches.
 7. **No compute shaders anywhere.** SSR/TAA/lighting/downsampling are all pixel-shader full-screen passes; the `_CS` loader path exists but no compute shader is shipped. Compute would be faster and enable HZB/clustering/mip-gen.
@@ -331,7 +333,7 @@ Ordered by value-to-effort.
 ### Tier 2 — architectural, unlocks the ceiling
 4. **Real frame pipelining.** Double/triple-buffer the dynamic constant buffers (see #6), remove the per-frame `WaitForFenceCPUBlocking`, and gate on the swap-chain back-buffer fence instead. Target CPU/GPU overlap.
 5. **Per-frame ring constant allocator.** Replace per-primitive committed CBs with one large upload buffer, sub-allocated per draw, N-buffered. Prerequisite for #4 and a large memory/alloc win.
-6. **Slim the G-buffer.** Reconstruct position from depth (delete the position target); octahedral-encode normals into `R16G16`/`RGBA8`. ~50% G-buffer bandwidth/memory reduction.
+6. ~~**Slim the G-buffer.**~~ **Done.** Position reconstructed from depth, both normals octahedral-encoded into one `RGBA16_UNORM` target, material narrowed to `RGBA8`: 8 targets at 52 B/px → 6 at 32 B/px, a 38% reduction (§4.1, `docs/GBuffer-Slimming-Guide.md`).
 7. **Async, batched uploads.** Keep uploads on the copy queue but make them fence-based/non-blocking; use a barrier on first-use rather than a synchronous graphics stall.
 
 ### Tier 3 — scale and modernization
@@ -344,6 +346,7 @@ Ordered by value-to-effort.
 12. **Split-sum BRDF LUT** for energy-correct IBL specular, replacing the ad-hoc `(1-roughness)²` weight.
 13. **Order-independent or depth-peeled transparency**, or at least per-triangle-sorted transparents; current sorting is per-object-center only.
 14. Remove the **unused D24S8 depth buffer** (`RenderWindow.cpp:99`) and audit other vestigial allocations.
+15. **Resolve the quarter-texel nudge in depth reconstruction.** `ReconstructViewPos` (`Shaders/Common/GBufferUtils.hlsli`) offsets clip-space by `0.5 / screenSize` before the `y` flip. One pixel spans `2 / screenSize` in NDC, so a half-texel correction would be `1 / screenSize` — this is a quarter texel, applied to both axes before the flip so they end up nudged in opposite directions. It was inherited verbatim from the pre-slimming `SSRPass_PS` so that the shared helper would be a provable no-op for SSR; SSR's heuristics are tuned around it. Worth fixing on its own, with SSR before/after screenshots in hand.
 
 ---
 

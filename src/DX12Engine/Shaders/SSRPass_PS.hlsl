@@ -1,12 +1,4 @@
-﻿cbuffer ScreenBuffer : register(b0)
-{
-    float4 CameraPosition;
-    float4x4 ViewMatrix;
-    float4x4 ProjectionMatrix;
-    float4x4 InvViewMatrix;
-    float4x4 InvProjectionMatrix;
-    float2 ScreenSize;
-};
+#include "Common/ScreenData.hlsli"
 
 cbuffer TemporalBuffer : register(b1)
 {
@@ -33,19 +25,18 @@ struct PSOutput
 TextureCube environmentMap : register(t0);
 // G-buffer inputs
 Texture2D albedoMap : register(t1);
-Texture2D normalMap : register(t2);
-Texture2D objectNormalMap : register(t3);
-Texture2D materialMap : register(t4);
-Texture2D positionMap : register(t5);
-Texture2D emissiveMap : register(t6);
-Texture2D depthMap : register(t7);
-Texture2D pipelineOutputMap : register(t8);
+Texture2D normalsMap : register(t2);
+Texture2D materialMap : register(t3);
+Texture2D emissiveMap : register(t4);
+Texture2D depthMap : register(t5);
+Texture2D pipelineOutputMap : register(t6);
 // Temporal history (read-only, previous frame result)
-Texture2D historyMap : register(t9);
+Texture2D historyMap : register(t7);
 
 SamplerState samp : register(s0);
 
 #include "Common/ColorUtils.hlsli"
+#include "Common/GBufferUtils.hlsli"
 #include "Lighting/PBRShading.hlsli"
 
 // ---------------------------------------------------------------------------
@@ -56,18 +47,6 @@ float InterleavedGradientNoise(float2 screenPos, uint frame)
 {
     screenPos += float(frame) * 5.588238f;
     return frac(52.9829189f * frac(dot(screenPos, float2(0.06711056f, 0.00583715f))));
-}
-
-// ---------------------------------------------------------------------------
-// Reconstruct view-space position from depth and UV.
-// ---------------------------------------------------------------------------
-float3 ReconstructViewPos(float2 uv, float depth)
-{
-    float4 posCS = float4(uv * 2.0 - 1.0, depth, 1.0);
-    posCS.xy += 0.5 / ScreenSize;
-    posCS.y *= -1.0;
-    float4 posVS = mul(InvProjectionMatrix, posCS);
-    return posVS.xyz / posVS.w;
 }
 
 void ComputePositionAndReflection(
@@ -275,12 +254,12 @@ float EstimateFallbackVisibility(float3 sceneColor, float3 emissive, float3 fall
 float SurfaceEdgeFactor(float2 texCoord, float3 normalWS)
 {
     float2 texel = 1.0 / ScreenSize;
-    float depthCenter = depthMap.SampleLevel(samp, texCoord, 0).r;
-    float depthX = abs(depthMap.SampleLevel(samp, texCoord + float2(texel.x, 0.0), 0).r - depthCenter);
-    float depthY = abs(depthMap.SampleLevel(samp, texCoord + float2(0.0, texel.y), 0).r - depthCenter);
+    float depthCenter = LoadMap(texCoord, depthMap).r;
+    float depthX = abs(LoadMap(texCoord + float2(texel.x, 0.0), depthMap).r - depthCenter);
+    float depthY = abs(LoadMap(texCoord + float2(0.0, texel.y), depthMap).r - depthCenter);
 
-    float3 normalX = normalize(normalMap.SampleLevel(samp, texCoord + float2(texel.x, 0.0), 0).xyz);
-    float3 normalY = normalize(normalMap.SampleLevel(samp, texCoord + float2(0.0, texel.y), 0).xyz);
+    float3 normalX = LoadWorldNormal(texCoord + float2(texel.x, 0.0), normalsMap);
+    float3 normalY = LoadWorldNormal(texCoord + float2(0.0, texel.y), normalsMap);
     float normalDelta = (1.0 - saturate(dot(normalWS, normalX))) + (1.0 - saturate(dot(normalWS, normalY)));
 
     float depthEdge = saturate((depthX + depthY) * 48.0);
@@ -291,15 +270,10 @@ float SurfaceEdgeFactor(float2 texCoord, float3 normalWS)
 float DepthEdgeFactor(float2 texCoord)
 {
     float2 texel = 1.0 / ScreenSize;
-    float depthCenter = depthMap.SampleLevel(samp, texCoord, 0).r;
-    float depthX = abs(depthMap.SampleLevel(samp, texCoord + float2(texel.x, 0.0), 0).r - depthCenter);
-    float depthY = abs(depthMap.SampleLevel(samp, texCoord + float2(0.0, texel.y), 0).r - depthCenter);
+    float depthCenter = LoadMap(texCoord, depthMap).r;
+    float depthX = abs(LoadMap(texCoord + float2(texel.x, 0.0), depthMap).r - depthCenter);
+    float depthY = abs(LoadMap(texCoord + float2(0.0, texel.y), depthMap).r - depthCenter);
     return saturate((depthX + depthY) * 56.0);
-}
-
-float3 SampleGeometricNormal(float2 uv)
-{
-    return normalize(objectNormalMap.SampleLevel(samp, uv, 0).xyz);
 }
 
 float HitSurfaceReflectivity(float2 uv)
@@ -316,9 +290,10 @@ float HitSurfaceReflectivity(float2 uv)
 
 float HitValidation(float2 hitUV, float3 reflectedDirVS, float3 receiverGeomNormal)
 {
-    float3 hitNormalWS = normalize(normalMap.SampleLevel(samp, hitUV, 0).xyz);
+    float4 hitPacked = LoadMap(hitUV, normalsMap);
+    float3 hitNormalWS = UnpackNormal(hitPacked.xy);
+    float3 hitGeomNormal = UnpackNormal(hitPacked.zw);
     float3 hitNormalVS = normalize(mul(ViewMatrix, float4(hitNormalWS, 0.0)).xyz);
-    float3 hitGeomNormal = SampleGeometricNormal(hitUV);
     float facing = saturate(-dot(hitNormalVS, normalize(reflectedDirVS)));
     float hitEdge = DepthEdgeFactor(hitUV);
     float normalMismatch = 1.0 - abs(dot(receiverGeomNormal, hitGeomNormal));
@@ -336,7 +311,7 @@ float EstimateRecursiveHotspotSuppression(
     float fallbackVisibility,
     float hotspotRatio)
 {
-    float3 hitGeomNormal = SampleGeometricNormal(hitUV);
+    float3 hitGeomNormal = SampleGeometricNormal(hitUV, normalsMap);
     float hitReflectivity = HitSurfaceReflectivity(hitUV);
     float normalMismatch = 1.0 - abs(dot(receiverGeomNormal, hitGeomNormal));
     float receiverVertical = 1.0 - saturate(abs(receiverGeomNormal.y));
@@ -478,9 +453,10 @@ PSOutput main(PSInput input)
         return output;
     }
 
-    float3 normalWS = normalize(normalMap.Sample(samp, texCoord).xyz);
-    float3 receiverGeomNormal = SampleGeometricNormal(texCoord);
-    float3 positionWS = positionMap.Sample(samp, texCoord).xyz;
+    float4 packedNormals = LoadMap(texCoord, normalsMap);
+    float3 normalWS = UnpackNormal(packedNormals.xy);
+    float3 receiverGeomNormal = UnpackNormal(packedNormals.zw);
+    float3 positionWS = ReconstructWorldPos(texCoord, depth);
     float3 incidentDirWS = normalize(positionWS - CameraPosition.xyz);
     float3 surfaceToCameraWS = -incidentDirWS;
 

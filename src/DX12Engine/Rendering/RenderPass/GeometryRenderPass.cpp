@@ -27,10 +27,8 @@ namespace DX12Engine
 
 		DirectX::XMINT3 renderSize{ m_RenderContext.GetRenderSize().x, m_RenderContext.GetRenderSize().y, 1 };
 		m_RenderTargets.emplace_back(ResourceManager::GetInstance().CreateRenderTargetTexture(RenderTextureConfig{ renderSize, DXGI_FORMAT_R8G8B8A8_UNORM }));		  // Albedo
-		m_RenderTargets.emplace_back(ResourceManager::GetInstance().CreateRenderTargetTexture(RenderTextureConfig{ renderSize, DXGI_FORMAT_R16G16B16A16_FLOAT }));	  // World Normal
-		m_RenderTargets.emplace_back(ResourceManager::GetInstance().CreateRenderTargetTexture(RenderTextureConfig{ renderSize, DXGI_FORMAT_R16G16B16A16_FLOAT }));	  // Object Normal
-		m_RenderTargets.emplace_back(ResourceManager::GetInstance().CreateRenderTargetTexture(RenderTextureConfig{ renderSize, DXGI_FORMAT_R16G16B16A16_FLOAT }));	  // Metallic, Roughness, AO
-		m_RenderTargets.emplace_back(ResourceManager::GetInstance().CreateRenderTargetTexture(RenderTextureConfig{ renderSize, DXGI_FORMAT_R16G16B16A16_FLOAT }));	  // Position
+		m_RenderTargets.emplace_back(ResourceManager::GetInstance().CreateRenderTargetTexture(RenderTextureConfig{ renderSize, DXGI_FORMAT_R16G16B16A16_UNORM }));	  // Normals
+		m_RenderTargets.emplace_back(ResourceManager::GetInstance().CreateRenderTargetTexture(RenderTextureConfig{ renderSize, DXGI_FORMAT_R8G8B8A8_UNORM }));		  // Metallic, Roughness, AO
 		m_RenderTargets.emplace_back(ResourceManager::GetInstance().CreateRenderTargetTexture(RenderTextureConfig{ renderSize, DXGI_FORMAT_R16G16B16A16_FLOAT }));	  // Emissive
 		m_RenderTargets.emplace_back(ResourceManager::GetInstance().CreateRenderTargetTexture(RenderTextureConfig{ renderSize, DXGI_FORMAT_R16G16_FLOAT }));		  // Velocity
 		RenderTextureConfig depthConfig{ renderSize, DXGI_FORMAT_R32_FLOAT, DXGI_FORMAT_D32_FLOAT };
@@ -52,9 +50,11 @@ namespace DX12Engine
 		m_CommandList.RSSetViewports(1, &m_Viewport);
 		m_CommandList.RSSetScissorRects(1, &m_ScissorRect);
 
-		CD3DX12_RESOURCE_BARRIER rtBarriers[8];
-		D3D12_CPU_DESCRIPTOR_HANDLE rtvHandles[7];
-		for (int i = 0; i < 7; i++)
+		const size_t colorTargetCount = m_RenderTargets.size() - 1;
+
+		CD3DX12_RESOURCE_BARRIER rtBarriers[7];
+		D3D12_CPU_DESCRIPTOR_HANDLE rtvHandles[6];
+		for (int i = 0; i < colorTargetCount; i++)
 		{
 			rtBarriers[i] = CD3DX12_RESOURCE_BARRIER::Transition(
 				m_RenderTargets[i]->GetResource(),
@@ -63,17 +63,17 @@ namespace DX12Engine
 			m_RenderTargets[i]->SetUsageState(D3D12_RESOURCE_STATE_RENDER_TARGET);
 			rtvHandles[i] = m_RenderTargets[i]->GetTextureDescriptor().GetCPUHandle();
 		}
-		rtBarriers[7] = CD3DX12_RESOURCE_BARRIER::Transition(
-			m_RenderTargets[7]->GetResource(),
-			m_RenderTargets[7]->GetUsageState(),
+		rtBarriers[colorTargetCount] = CD3DX12_RESOURCE_BARRIER::Transition(
+			m_RenderTargets[colorTargetCount]->GetResource(),
+			m_RenderTargets[colorTargetCount]->GetUsageState(),
 			D3D12_RESOURCE_STATE_DEPTH_WRITE);
-		m_RenderTargets[7]->SetUsageState(D3D12_RESOURCE_STATE_DEPTH_WRITE);
+		m_RenderTargets[colorTargetCount]->SetUsageState(D3D12_RESOURCE_STATE_DEPTH_WRITE);
 		m_CommandList.ResourceBarrier(m_RenderTargets.size(), rtBarriers);
 
-		auto dsvHandle = m_RenderTargets[7]->GetTextureDescriptor().GetCPUHandle();
-		m_CommandList.OMSetRenderTargets(7, rtvHandles, false, &dsvHandle);
+		auto dsvHandle = m_RenderTargets[colorTargetCount]->GetTextureDescriptor().GetCPUHandle();
+		m_CommandList.OMSetRenderTargets(colorTargetCount, rtvHandles, false, &dsvHandle);
 
-		for (int i = 0; i < 7; i++)
+		for (int i = 0; i < colorTargetCount; i++)
 			m_CommandList.ClearRenderTargetView(rtvHandles[i], m_RenderTargets[i]->GetClearColorArray(), 0, nullptr);
 
 		m_CommandList.ClearDepthStencilView(dsvHandle, D3D12_CLEAR_FLAG_DEPTH, 0.0f, 0, 0, nullptr); // Reverse-Z: clear to the far value (0.0)
@@ -170,20 +170,16 @@ namespace DX12Engine
 		{
 		case ResourceSlot::Albedo:
 			return m_RenderTargets[0];
-		case ResourceSlot::WorldNormal:
+		case ResourceSlot::Normals:
 			return m_RenderTargets[1];
-		case ResourceSlot::ObjectNormal:
-			return m_RenderTargets[2];
 		case ResourceSlot::Material:
-			return m_RenderTargets[3];
-		case ResourceSlot::Position:
-			return m_RenderTargets[4];
+			return m_RenderTargets[2];
 		case ResourceSlot::Emissive:
-			return m_RenderTargets[5];
+			return m_RenderTargets[3];
 		case ResourceSlot::Velocity:
-			return m_RenderTargets[6];
+			return m_RenderTargets[4];
 		case ResourceSlot::Depth:
-			return m_RenderTargets[7];
+			return m_RenderTargets[5];
 		default:
 			return nullptr;
 		}
@@ -201,10 +197,8 @@ namespace DX12Engine
 		pipelineStateBuilder = pipelineStateBuilder
 								   .ConfigureFromDefault(ResourceManager::GetInstance().GetShader(m_VertexShaderName), ResourceManager::GetInstance().GetShader(m_PixelShaderName))
 								   .SetRenderTargets({ DXGI_FORMAT_R8G8B8A8_UNORM,
-													   DXGI_FORMAT_R16G16B16A16_FLOAT,
-													   DXGI_FORMAT_R16G16B16A16_FLOAT,
-													   DXGI_FORMAT_R16G16B16A16_FLOAT,
-													   DXGI_FORMAT_R16G16B16A16_FLOAT,
+													   DXGI_FORMAT_R16G16B16A16_UNORM,
+													   DXGI_FORMAT_R8G8B8A8_UNORM,
 													   DXGI_FORMAT_R16G16B16A16_FLOAT,
 													   DXGI_FORMAT_R16G16_FLOAT })
 								   .SetDepthStencilState(depthDesc)

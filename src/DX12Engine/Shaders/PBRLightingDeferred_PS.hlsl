@@ -3,16 +3,7 @@
 
 #include "Common/ColorUtils.hlsli"
 #include "Lighting/PBRShading.hlsli"
-
-cbuffer ScreenBuffer : register(b0)
-{
-    float4 CameraPosition;
-    float4x4 ViewMatrix;
-    float4x4 ProjectionMatrix;
-    float4x4 InvViewMatrix;
-    float4x4 InvProjectionMatrix;
-    float2 ScreenSize;
-};
+#include "Common/ScreenData.hlsli"
 
 cbuffer LightBuffer : register(b1)
 {
@@ -39,36 +30,27 @@ struct PSInput
 TextureCube environmentMap : register(t0);
 TextureCube irradianceMap : register(t1);
 Texture2D albedoMap : register(t2);
-Texture2D worldNormalMap : register(t3);
-Texture2D objectNormalMap : register(t4);
-Texture2D materialMap : register(t5);
-Texture2D positionMap : register(t6);
-Texture2D emissiveMap : register(t7);
-Texture2D depthMap : register(t8);
-Texture2DArray shadowMaps : register(t9);
-TextureCubeArray shadowCubeMaps : register(t10);
-Texture2DArray cascadedShadowMaps : register(t11);
+Texture2D normalsMap : register(t3);
+Texture2D materialMap : register(t4);
+Texture2D emissiveMap : register(t5);
+Texture2D depthMap : register(t6);
+Texture2DArray shadowMaps : register(t7);
+TextureCubeArray shadowCubeMaps : register(t8);
+Texture2DArray cascadedShadowMaps : register(t9);
 
 SamplerState samp : register(s0);
 SamplerComparisonState shadowSampler : register(s1);
 
+#include "Common/GBufferUtils.hlsli"
 #include "Shadows/ShadowSampling.hlsli"
 #include "Shadows/CascadedShadowSampling.hlsli"
-
-float3 GetViewRay(float2 uv)
-{
-    float2 ndc = uv * 2.0f - 1.0f;
-    float4 clipPos = float4(ndc.x, -ndc.y, 1.0f, 1.0f);
-    float4 viewPos = mul(InvProjectionMatrix, clipPos);
-    viewPos /= viewPos.w;
-    return normalize(viewPos.xyz);
-}
 
 float4 main(PSInput input) : SV_TARGET
 {
     float3 albedo = albedoMap.Sample(samp, input.texCoord).rgb;
-    float3 worldNormal = normalize(worldNormalMap.Sample(samp, input.texCoord).rgb);
-    float3 objectNormal = objectNormalMap.Sample(samp, input.texCoord).rgb;
+    float4 packedNormals = LoadMap(input.texCoord, normalsMap);
+    float3 worldNormal = UnpackNormal(packedNormals.xy);
+    float3 objectNormal = UnpackNormal(packedNormals.zw);
     float4 material = materialMap.Sample(samp, input.texCoord);
     float roughness = saturate(material.r);
     float metallic = saturate(material.g);
@@ -77,7 +59,7 @@ float4 main(PSInput input) : SV_TARGET
     float3 emissive = emissiveMap.Sample(samp, input.texCoord).rgb;
     float ao = saturate(emissiveMap.Sample(samp, input.texCoord).a);
     float depth = depthMap.Sample(samp, input.texCoord).r;
-    float3 worldPos = positionMap.Sample(samp, input.texCoord).rgb;
+    float3 worldPos = ReconstructWorldPos(input.texCoord, depth);
     
     float3 V = normalize(CameraPosition.xyz - worldPos);
     
@@ -87,7 +69,7 @@ float4 main(PSInput input) : SV_TARGET
     
     if (depth <= 0.001f) // Reverse-Z: the far plane / sky sits at depth 0.0
     {
-        float3 viewRay = GetViewRay(input.texCoord);
+        float3 viewRay = normalize(ReconstructViewPos(input.texCoord, depth));
         float3 worldDir = mul((float3x3)InvViewMatrix, viewRay);
         return float4(sRGBToLinear(environmentMap.Sample(samp, worldDir).rgb), 0.0);
     }

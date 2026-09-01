@@ -107,10 +107,8 @@ namespace DX12Engine
 			depthDesc.DepthFunc = D3D12_COMPARISON_FUNC_GREATER;
 
 			m_PipelineStateBuilder.SetRenderTargets({ DXGI_FORMAT_R8G8B8A8_UNORM,
-													  DXGI_FORMAT_R16G16B16A16_FLOAT,
-													  DXGI_FORMAT_R16G16B16A16_FLOAT,
-													  DXGI_FORMAT_R16G16B16A16_FLOAT,
-													  DXGI_FORMAT_R16G16B16A16_FLOAT,
+													  DXGI_FORMAT_R16G16B16A16_UNORM,
+													  DXGI_FORMAT_R8G8B8A8_UNORM,
 													  DXGI_FORMAT_R16G16B16A16_FLOAT,
 													  DXGI_FORMAT_R16G16_FLOAT })
 				.SetDepthStencilState(depthDesc)

@@ -1,12 +1,4 @@
-cbuffer ScreenData : register(b0)
-{
-    float4 CameraPosition;
-    float4x4 ViewMatrix;
-    float4x4 ProjectionMatrix;
-    float4x4 InvViewMatrix;
-    float4x4 InvProjectionMatrix;
-    float2 ScreenSize;
-};
+#include "Common/ScreenData.hlsli"
 
 cbuffer PostProcessingData : register(b1)
 {

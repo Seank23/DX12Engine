@@ -50,15 +50,14 @@ struct PSInput
 struct PSOutput
 {
     float4 albedo : SV_Target0;
-    float4 worldNormal : SV_Target1;
-    float4 objectNormal : SV_Target2;
-    float4 material : SV_Target3; // roughness, metallic, ao
-    float4 position : SV_Target4;
-    float4 emissive : SV_Target5;
-    float2 velocity : SV_Target6;
+    float4 normals : SV_Target1;
+    float4 material : SV_Target2; // roughness, metallic, ao
+    float4 emissive : SV_Target3;
+    float2 velocity : SV_Target4;
 };
 
 #include "Common/ColorUtils.hlsli"
+#include "Common/GBufferUtils.hlsli"
 
 PSOutput main(PSInput input)
 {
@@ -106,10 +105,8 @@ PSOutput main(PSInput input)
     velocity.y = -velocity.y;
 
     output.albedo       = outputAlbedo;
-    output.worldNormal  = float4(worldNormal, 1.0);
-    output.objectNormal = float4(input.normal, 1.0);
+    output.normals      = float4(PackNormal(worldNormal), PackNormal(normalize(input.normal)));
     output.material     = float4(roughness, metallic, Clearcoat, ClearcoatRoughness);
-    output.position     = float4(input.worldPos, 1.0);
     output.emissive     = float4(emissiveColor, ao);
     output.velocity     = velocity;
     return output;

@@ -1,14 +1,4 @@
-cbuffer ScreenBuffer : register(b0)
-{
-    float4 CameraPosition;
-    float4x4 ViewMatrix;
-    float4x4 ProjectionMatrix;
-    float4x4 InvViewMatrix;
-    float4x4 InvProjectionMatrix;
-    float2 ScreenSize;
-    float2 Jitter;
-    float2 PrevJitter;
-};
+#include "Common/ScreenData.hlsli"
 
 cbuffer TemporalBuffer : register(b1)
 {
