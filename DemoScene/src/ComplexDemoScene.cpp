@@ -1,4 +1,4 @@
-﻿#include "ComplexDemoScene.h"
+#include "ComplexDemoScene.h"
 
 #include "DX12Engine/Entity/RenderComponent.h"
 #include "DX12Engine/IO/ModelLoader.h"
@@ -30,24 +30,25 @@ namespace DX12EngineDemo
 		m_LightBuffer = std::make_unique<DX12Engine::LightBuffer>();
 		std::shared_ptr<DX12Engine::Light> sunLight = std::make_shared<DX12Engine::Light>();
 		sunLight->SetDirection({ 0.45f, -0.577f, 0.577f });
-		sunLight->SetIntensity(5.0f);
+		sunLight->SetIntensity(0.1f);
 		sunLight->SetColor({ 1.0f, 0.85f, 0.8f });
 		m_LightBuffer->AddLight(sunLight);
 		std::shared_ptr<DX12Engine::Light> pointLight = std::make_shared<DX12Engine::Light>();
 		pointLight->SetType((int)DX12Engine::LightType::Point);
-		pointLight->SetPosition({ 0.0f, 1.5f, -0.8f });
+		pointLight->SetPosition({ 0.0f, 5.0f, -0.8f });
 		pointLight->SetIntensity(20.0f);
 		pointLight->SetRange(200.0f);
-		pointLight->SetColor({ 1.0f, 1.0f, 1.0f });
-		//m_LightBuffer->AddLight(pointLight);
+		pointLight->SetColor({ 1.0f, 0.6f, 0.3f });
+		m_LightBuffer->AddLight(pointLight);
 		std::shared_ptr<DX12Engine::Light> spotLight = std::make_shared<DX12Engine::Light>();
 		spotLight->SetType((int)DX12Engine::LightType::Spot);
-		spotLight->SetPosition({ 1.0f, 6.0f, -1.0f });
+		spotLight->SetPosition({ 5.0f, 10.0f, -5.0f });
+		spotLight->SetRange(40.0f);
 		spotLight->SetDirection({ -0.1f, -0.8f, 0.1f });
 		spotLight->SetColor({ 0.9f, 0.5f, 0.0f });
 		spotLight->SetIntensity(20.0f);
 		spotLight->SetSpotAngle(45.0f);
-		//m_LightBuffer->AddLight(spotLight);
+		m_LightBuffer->AddLight(spotLight);
 
 		DX12Engine::TextureLoader textureLoader;
 		m_SkyboxCubemap = textureLoader.LoadCubemapDDS(DX12Engine::ResourceManager::GetMaterialPath("skybox/skybox_cubemap.dds"));
@@ -60,6 +61,7 @@ namespace DX12EngineDemo
 
 		DX12Engine::ModelLoader modelLoader;
 		auto mazdaModel = modelLoader.LoadCookedModel("Mazda3_Anim");
+		auto garageModel = modelLoader.LoadCookedModel("garage");
 		auto floorMesh = std::make_shared<DX12Engine::MeshAsset>(modelLoader.LoadObj(DX12Engine::ResourceManager::GetModelPath("floor.obj")));
 
 		auto floorModel = std::make_shared<DX12Engine::ModelAsset>("Floor");
@@ -95,6 +97,11 @@ namespace DX12EngineDemo
 		mazdaPhysicsComp->SetStaticFriction(0.6f);
 		mazdaPhysicsComp->SetKineticFriction(0.5f);
 		m_SceneObjects.Add("Mazda", mazda);
+
+		std::shared_ptr<DX12Engine::GameObject> garage = std::make_shared<DX12Engine::GameObject>();
+		garage->CreateComponent<DX12Engine::RenderComponent>(std::make_shared<DX12Engine::ModelInstance>(garageModel));
+		garage->Scale({ 2.0f, 2.0f, 2.0f });
+		//m_SceneObjects.Add("Garage", garage);
 
 		m_SceneObjects.Init();
 	}

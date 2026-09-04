@@ -44,7 +44,7 @@ namespace DX12Engine
 		case LightType::Point:
 			return m_LightData.Range;
 		case LightType::Spot:
-			return 50.0f;
+			return m_LightData.Range;
 		default:
 			return 50.0f;
 		}
@@ -72,8 +72,16 @@ namespace DX12Engine
 			lightDir = DirectX::XMVector3Normalize(DirectX::XMLoadFloat3(&m_LightData.Direction));
 			lightPos = DirectX::XMLoadFloat3(&m_LightData.Position);
 			DirectX::XMVECTOR target = DirectX::XMVectorAdd(lightPos, lightDir);
-			lightView = DirectX::XMMatrixLookAtLH(lightPos, target, UpDirection);
-			lightProj = DirectX::XMMatrixPerspectiveFovLH(m_LightData.SpotAngle * 2.0f, 1.0, 1.0f, GetFarPlane());
+			// A spot aimed straight down is colinear with the default up vector, which makes
+			// XMMatrixLookAtLH produce a NaN basis - and straight down is the common case.
+			DirectX::XMVECTOR up = fabsf(DirectX::XMVectorGetY(lightDir)) > 0.999f
+									   ? DirectX::XMVectorSet(0.0f, 0.0f, 1.0f, 0.0f)
+									   : UpDirection;
+			lightView = DirectX::XMMatrixLookAtLH(lightPos, target, up);
+			// Cover the whole lit cone plus a margin, so PCF taps at the cone edge still land
+			// inside the map instead of falling through to the unshadowed border.
+			float spotFov = DirectX::XMMin(m_LightData.SpotAngle * 2.0f + DirectX::XMConvertToRadians(10.0f), DirectX::XMConvertToRadians(170.0f));
+			lightProj = DirectX::XMMatrixPerspectiveFovLH(spotFov, 1.0f, 0.5f, DirectX::XMMax(GetFarPlane(), 1.0f));
 			m_LightData.ViewProjMatrix = DirectX::XMMatrixMultiply(lightView, lightProj);
 			break;
 		}

@@ -65,6 +65,8 @@ float4 main(PSInput input) : SV_TARGET
     
     float3 finalColor = float3(0, 0, 0);
     float aoFactor = 0.02;
+    // Sky/IBL occlusion, so only the sun's cascade may drive it - a local light's
+    // shadow map says nothing about how much environment reaches the surface.
     float ambientShadow = 1.0;
     
     if (depth <= 0.001f) // Reverse-Z: the far plane / sky sits at depth 0.0
@@ -120,14 +122,17 @@ float4 main(PSInput input) : SV_TARGET
         }
         else if (Lights[i].Type == 2) // Spot Light
         {
+            float cosOuter = cos(Lights[i].SpotAngle);
+            float cosInner = cos(Lights[i].SpotAngle * 0.9);
             float theta = dot(lightDir, normalize(-Lights[i].Direction));
-            float epsilon = cos(Lights[i].SpotAngle) - cos(Lights[i].SpotAngle) * 0.9;
-            float intensity = saturate((theta - cos(Lights[i].SpotAngle * 0.9)) / epsilon);
+            float intensity = saturate((theta - cosOuter) / max(cosInner - cosOuter, 1e-4));
             float dist = length(Lights[i].Position - worldPos);
             float attenuation = saturate(1.0 - (dist * dist) / (Lights[i].Range * Lights[i].Range));
             lightContribution = PBRLighting(albedo, metallic, roughness, clearcoat, clearcoatRoughness, worldNormal, V, lightDir, Lights[i]) * intensity * attenuation;
-            shadowFactor = ShadowPCF(Lights[i].ShadowMapIndex, lightSpacePosition, 2.0);
-            ambientShadow = min(ambientShadow, shadowFactor);
+            // The shadow frustum is wider than the lit cone and reaches past Range, so an
+            // unmasked lookup darkens geometry this light never actually illuminates.
+            if (intensity * attenuation > 0.0)
+                shadowFactor = ShadowPCF(Lights[i].ShadowMapIndex, lightSpacePosition, 2.0);
         }
         finalColor += lightContribution * shadowFactor;
     }
