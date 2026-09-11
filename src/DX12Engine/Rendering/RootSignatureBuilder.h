@@ -67,7 +67,6 @@ namespace DX12Engine
 			param.Descriptor.ShaderRegister = shaderRegister;
 			param.Descriptor.RegisterSpace = space;
 			param.ShaderVisibility = visibility;
-
 			m_Parameters.push_back(param);
 			return *this;
 		}
@@ -106,6 +105,17 @@ namespace DX12Engine
 			shadowSampler.RegisterSpace = 0;
 			shadowSampler.ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
 			m_StaticSamplers.push_back(shadowSampler);
+			return *this;
+		}
+
+		RootSignatureBuilder& AddShaderResourceView(UINT shaderRegister, UINT space = 0, D3D12_SHADER_VISIBILITY visibility = D3D12_SHADER_VISIBILITY_PIXEL)
+		{
+			CD3DX12_ROOT_PARAMETER param = {};
+			param.ParameterType = D3D12_ROOT_PARAMETER_TYPE_SRV;
+			param.Descriptor.ShaderRegister = shaderRegister;
+			param.Descriptor.RegisterSpace = space;
+			param.ShaderVisibility = visibility;
+			m_Parameters.push_back(param);
 			return *this;
 		}
 

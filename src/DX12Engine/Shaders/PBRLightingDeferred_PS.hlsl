@@ -1,16 +1,9 @@
-#define MAX_LIGHTS 4
 #define MAX_CSM_CASCADES 8
 
 #include "Common/ColorUtils.hlsli"
 #include "Lighting/PBRShading.hlsli"
 #include "Common/ScreenData.hlsli"
-
-cbuffer LightBuffer : register(b1)
-{
-    int LightCount;
-    float3 Padding;
-    Light Lights[MAX_LIGHTS];
-};
+#include "Lighting/ClusteredLighting.hlsli"
 
 cbuffer CascadedShadowBuffer : register(b2)
 {
@@ -45,6 +38,48 @@ SamplerComparisonState shadowSampler : register(s1);
 #include "Shadows/ShadowSampling.hlsli"
 #include "Shadows/CascadedShadowSampling.hlsli"
 
+void ShadeLight(Light light, float3 worldPos, float3 worldNormal, float3 objectNormal, float3 V,
+                float3 albedo, float metallic, float roughness, float clearcoat, float clearcoatRoughness,
+                float aoFactor, inout float3 finalColor, inout float ambientShadow)
+{
+    float3 offsetPos = worldPos + (objectNormal * 0.04) + (worldNormal * aoFactor);
+    float4 lightSpacePosition = mul(light.ViewProjMatrix, float4(offsetPos, 1.0));
+    float3 lightDir = normalize(light.Position - worldPos);
+    float shadowFactor = 1.0;
+    float3 lightContribution = float3(0, 0, 0);
+    
+    if (light.Type == 0) // Directional Light
+    {
+        float3 directionalL = normalize(-light.Direction);
+        lightContribution = PBRLighting(albedo, metallic, roughness, clearcoat, clearcoatRoughness, worldNormal, V, directionalL, light);
+        shadowFactor = CascadedDirectionalShadow(worldPos, worldNormal, directionalL);
+        ambientShadow = min(ambientShadow, shadowFactor);
+    }
+    else if (light.Type == 1) // Point Light
+    {
+        float dist = length(light.Position - worldPos);
+        float distOverRange = dist / light.Range;
+        float window = saturate(1.0 - distOverRange * distOverRange * distOverRange * distOverRange);
+        float attenuation = (window * window) / (dist * dist + 1.0);
+        lightContribution = PBRLighting(albedo, metallic, roughness, clearcoat, clearcoatRoughness, worldNormal, V, lightDir, light) * attenuation;
+		if (attenuation > 0.0)
+			shadowFactor = (light.ShadowMapIndex >= 0) ? PointLightShadowPCF(worldPos, light.Position, 3.0, worldNormal, light.Padding1.x, light.ShadowMapIndex) : 1.0;
+    }
+    else if (light.Type == 2) // Spot Light
+    {
+        float cosOuter = cos(light.SpotAngle);
+        float cosInner = cos(light.SpotAngle * 0.9);
+        float theta = dot(lightDir, normalize(-light.Direction));
+        float intensity = saturate((theta - cosOuter) / max(cosInner - cosOuter, 1e-4));
+        float dist = length(light.Position - worldPos);
+        float attenuation = saturate(1.0 - (dist * dist) / (light.Range * light.Range));
+        lightContribution = PBRLighting(albedo, metallic, roughness, clearcoat, clearcoatRoughness, worldNormal, V, lightDir, light) * intensity * attenuation;
+        if (intensity * attenuation > 0.0)
+			shadowFactor = (light.ShadowMapIndex >= 0) ? ShadowPCF(light.ShadowMapIndex, lightSpacePosition, 2.0) : 1.0;
+	}
+    finalColor += lightContribution * shadowFactor;
+}
+
 float4 main(PSInput input) : SV_TARGET
 {
     float3 albedo = albedoMap.Sample(samp, input.texCoord).rgb;
@@ -60,6 +95,7 @@ float4 main(PSInput input) : SV_TARGET
     float ao = saturate(emissiveMap.Sample(samp, input.texCoord).a);
     float depth = depthMap.Sample(samp, input.texCoord).r;
     float3 worldPos = ReconstructWorldPos(input.texCoord, depth);
+    float3 viewPos = ReconstructViewPos(input.texCoord, depth);
     
     float3 V = normalize(CameraPosition.xyz - worldPos);
     
@@ -69,9 +105,9 @@ float4 main(PSInput input) : SV_TARGET
     // shadow map says nothing about how much environment reaches the surface.
     float ambientShadow = 1.0;
     
-    if (depth <= 0.001f) // Reverse-Z: the far plane / sky sits at depth 0.0
+    if (depth <= 0.0f)
     {
-        float3 viewRay = normalize(ReconstructViewPos(input.texCoord, depth));
+        float3 viewRay = normalize(viewPos);
         float3 worldDir = mul((float3x3)InvViewMatrix, viewRay);
         return float4(sRGBToLinear(environmentMap.Sample(samp, worldDir).rgb), 0.0);
     }
@@ -96,46 +132,15 @@ float4 main(PSInput input) : SV_TARGET
     float3 clearcoatEnv = sRGBToLinear(environmentMap.SampleLevel(samp, reflectionVector, clearcoatRoughness * 12.0).rgb);
     float3 clearcoatAmbient = clearcoatEnv * (clearcoat * clearcoatF * clearcoatOcc);
     
-    for (int i = 0; i < LightCount; i++)
-    {
-        float3 offsetPos = worldPos + (objectNormal * 0.04) + (worldNormal * aoFactor);
-        float4 lightSpacePosition = mul(Lights[i].ViewProjMatrix, float4(offsetPos, 1.0));
-        float3 lightDir = normalize(Lights[i].Position - worldPos);
-        float shadowFactor = 1.0;
-        float3 lightContribution = float3(0, 0, 0);
-        
-        if (Lights[i].Type == 0) // Directional Light
-        {
-            float3 directionalL = normalize(-Lights[i].Direction);
-            lightContribution = PBRLighting(albedo, metallic, roughness, clearcoat, clearcoatRoughness, worldNormal, V, directionalL, Lights[i]);
-            shadowFactor = CascadedDirectionalShadow(worldPos, worldNormal, directionalL);
-            ambientShadow = min(ambientShadow, shadowFactor);
-        }
-        else if (Lights[i].Type == 1) // Point Light
-        {
-            float dist = length(Lights[i].Position - worldPos);
-            float distOverRange = dist / Lights[i].Range;
-            float window = saturate(1.0 - distOverRange * distOverRange * distOverRange * distOverRange);
-            float attenuation = (window * window) / (dist * dist + 1.0);
-            lightContribution = PBRLighting(albedo, metallic, roughness, clearcoat, clearcoatRoughness, worldNormal, V, lightDir, Lights[i]) * attenuation;
-            shadowFactor = PointLightShadowPCF(worldPos, Lights[i].Position, 3.0, worldNormal, Lights[i].Padding.x, Lights[i].ShadowMapIndex);
-        }
-        else if (Lights[i].Type == 2) // Spot Light
-        {
-            float cosOuter = cos(Lights[i].SpotAngle);
-            float cosInner = cos(Lights[i].SpotAngle * 0.9);
-            float theta = dot(lightDir, normalize(-Lights[i].Direction));
-            float intensity = saturate((theta - cosOuter) / max(cosInner - cosOuter, 1e-4));
-            float dist = length(Lights[i].Position - worldPos);
-            float attenuation = saturate(1.0 - (dist * dist) / (Lights[i].Range * Lights[i].Range));
-            lightContribution = PBRLighting(albedo, metallic, roughness, clearcoat, clearcoatRoughness, worldNormal, V, lightDir, Lights[i]) * intensity * attenuation;
-            // The shadow frustum is wider than the lit cone and reaches past Range, so an
-            // unmasked lookup darkens geometry this light never actually illuminates.
-            if (intensity * attenuation > 0.0)
-                shadowFactor = ShadowPCF(Lights[i].ShadowMapIndex, lightSpacePosition, 2.0);
-        }
-        finalColor += lightContribution * shadowFactor;
-    }
+    for (int i = 0; i < DirectionalLightCount; i++)
+        ShadeLight(Lights[i], worldPos, worldNormal, objectNormal, V, albedo, metallic, roughness, clearcoat, clearcoatRoughness, aoFactor, finalColor, ambientShadow);
+
+	uint2 range = ClusterGrid[GetClusterIndex(input.position.xy, viewPos.z)];
+	if (ShowClusterHeatmap)
+		return float4(ClusterHeatmapColour(range.y), 1.0f);
+	
+	for (int j = 0; j < range.y; j++)
+		ShadeLight(Lights[LightIndices[range.x + j]], worldPos, worldNormal, objectNormal, V, albedo, metallic, roughness, clearcoat, clearcoatRoughness, aoFactor, finalColor, ambientShadow);
 
     // Apply the shadow-to-ambient gradient once on the accumulated result so the
     // full 0..1 PCF range maps smoothly to the min/max ambient levels.
@@ -143,8 +148,8 @@ float4 main(PSInput input) : SV_TARGET
     float remappedDiffuseShadow = lerp(0.2, 1.0, smoothShadow);
     float glossyShadowFloor = lerp(0.06, 0.30, saturate(max(baseGloss * 0.75, clearcoatGloss)));
     float remappedSpecularShadow = lerp(glossyShadowFloor, 1.0, smoothShadow);
-    finalColor += diffuseAmbient * remappedDiffuseShadow;
-    finalColor += (specularAmbient + clearcoatAmbient) * remappedSpecularShadow;
+    finalColor += diffuseAmbient * remappedDiffuseShadow * AmbientIntensity;
+    finalColor += (specularAmbient + clearcoatAmbient) * remappedSpecularShadow * AmbientIntensity;
     finalColor += emissive;
     return float4(finalColor, 1.0f);
 }

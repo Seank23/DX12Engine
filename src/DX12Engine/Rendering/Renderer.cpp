@@ -380,9 +380,13 @@ namespace DX12Engine
 		if (skyboxCubemap && !skyboxCubemap->GetIsReady())
 			m_RenderContext->GetUploader().UploadTextureBatch({ skyboxCubemap, m_CurrentScene->GetSkyboxIrradiance() });
 
+		ClusteredLightGrid::LightGridFrameAddresses lightGridFrameAddresses{};
 		LightBuffer* lightBuffer = m_CurrentScene->GetLightBuffer();
 		if (lightBuffer)
+		{
 			lightBuffer->Update();
+			lightGridFrameAddresses = m_LightGrid.Build(*m_CurrentScene->GetCamera(), *lightBuffer, m_RenderContext->GetRenderSize(), m_Options.ShowLightGridHeatmap);
+		}
 
 		Camera* sceneCamera = m_CurrentScene->GetCamera();
 		DirectX::XMMATRIX cameraView = sceneCamera->GetViewMatrix();
@@ -520,20 +524,20 @@ namespace DX12Engine
 
 		auto cameraPos = sceneCamera->GetPosition();
 		std::sort(transparentPassDrawItems.begin(), transparentPassDrawItems.end(), [cameraPos](const DrawItem& a, const DrawItem& b)
-				  {
-					  DirectX::XMVECTOR camVec = DirectX::XMLoadFloat3(&cameraPos);
+		{
+			DirectX::XMVECTOR camVec = DirectX::XMLoadFloat3(&cameraPos);
 
-					  DirectX::XMVECTOR posA = a.ModelMatrix.r[3];
-					  DirectX::XMVECTOR posB = b.ModelMatrix.r[3];
+			DirectX::XMVECTOR posA = a.ModelMatrix.r[3];
+			DirectX::XMVECTOR posB = b.ModelMatrix.r[3];
 
-					  DirectX::XMVECTOR diffA = DirectX::XMVectorSubtract(posA, camVec);
-					  DirectX::XMVECTOR diffB = DirectX::XMVectorSubtract(posB, camVec);
+			DirectX::XMVECTOR diffA = DirectX::XMVectorSubtract(posA, camVec);
+			DirectX::XMVECTOR diffB = DirectX::XMVectorSubtract(posB, camVec);
 
-					  float distSqA = DirectX::XMVectorGetX(DirectX::XMVector3Dot(diffA, diffA));
-					  float distSqB = DirectX::XMVectorGetX(DirectX::XMVector3Dot(diffB, diffB));
+			float distSqA = DirectX::XMVectorGetX(DirectX::XMVector3Dot(diffA, diffA));
+			float distSqB = DirectX::XMVectorGetX(DirectX::XMVector3Dot(diffB, diffB));
 
-					  return distSqA > distSqB; // back-to-front
-				  });
+			return distSqA > distSqB; // back-to-front
+		});
 
 		m_DrawnPrimitiveCount = static_cast<uint32_t>(geometryPassDrawItems.size() + transparentPassDrawItems.size());
 
@@ -558,7 +562,7 @@ namespace DX12Engine
 				break;
 			}
 			case RenderPassType::Lighting:
-				static_cast<LightingRenderPass*>(renderPass)->SetLightBuffer(lightBuffer);
+				static_cast<LightingRenderPass*>(renderPass)->SetLightGridAddresses(lightGridFrameAddresses);
 				break;
 			case RenderPassType::Transparent:
 				static_cast<TransparentRenderPass*>(renderPass)->SetDrawItems(transparentPassDrawItems);
@@ -622,6 +626,10 @@ namespace DX12Engine
 		m_RenderContext->PresentFrame();
 
 #ifdef _DEBUG
+		m_LightGridPeakLights = (std::max)(m_LightGridPeakLights, m_LightGrid.GetPeakLightsPerCluster());
+		m_LightGridDroppedLights = (std::max)(m_LightGridDroppedLights, m_LightGrid.GetDroppedLightCount());
+		m_LightGridPeakIndices = (std::max)(m_LightGridPeakIndices, m_LightGrid.GetLightIndexCount());
+
 		if (m_FrameIndex % 60 == 0)
 		{
 			DescriptorHeapStats stats = m_RenderContext->GetHeapManager().GetStats();
@@ -632,6 +640,18 @@ namespace DX12Engine
 				OutputDebugStringA("[Renderer] WARNING: Persistent SRV heap above 95% capacity!\n");
 			else if (stats.persistentUsed > static_cast<UINT>(stats.persistentCapacity * HEAP_WARN_THRESHOLD_MED))
 				OutputDebugStringA("[Renderer] WARNING: Persistent SRV heap above 80% capacity.\n");
+
+			const UINT peakRingBytes = ResourceManager::GetInstance().GetFrameConstantPeakBytes();
+			_snprintf_s(buf, sizeof(buf), "[LightGrid] Frame %u: peakLights/cluster=%u, indices=%u/%u (%.0f%%), dropped=%u, froxelRebuilds=%u, peakRing=%.0f/%.0f KB (%.0f%%)\n", m_FrameIndex, m_LightGridPeakLights, m_LightGridPeakIndices, MAX_LIGHT_INDICES, 100.0f * m_LightGridPeakIndices / MAX_LIGHT_INDICES, m_LightGridDroppedLights, m_LightGrid.GetFroxelRebuildCount(), peakRingBytes / 1024.0f, CONSTANT_RING_BYTES_PER_FRAME / 1024.0f, 100.0f * peakRingBytes / CONSTANT_RING_BYTES_PER_FRAME);
+			OutputDebugStringA(buf);
+			if (m_LightGridDroppedLights > 0)
+			{
+				_snprintf_s(buf, sizeof(buf), "[LightGrid] WARNING: %u light indices dropped; MAX_LIGHT_INDICES (%u) exhausted, far clusters left unlit.\n", m_LightGridDroppedLights, MAX_LIGHT_INDICES);
+				OutputDebugStringA(buf);
+			}
+			m_LightGridPeakLights = 0;
+			m_LightGridDroppedLights = 0;
+			m_LightGridPeakIndices = 0;
 		}
 #endif
 	}
@@ -652,6 +672,7 @@ namespace DX12Engine
 
 		m_Options = options;
 		m_RenderContext->UpdateRenderScale(m_Options.RenderScale);
+		m_RenderContext->SetAmbientIntensity(m_Options.AmbientIntensity);
 		if (aaModeChanged || taaSettingsChanged || renderScaleChanged)
 		{
 			m_RequestTAAHistoryReset = true;

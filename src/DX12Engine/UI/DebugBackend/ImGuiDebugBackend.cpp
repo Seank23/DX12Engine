@@ -149,7 +149,9 @@ namespace DX12Engine
 	X(ToneMappingMode, ToneMapping)   \
 	X(float, Exposure)                \
 	X(bool, EnableGammaCorrection)    \
-	X(bool, EnableFrustumCulling)
+	X(bool, EnableFrustumCulling)	  \
+	X(bool, ShowLightGridHeatmap)  \
+	X(float, AmbientIntensity)
 
 #define RENDERER_NESTED_FIELDS(X) \
 	X(TAA, DrawTAASettings)       \

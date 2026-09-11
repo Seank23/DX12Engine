@@ -360,7 +360,9 @@ float4 ComputeReflectedColor(
 {
     float3 reflectionWeight = ComputeReflectionWeight(normalWS, surfaceToCameraWS, albedo, roughness, metallic, clearcoat, ao);
     float3 ssrSample = SampleFilteredSSRHit(intersectionPosTS.xy, roughness);
-    float3 fallbackSample = SampleIrradianceFallback(normalWS, viewDirWS, roughness);
+    // Scaled by the same factor the lighting pass applied, or the delta below subtracts an
+    // environment term that was never added and smooth metals go black as ambient comes down.
+    float3 fallbackSample = SampleIrradianceFallback(normalWS, viewDirWS, roughness) * AmbientIntensity;
     float3 ssrContribution = ssrSample * reflectionWeight;
     float3 fallbackContribution = fallbackSample * reflectionWeight;
     float fallbackVisibility = EstimateFallbackVisibility(sceneColor, emissive, fallbackContribution, ao);
@@ -445,7 +447,7 @@ PSOutput main(PSInput input)
     float ao = saturate(emissiveAo.a);
     float depth = depthMap.Sample(samp, texCoord).r;
 
-    if (depth <= 0.001) // Reverse-Z: the far plane / sky sits at depth 0.0
+    if (depth <= 0.0) // Reverse-Z: the far plane / sky sits at depth 0.0
     {
         output.color = float4(sceneColor, 1.0);
         output.history = float4(sceneColor, 0.0);

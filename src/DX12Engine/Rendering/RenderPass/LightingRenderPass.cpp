@@ -82,13 +82,16 @@ namespace DX12Engine
 		{
 			ConstantBuffer* cascadedShadowCB = !m_ExternalCBs.empty() ? m_ExternalCBs[0] : m_FallbackCascadedShadowCB.get();
 			m_CommandList.SetGraphicsRootConstantBufferView(0, m_RenderContext.GetScreenDataBuffer().GetGPUAddress());
-			m_CommandList.SetGraphicsRootConstantBufferView(1, m_LightBuffer->GetCBVAddress());
+			m_CommandList.SetGraphicsRootConstantBufferView(1, m_LightGridAddresses.ClusterData);
 			m_CommandList.SetGraphicsRootConstantBufferView(2, cascadedShadowCB->GetGPUAddress());
 			m_CommandList.SetGraphicsRootDescriptorTable(3, m_InputResourceBlockHandles[InputResourceType::EnvironmentMap].GetGPUHandle());
 			m_CommandList.SetGraphicsRootDescriptorTable(4, m_InputResourceBlockHandles[InputResourceType::GBuffer].GetGPUHandle());
 			m_CommandList.SetGraphicsRootDescriptorTable(5, m_InputResourceBlockHandles[InputResourceType::ShadowMap].GetGPUHandle());
 			m_CommandList.SetGraphicsRootDescriptorTable(6, m_InputResourceBlockHandles[InputResourceType::CubeShadowMap].GetGPUHandle());
 			m_CommandList.SetGraphicsRootDescriptorTable(7, m_InputResourceBlockHandles[InputResourceType::CascadedShadowMap].GetGPUHandle());
+			m_CommandList.SetGraphicsRootShaderResourceView(8, m_LightGridAddresses.Lights);
+			m_CommandList.SetGraphicsRootShaderResourceView(9, m_LightGridAddresses.Grid);
+			m_CommandList.SetGraphicsRootShaderResourceView(10, m_LightGridAddresses.LightIndices);
 		};
 		bindPassInputTables();
 
@@ -129,7 +132,13 @@ namespace DX12Engine
 								   .SetVertexShader(ResourceManager::GetInstance().GetShader(m_VertexShaderName))
 								   .SetPixelShader(ResourceManager::GetInstance().GetShader(m_PixelShaderName));
 
-		rootSignatureBuilder = rootSignatureBuilder.AddConstantBuffer(0).AddConstantBuffer(1).AddConstantBuffer(2).AddDescriptorTables(m_DescriptorTableConfigs).AddSampler(0, D3D12_FILTER_ANISOTROPIC).AddShadowMapSampler(1);
+		rootSignatureBuilder = rootSignatureBuilder.AddConstantBuffer(0).AddConstantBuffer(1).AddConstantBuffer(2)
+			.AddDescriptorTables(m_DescriptorTableConfigs)
+			.AddShaderResourceView(0, 1)
+			.AddShaderResourceView(1, 1)
+			.AddShaderResourceView(2, 1)
+			.AddSampler(0, D3D12_FILTER_ANISOTROPIC)
+			.AddShadowMapSampler(1);
 
 		m_RootSignature = ResourceManager::GetInstance().CreateRootSignature(rootSignatureBuilder.Build());
 		pipelineStateBuilder = pipelineStateBuilder.SetRootSignature(m_RootSignature.Get());

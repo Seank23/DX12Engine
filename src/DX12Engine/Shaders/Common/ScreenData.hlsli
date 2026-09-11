@@ -18,6 +18,8 @@ cbuffer ScreenData : register(SCREEN_DATA_REGISTER)
     float2 ScreenSize;
     float2 Jitter;
     float2 PrevJitter;
+    float AmbientIntensity;
+    float ScreenDataPadding;
 };
 
 // Convenience overloads that close over the cbuffer, so call sites do not repeat it.

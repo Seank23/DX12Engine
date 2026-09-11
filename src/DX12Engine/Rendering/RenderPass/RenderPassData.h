@@ -12,6 +12,8 @@ struct ScreenData
 	DirectX::XMFLOAT2 ScreenSize;
 	DirectX::XMFLOAT2 Jitter;
 	DirectX::XMFLOAT2 PrevJitter;
+	float AmbientIntensity = 1.0f;
+	float Padding = 0.0f;
 };
 
 struct SSRTemporalData
@@ -52,5 +54,18 @@ struct alignas(16) CascadedShadowData
 	DirectX::XMFLOAT4 BiasParams;					 // x=const, y=slope, z=normal, w=unused
 };
 
+struct alignas(16) ClusterData
+{
+	DirectX::XMUINT3 GridSize;
+	uint32_t DirectionalLightCount; 
+	DirectX::XMFLOAT2 TileSizePx;
+	float DepthScale;				
+	float DepthBias;				
+	uint32_t TotalLightCount;		
+	uint32_t ShowClusterHeatmap;	
+	DirectX::XMFLOAT2 Padding;
+};
+
 static_assert(sizeof(AlignedFloat) == 16, "AlignedFloat must map to one 16-byte cbuffer register");
 static_assert(sizeof(CascadedShadowData) == 800, "CascadedShadowData size no longer matches HLSL cbuffer layout");
+static_assert(sizeof(ClusterData) == 48, "ClusterData no longer matches the HLSL cbuffer layout");

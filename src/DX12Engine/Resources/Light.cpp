@@ -57,7 +57,7 @@ namespace DX12Engine
 		DirectX::XMMATRIX lightView;
 		DirectX::XMMATRIX lightProj;
 		DirectX::XMFLOAT3 centre(0.0f, 0.0f, 0.0f);
-		m_LightData.Padding.x = GetFarPlane();
+		m_LightData.Padding1[0] = GetFarPlane();
 		switch (m_LightData.Type)
 		{
 		case (int)LightType::Directional:

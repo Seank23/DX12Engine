@@ -40,6 +40,7 @@ namespace DX12Engine
 		void UpdateScreenData(Camera* camera, const DirectX::XMFLOAT2& jitter, const DirectX::XMFLOAT2& prevJitter, const DirectX::XMMATRIX* projectionOverride = nullptr);
 		ConstantBuffer& GetScreenDataBuffer() const { return *m_ScreenDataCB; }
 		ScreenData GetScreenData() const { return m_ScreenData; }
+		void SetAmbientIntensity(float intensity) { m_ScreenData.AmbientIntensity = intensity; }
 		bool IsPendingResize() const { return m_PendingResize; }
 
 		void OnResize();

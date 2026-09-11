@@ -19,10 +19,12 @@ namespace DX12Engine
 		float Range = 10.0f;
 		DirectX::XMFLOAT3 Color = { 1.0f, 1.0f, 1.0f };
 		float SpotAngle = 0.01f;
-		DirectX::XMFLOAT3 Padding = { 0.0f, 0.0f, 0.0f };
+		float Padding1[3] = {};
 		DirectX::XMMATRIX ViewProjMatrix;
 		int ShadowMapIndex = -1;
+		float Padding2[3] = {};
 	};
+	static_assert(sizeof(LightData) == 144, "LightData no longer matches the HLSL StructuredBuffer stride");
 
 	class Light
 	{
@@ -38,6 +40,8 @@ namespace DX12Engine
 		void SetDirection(DirectX::XMFLOAT3 direction);
 		void SetSpotAngle(float angle);
 		void SetShadowMapIndex(int index) { m_LightData.ShadowMapIndex = index; }
+		void SetCastsShadows(bool castsShadows) { m_CastsShadows = castsShadows; }
+		bool GetCastsShadows() const { return m_CastsShadows; }
 
 		LightType GetType() { return (LightType)m_LightData.Type; }
 		LightData& GetLightData() { return m_LightData; }
@@ -50,6 +54,7 @@ namespace DX12Engine
 		void UpdateViewProjMatrix();
 
 		LightData m_LightData;
+		bool m_CastsShadows = true;
 
 		DirectX::XMVECTOR UpDirection = DirectX::XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f);
 	};

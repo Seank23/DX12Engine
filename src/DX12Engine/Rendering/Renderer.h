@@ -1,12 +1,12 @@
 #pragma once
 #include "RenderContext.h"
-#include "../Resources/Texture.h"
 #include "Heaps/RenderPassDescriptorHeap.h"
 #include "../Resources/RenderTexture.h"
 #include "../Entity/Scene.h"
-#include "RenderPipelineConfig.h"
 #include "RenderPass/RenderPass.h"
 #include "RendererOptions.h"
+#include "Lighting/ClusteredLightGrid.h"
+
 #include <cstdint>
 #include <unordered_map>
 
@@ -96,5 +96,12 @@ namespace DX12Engine
 		// during the frame that owns it, or slots that never see an update keep stale/zeroed data.
 		UINT m_OptionsDirtyFrames = 0;
 		UINT m_FrameFenceValues[FRAMES_IN_FLIGHT] = {};
+
+		ClusteredLightGrid m_LightGrid;
+		// Maxed every frame and reset when logged: the grid's own counters are per-frame, so
+		// sampling them once every 60 would step over a transient overflow.
+		uint32_t m_LightGridPeakLights = 0;
+		uint32_t m_LightGridDroppedLights = 0;
+		uint32_t m_LightGridPeakIndices = 0;
 	};
 }

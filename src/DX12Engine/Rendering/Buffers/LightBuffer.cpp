@@ -1,13 +1,11 @@
 #include "LightBuffer.h"
 #include "../../Resources/ResourceManager.h"
 #include "../../Utils/EngineUtils.h"
-#include <iostream>
 
 namespace DX12Engine
 {
 	LightBuffer::LightBuffer()
 	{
-		m_ConstantBuffer = ResourceManager::GetInstance().CreateConstantBuffer(sizeof(LightBufferData));
 		m_LightsByTypeMap[LightType::Directional] = {};
 		m_LightsByTypeMap[LightType::Spot] = {};
 		m_LightsByTypeMap[LightType::Point] = {};
@@ -19,33 +17,56 @@ namespace DX12Engine
 
 	void LightBuffer::Update()
 	{
-		for (int i = 0; i < m_LightsBufferData.LightCount && i < 4; i++)
-			m_LightsBufferData.Lights[i] = m_Lights[i]->GetLightData();
+		m_LightData.clear();
+		m_LightData.reserve(m_Lights.size());
+		m_DirectionalLightCount = 0;
 
-		m_ConstantBuffer->Update(&m_LightsBufferData, sizeof(LightBufferData));
+		for (const auto& light : m_Lights)
+		{
+			if (light->GetType() == LightType::Directional)
+			{
+				m_LightData.push_back(light->GetLightData());
+				m_DirectionalLightCount++;
+			}
+		}
+
+		for (const auto& light : m_Lights)
+		{
+			if (light->GetType() != LightType::Directional)
+				m_LightData.push_back(light->GetLightData());
+		}
 	}
 
 	void LightBuffer::AddLight(std::shared_ptr<Light> light)
 	{
-		if (m_Lights.size() >= 4)
-		{
-			std::cout << "LightBuffer can only hold 4 lights. Cannot add more lights." << std::endl;
-			return;
-		}
-		// Assign the light's slice within its own type's shadow atlas: spot lights index the
-		// shadowMaps Texture2DArray, point lights index the shadowCubeMaps cube array. Passes
-		// render each type in this same insertion order, so the slot doubles as the sample index.
 		LightType type = light->GetType();
-		light->SetShadowMapIndex(static_cast<int>(m_LightsByTypeMap[type].size()));
+		uint32_t* shadowSlots = nullptr;
+		if (type == LightType::Spot && m_SpotShadowSlots < MAX_SHADOW_CASTING_SPOT_LIGHTS)
+			shadowSlots = &m_SpotShadowSlots;
+		else if (type == LightType::Point && m_PointShadowSlots < MAX_SHADOW_CASTING_POINT_LIGHTS)
+			shadowSlots = &m_PointShadowSlots;
+		
+		bool castsShadows = shadowSlots != nullptr && light->GetCastsShadows();
+		light->SetShadowMapIndex(castsShadows ? (int)(*shadowSlots)++ : -1);
 		m_Lights.push_back(light);
-		m_LightsByTypeMap[type].push_back(m_LightsBufferData.LightCount);
-		m_LightsBufferData.Lights[m_LightsBufferData.LightCount++] = light->GetLightData();
-		Update();
+		m_LightsByTypeMap[type].push_back(static_cast<int>(m_Lights.size() - 1));
+		m_LightData.push_back(light->GetLightData());
 	}
 
 	std::vector<Light*> LightBuffer::GetAllLights()
 	{
 		return EngineUtils::VectorSharedPtrToPtrs(m_Lights);
+	}
+
+	std::vector<Light*> LightBuffer::GetShadowCastingLightsByType(std::vector<LightType> types)
+	{
+		std::vector<Light*> shadowCasters;
+		for (Light* light : GetLightsByType(types))
+		{
+			if (light->GetLightData().ShadowMapIndex >= 0)
+				shadowCasters.push_back(light);
+		}
+		return shadowCasters;
 	}
 
 	std::vector<Light*> LightBuffer::GetLightsByType(std::vector<LightType> types)

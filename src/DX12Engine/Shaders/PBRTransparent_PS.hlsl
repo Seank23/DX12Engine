@@ -112,7 +112,7 @@ float4 main(PSInput i, bool isFrontFace : SV_IsFrontFace) : SV_TARGET
 
     float3 R = reflect(-V, N);
     float perceptualRoughness = roughness * roughness;
-    float3 reflected = envMap.SampleLevel(sampWrap, R, perceptualRoughness * 12.0).rgb;
+    float3 reflected = envMap.SampleLevel(sampWrap, R, perceptualRoughness * 12.0).rgb * AmbientIntensity;
 
     // Cheap screen-space refraction from existing opaque composite
     float2 screenUV = screenUVdepth;

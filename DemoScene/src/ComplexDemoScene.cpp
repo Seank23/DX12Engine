@@ -37,13 +37,13 @@ namespace DX12EngineDemo
 		pointLight->SetType((int)DX12Engine::LightType::Point);
 		pointLight->SetPosition({ 0.0f, 5.0f, -0.8f });
 		pointLight->SetIntensity(20.0f);
-		pointLight->SetRange(200.0f);
+		pointLight->SetRange(15.0f);
 		pointLight->SetColor({ 1.0f, 0.6f, 0.3f });
 		m_LightBuffer->AddLight(pointLight);
 		std::shared_ptr<DX12Engine::Light> spotLight = std::make_shared<DX12Engine::Light>();
 		spotLight->SetType((int)DX12Engine::LightType::Spot);
 		spotLight->SetPosition({ 5.0f, 10.0f, -5.0f });
-		spotLight->SetRange(40.0f);
+		spotLight->SetRange(25.0f);
 		spotLight->SetDirection({ -0.1f, -0.8f, 0.1f });
 		spotLight->SetColor({ 0.9f, 0.5f, 0.0f });
 		spotLight->SetIntensity(20.0f);

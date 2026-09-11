@@ -78,6 +78,7 @@ namespace DX12Engine
 
 		void BeginFrame(UINT slot);
 		D3D12_GPU_VIRTUAL_ADDRESS AllocateFrameConstants(const void* data, UINT size) { return m_FrameConstantAllocator->Allocate(data, size); }
+		UINT GetFrameConstantPeakBytes() const { return m_FrameConstantAllocator->GetPeakBytesUsed(); }
 
 	private:
 		Microsoft::WRL::ComPtr<ID3D12Device> m_Device;

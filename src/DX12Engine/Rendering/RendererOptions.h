@@ -66,5 +66,8 @@ namespace DX12Engine
 		CSMSettings CSM;
 		bool EnableGammaCorrection = true;
 		bool EnableFrustumCulling = true;
+		bool ShowLightGridHeatmap = false;
+		// Scales every environment-map contribution: the diffuse irradiance, the specular reflection, and SSR's fallback.
+		float AmbientIntensity = 1.0f;
 	};
 }

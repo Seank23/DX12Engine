@@ -10,9 +10,10 @@ struct Light
     float Range;
     float3 Color;
     float SpotAngle;
-    float3 Padding;
+    float3 Padding1;
     matrix ViewProjMatrix;
 	int ShadowMapIndex;
+	float3 Padding2;
 };
 
 float3 FresnelSchlick(float cosTheta, float3 F0)

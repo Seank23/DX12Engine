@@ -3,6 +3,7 @@
 #include <windowsx.h>
 
 #include "DemoScene.h"
+#include "ClusteredLightingScene.h"
 #include "ComplexDemoScene.h"
 #include "DX12Engine/Rendering/RenderPipelineConfig.h"
 #include "DX12Engine/Rendering/PipelineBuilder.h"
@@ -28,13 +29,16 @@ namespace DX12EngineDemo
 		m_Renderer = std::make_unique<DX12Engine::Renderer>(m_RenderContext);
 		DX12Engine::RendererOptions options;
 		options.AA_Mode = DX12Engine::AntiAliasingMode::TAA;
-		//options.RenderScale = 1.5f;
 		options.CSM.CascadeCount = 6;
+		// The hall is open to a bright sky cubemap and only the sun's cascade occludes ambient,
+		// so at 1.0 the IBL drowns a few hundred small lamps and the shadows they cast.
+		options.AmbientIntensity = 0.5f;
 		m_Renderer->SetOptions(options);
 
 		m_PhysicsEngine = std::make_shared<DX12Engine::PhysicsEngine>();
 
-		m_Scene = std::make_unique<ComplexDemoScene>(m_RenderContext, m_PhysicsEngine, windowSize);
+		m_Scene = std::make_unique<ClusteredLightingScene>(m_RenderContext, m_PhysicsEngine, windowSize);
+		//m_Scene = std::make_unique<ComplexDemoScene>(m_RenderContext, m_PhysicsEngine, windowSize);
 		m_Scene->Init();
 		m_Renderer->SetCurrentScene(m_Scene.get());
 
@@ -55,8 +59,8 @@ namespace DX12EngineDemo
 		m_InteractionController = std::make_unique<InteractionController>(m_UISystem);
 		m_InputHandler->AddInputController(m_InteractionController.get());
 
-		auto shadowCastingLights = m_Scene->GetLightBuffer()->GetLightsByType({ DX12Engine::LightType::Spot });
-		auto cubeShadowCastingLights = m_Scene->GetLightBuffer()->GetLightsByType({ DX12Engine::LightType::Point });
+		auto shadowCastingLights = m_Scene->GetLightBuffer()->GetShadowCastingLightsByType({ DX12Engine::LightType::Spot });
+		auto cubeShadowCastingLights = m_Scene->GetLightBuffer()->GetShadowCastingLightsByType({ DX12Engine::LightType::Point });
 		auto cascadedShadowCastingLights = m_Scene->GetLightBuffer()->GetLightsByType({ DX12Engine::LightType::Directional });
 
 		DX12Engine::RenderPassConfig shadowMapConfig;
