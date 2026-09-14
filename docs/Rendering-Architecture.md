@@ -6,32 +6,34 @@
 
 ## 1. Executive summary
 
-DX12Engine is a **clustered-less, deferred, physically-based renderer** built directly on Direct3D 12 with a data-driven, frame-graph-lite pass system. For a single-author/learning-oriented engine it is unusually complete: it ships a full G-buffer deferred pipeline, image-based lighting with a clearcoat lobe, three shadowing techniques (spot 2D, point cube, cascaded directional), screen-space reflections with temporal accumulation, a hand-written TAA resolve with variance clipping and dilated velocity, discrete LOD selection with hysteresis, frustum culling, and a data-driven render-pass graph that automatically wires producers to consumers and re-creates transient targets on resize.
+DX12Engine is a **clustered, deferred, physically-based renderer** built directly on Direct3D 12 with a data-driven, frame-graph-lite pass system. For a single-author/learning-oriented engine it is unusually complete: it ships a full G-buffer deferred pipeline, image-based lighting with a clearcoat lobe, three shadowing techniques (spot 2D, point cube, cascaded directional), screen-space reflections with temporal accumulation, a hand-written TAA resolve with variance clipping and dilated velocity, ACES tone mapping, discrete LOD selection with hysteresis, frustum culling, and a data-driven render-pass graph that automatically wires producers to consumers and re-creates transient targets on resize.
 
-The technique *quality* is well above the typical tutorial renderer and lands somewhere in the **intermediate-to-advanced hobby** tier. The main things separating it from a production engine are not the effects — those are respectable — but the **execution/scale layer**: a strictly serialized single-frame-in-flight submission model that prevents CPU/GPU overlap, a hard limit of **four total lights** with single-slot shadowing, a **fat 52-byte G-buffer**, the **absence of tone mapping/exposure**, and a handful of concrete correctness bugs (PSO cache hash truncation, spot-shadow indexing, light-buffer overflow).
+The technique *quality* is well above the typical tutorial renderer and lands somewhere in the **intermediate-to-advanced hobby** tier. Every execution-layer ceiling this report originally named has since been lifted: the submission model is pipelined `FRAMES_IN_FLIGHT` deep (§3.2), dynamic constants come from a per-frame ring (§10.3), uploads are fence-based instead of CPU-blocking (§3.3), the G-buffer is 32 bytes/pixel (§4.1), lighting is **clustered** with no fixed light cap (§5), tone mapping and reverse-Z are in, and all five documented bugs are fixed (§15).
 
-The rest of this document walks the pipeline in detail, then collects strengths, weaknesses, bugs (with fixes), and a roadmap.
+What separates it from a production engine now is **scale machinery rather than correctness**: cluster assignment is single-threaded CPU work, no compute shader ships at all, there is no GPU-driven submission or occlusion culling, and no global illumination beyond SSR.
+
+The rest of this document walks the pipeline in detail, then collects strengths, weaknesses, the bugs it carried (all now fixed), and a roadmap.
 
 ---
 
 ## 2. The frame at a glance
 
-The demo (`DemoScene/src/DX12EngineDemoApp.cpp:154`) builds this pass graph, executed in order by `Renderer::ExecutePipeline` (`src/DX12Engine/Rendering/Renderer.cpp:206`):
+The demo (`DemoScene/src/DX12EngineDemoApp.cpp:154`) builds this pass graph, executed in order by `Renderer::ExecutePipeline` (`src/DX12Engine/Rendering/Renderer.cpp:205`):
 
 ```mermaid
 flowchart TD
     subgraph Shadows
       SM[ShadowMap<br/>spot lights → Tex2DArray]
-      CSM_pt[CubeShadowMap<br/>point lights → TexCube]
+      CSM_pt[CubeShadowMap<br/>point lights → TexCubeArray]
       CSMd[CascadedShadowMap<br/>directional → Tex2DArray]
     end
-    G[Geometry pass<br/>7 MRT G-buffer + D32 depth]
-    L[Lighting pass<br/>deferred PBR + IBL + shadows → SceneColor HDR]
+    G[Geometry pass<br/>5 MRT G-buffer + D32 depth]
+    L[Lighting pass<br/>clustered deferred PBR + IBL + shadows → SceneColor HDR]
     SSR[SSR pass<br/>ray-march + temporal accum → SceneColor + ReactiveMask]
     TAA[TAA pass<br/>optional → SceneColor]
     TR[Transparent pass<br/>forward blend over SceneColor]
     UI[UI pass → SceneColor]
-    P[Present<br/>FinalRender_PS: FXAA? + gamma → backbuffer]
+    P[Present<br/>FinalRender_PS: exposure → ACES → gamma → FXAA? → backbuffer]
 
     SM --> L
     CSM_pt --> L
@@ -46,7 +48,7 @@ Key structural facts:
 
 - **Deferred core, forward tail.** Opaque geometry is deferred (G-buffer → single full-screen lighting resolve). Transparent geometry is drawn afterward in a **forward** pass that copies the resolved scene and alpha-blends over it (`TransparentRenderPass.cpp:78`).
 - **Post-order.** SSR and TAA operate on the HDR `SceneColor` before transparents. Transparents therefore receive **no TAA and no SSR** — a deliberate, common tradeoff (transparents lack motion vectors), but worth knowing.
-- **Present is a blit.** The final image is produced by a full-screen triangle in `Renderer::PresentFrame` running `FinalRender_PS` (optional FXAA + gamma), sampling the last pass's `Composite` target (`Renderer.cpp:571`).
+- **Present is a blit.** The final image is produced by a full-screen triangle in `Renderer::PresentFrame` running `FinalRender_PS` (exposure → ACES → gamma, then optional FXAA), sampling the last pass's `Composite` target (`Renderer.cpp:588`).
 
 ---
 
@@ -55,27 +57,28 @@ Key structural facts:
 ### 3.1 Setup
 `RenderContext` creates the device at **feature level 11.0** (`RenderContext.cpp:52`), a `CommandQueueManager`, a `DescriptorHeapManager`, and a `GPUUploader`. The swap chain is **double-buffered, `FLIP_DISCARD`, `R8G8B8A8_UNORM`, windowed, vsync on** (`RenderWindow.cpp:63`, `Present(1,0)` at `RenderWindow.cpp:128`).
 
-### 3.2 The submission model — the single most important performance characteristic
+### 3.2 The submission model
 
-Each render pass records into the graphics queue's command list and **submits its own command list** at the end of `Execute()` (e.g. `GeometryRenderPass.cpp:165`, `LightingRenderPass.cpp:108`). The next pass calls `ResetCommandAllocatorAndList()` (`RenderPass::Execute`, `RenderPass.cpp:79`), which rotates through a pool of **8 command allocators** (`CommandQueue.cpp:11`) and only CPU-waits if none is free.
+Each render pass records into the graphics queue's command list and **submits its own command list** at the end of `Execute()` (e.g. `GeometryRenderPass.cpp:164`, `LightingRenderPass.cpp:108`). The next pass calls `ResetCommandAllocatorAndList()` (`RenderPass::Execute`, `RenderPass.cpp:79`), which rotates through a pool of `COMMAND_ALLOCATOR_POOL_SIZE` allocators (`FRAMES_IN_FLIGHT * 32`, `Constants.h:5`) and only CPU-waits if none is free.
 
-At the end of the frame, `PresentFrame` does:
+Frames are **pipelined `FRAMES_IN_FLIGHT` deep** (2 today). The only per-frame CPU wait is at the *top* of the frame, in `Renderer::ExecutePipeline` (`Renderer.cpp:208`):
 
 ```cpp
-UINT fenceVal = ...ExecuteCommandList();
-m_RenderContext->PresentFrame();               // Present(1,0)
-m_QueueManager.GetGraphicsQueue().WaitForFenceCPUBlocking(fenceVal);  // full stall
+UINT currentSlot = m_FrameIndex % FRAMES_IN_FLIGHT;
+if (m_FrameFenceValues[currentSlot] != 0)
+    m_QueueManager.GetGraphicsQueue().WaitForFenceCPUBlocking(m_FrameFenceValues[currentSlot]);
 ```
-`Renderer.cpp:606`
 
-This means: **the CPU blocks until the GPU has finished the entire frame before starting the next one.** Even though the swap chain is double-buffered and the descriptor heap/allocators are sized for `FRAMES_IN_FLIGHT`, the per-frame CPU stall makes the engine effectively **single-frame-in-flight**: the GPU is idle while the CPU records, and the CPU is idle while the GPU executes. There is **no CPU/GPU overlap across frames**.
+The CPU therefore blocks on the frame that last used *this slot's* resources — not on the frame it just submitted. `PresentFrame` records the frame's completion fence into `m_FrameFenceValues[slot]` and presents without waiting (`Renderer.cpp:623`), so the CPU records frame N+1 while the GPU executes frame N.
 
-There is a second, subtler consequence: the full-frame stall is currently **load-bearing for correctness**. Per-object constant buffers (`RenderComponent::Init`, `RenderComponent.cpp:29`), the light buffer, and the screen buffer are each a **single** upload-heap resource that is rewritten every frame. That is only safe because the GPU is guaranteed done with last frame's copy before the CPU overwrites it. You cannot simply "add frames in flight" without also double/triple-buffering every dynamic constant buffer.
+Everything the CPU writes and the GPU reads within a frame is slot-indexed behind that gate: the constant ring (`FrameConstantAllocator`, §10.3), `ConstantBuffer`'s `s_FrameSlot` sub-allocation, the command-allocator pool, and the transient descriptor heap. All of them size themselves from `FRAMES_IN_FLIGHT`, so deepening the pipeline is a one-constant change. The corollary is the rule for new code: **a single-buffered upload resource rewritten every frame is a race under this model** — put per-frame data through the ring, or N-buffer it the same way.
 
-### 3.3 Uploads are synchronous too
-`GPUUploader::ExecuteUpload` (`GPUUploader.cpp:105`) executes the copy-queue list, **CPU-waits** for it, executes a graphics-queue barrier list, and **CPU-waits again**. So any frame that streams in a new texture (first sighting of a material) triggers two full CPU stalls mid-frame. Vertex/index/constant creation goes through the same path.
+(This section previously described a full `WaitForFenceCPUBlocking` after `Present` and an effectively single-frame-in-flight engine. That stall is gone; see `docs/Frame-Pipelining-Guide.md` for how it was removed.)
 
-**Net:** the architecture is *correct* and easy to reason about, but its throughput ceiling is roughly half of a pipelined design, and texture streaming produces visible hitches.
+### 3.3 Uploads are asynchronous
+`GPUUploader` records copies on the **copy queue** and the acquiring barriers on the **graphics queue** through two independent `UploadCommandList`s, submits both, and returns without waiting. Each list owns a pool of allocator slots and CPU-waits only when every slot is still in flight (`UploadCommandList::Begin`, `GPUUploader.cpp:209`). Upload heaps and the resources they feed are retired against the graphics fence (`ProcessRetiredResources`), so staging memory is reclaimed without a stall and a first-sighting texture no longer freezes the frame that discovers it.
+
+**Net:** the frame pipelines and streaming does not hitch. What is left on the CPU each frame is single-threaded pass recording, per-object culling/LOD (§11), and cluster assignment (§5).
 
 ---
 
@@ -91,7 +94,7 @@ There is a second, subtler consequence: the full-frame stall is currently **load
 | Material | `R8G8B8A8_UNORM` | 4 | roughness, metallic, clearcoat, clearcoatRoughness |
 | Emissive | `R16G16B16A16_FLOAT` | 8 | emissive rgb + **AO in alpha** |
 | Velocity | `R16G16_FLOAT` | 4 | screen-space motion vector |
-| Depth | `D32_FLOAT` | 4 | hardware depth |
+| Depth | `D32_FLOAT` | 4 | hardware depth, **reverse-Z** (near → 1.0, far → 0.0, `GREATER` test) |
 
 **Total ≈ 32 bytes/pixel.** At 1080p that is **~66 MB** for the G-buffer, before SceneColor, two SSR history buffers, two TAA history buffers, the reactive mask, and the transparent scene copy — all full-resolution `R16G16B16A16_FLOAT`.
 
@@ -111,7 +114,7 @@ Each render-target format is declared in **three** places that must agree: the `
 Tangent space uses a stored handedness sign (`Vertex.Tangent.w`) and reconstructs the bitangent with `cross(N,T)*w` (`Geometry_VS.hlsl:49`), so mirrored UVs are handled correctly.
 
 ### 4.3 Draw submission
-`Renderer::SetSceneData` builds `DrawItem`s and sorts opaque items by **(PSO key, material, mesh, CBV address)** (`Renderer.cpp:493`) to minimize state changes, shadow items the same way, and transparent items **back-to-front by object-center distance** (`Renderer.cpp:510`). The geometry pass then binds lazily, skipping redundant PSO/root-sig/CBV/material/VB-IB sets (`GeometryRenderPass.cpp:92`). This is textbook sort-then-batch and is done well. Materials can carry their own PSO variant via `MaterialTemplate`, falling back to the pass's default PSO when none is resolved.
+`Renderer::SetSceneData` builds `DrawItem`s and sorts opaque items by **(PSO key, material, mesh, CBV address)** (`Renderer.cpp:511`) to minimize state changes, shadow items the same way, and transparent items **back-to-front by object-center distance** (`Renderer.cpp:526`). The geometry pass then binds lazily, skipping redundant PSO/root-sig/CBV/material/VB-IB sets (`GeometryRenderPass.cpp:92`). This is textbook sort-then-batch and is done well. Materials can carry their own PSO variant via `MaterialTemplate`, falling back to the pass's default PSO when none is resolved.
 
 ---
 
@@ -121,15 +124,29 @@ The resolve is `PBRLightingDeferred_PS` (`Shaders/PBRLightingDeferred_PS.hlsl`) 
 
 **Analytic lighting** (`PBRShading.hlsli`) is standard Cook-Torrance: GGX/Trowbridge-Reitz NDF, Schlick-GGX geometry with the `(r+1)²/8` direct-lighting `k`, Schlick Fresnel, `F0 = lerp(0.04, albedo, metallic)`. On top of the base lobe there is a **glTF-style clearcoat** second specular lobe with fixed `F0≈0.04` and base-layer energy attenuation (`ClearcoatSpecLobe`). This is a real, correct extension most hobby engines never add.
 
-**Image-based lighting:** diffuse from an irradiance cubemap, specular from the environment cubemap sampled at `roughness*12` mip (`PBRLightingDeferred_PS.hlsl:104`), Fresnel-roughness split, plus a **specular-occlusion** term (`SpecularOcclusion`) that keeps polished metals from glowing in shadow. The environment reflection is a prefiltered-mip approximation rather than a proper split-sum BRDF LUT.
+**Image-based lighting:** diffuse from an irradiance cubemap, specular from the environment cubemap sampled at `roughness*12` mip (`PBRLightingDeferred_PS.hlsl:124`), Fresnel-roughness split, plus a **specular-occlusion** term (`SpecularOcclusion`) that keeps polished metals from glowing in shadow. The environment reflection is a prefiltered-mip approximation rather than a proper split-sum BRDF LUT.
 
-**Light types:** directional (with CSM), point (inverse-square with a windowing falloff, cube-map PCF shadow), spot (cone falloff, 2D PCF shadow). The shadow term is folded into an "ambient shadow" that also darkens the IBL contribution via a smooth remap (`PBRLightingDeferred_PS.hlsl:155`) — a pragmatic hack to fake shadowing of ambient light without an AO/GI pass.
+**Light types:** directional (with CSM), point (inverse-square with a windowing falloff, cube-array PCF shadow), spot (cone falloff, 2D PCF shadow). Shadow sampling is gated on `light.ShadowMapIndex >= 0`, so a light with no atlas slot (§6) simply shades unshadowed rather than reading a stranger's map. Only the directional cascade feeds the **"ambient shadow"** term that darkens IBL through a smooth remap (`PBRLightingDeferred_PS.hlsl:147`) — a pragmatic hack to fake shadowing of ambient light without an AO/GI pass, deliberately limited to the sun because a local light's shadow map says nothing about how much environment reaches a surface.
 
-**Sky:** pixels at far depth sample the environment cubemap directly (`PBRLightingDeferred_PS.hlsl:88`).
+**Sky:** pixels at far depth (reverse-Z: `depth <= 0`) sample the environment cubemap directly (`PBRLightingDeferred_PS.hlsl:112`).
+
+### Clustered light assignment
+
+Lights live in a runtime-sized `StructuredBuffer<LightData>` bound at `t0, space1` — there is no compile-time light cap. `LightBuffer::Update` uploads directional lights first and everything else after (`LightBuffer.cpp:18`), which is what lets the shader split its loop into "always shade" and "shade if the cluster lists it".
+
+`ClusteredLightGrid` (`Rendering/Lighting/ClusteredLightGrid.cpp`) divides the view frustum into **16 × 9 × 24 froxels** (`LIGHT_CLUSTER_GRID_*`, `Constants.h:12`): screen-space tiles in x/y, **exponentially spaced slices** in z, `z_k = near · (far/near)^(k/24)`. Exponential slicing keeps each slice's depth range proportional to its distance instead of packing almost every froxel into the first few metres, which is what makes a single 24-deep grid usable across the whole near-to-far range. The slice index is therefore a logarithm, precomputed as a scale/bias pair (`DepthScale`, `DepthBias`) shared verbatim by CPU and shader.
+
+Froxel AABBs are view-space and depend only on FOV, aspect and the near/far planes, so they are cached and rebuilt only when one of those changes (`RebuildFroxelBounds`) — camera movement does not invalidate them. Each AABB takes the min/max over **both** z planes of the froxel, because a perspective froxel's near face is smaller than its far face and the corners of one do not bound the other.
+
+Per frame, every non-directional light's bounding sphere is tested against the froxels within its slice range (`SphereIntersectsAABB`), and the per-froxel buckets are flattened into two more buffers: `ClusterGrid` (`t1, space1`, one `uint2` offset/count per froxel) and `LightIndices` (`t2, space1`, the flat index list, capped at `MAX_LIGHT_INDICES` = 32 × froxel count). Those two, the light list, and the `ClusterData` cbuffer that carries grid size, tile size, depth scale/bias and the directional count all go through the per-frame constant ring (§10.3) and are bound as **root SRVs / root CBV**. Clustering therefore consumes **no descriptors at all** and moved no existing register — the deliberate design choice that kept the change out of the descriptor-heap code entirely.
+
+The shader half is `Shaders/Lighting/ClusteredLighting.hlsli`, shared by the deferred and transparent pixel shaders: `GetClusterIndex(SV_POSITION.xy, viewZ)` resolves the froxel, and shading runs the directional lights unconditionally, then only the lights that froxel lists (`PBRLightingDeferred_PS.hlsl:138`). The transparent pass reads the same three buffers and derives its `viewZ` from the interpolated world position rather than `SV_POSITION.w`.
+
+**What this buys and what it costs.** Shading cost stops scaling with *total* light count and starts scaling with *local* light density, so hundreds of short-range lights cost little more than a handful — that is the whole point of the exercise. The costs are that assignment is **single-threaded CPU work** proportional to lights × froxels touched, and that a froxel whose bucket exhausts `MAX_LIGHT_INDICES` silently drops the overflow. Both are instrumented: a `_DEBUG` print every 60 frames reports peak lights per cluster, index-list high-water mark, dropped count and froxel rebuilds (`Renderer.cpp:646`), and `RendererOptions::ShowLightGridHeatmap` (`RendererOptions.h:69`, exposed as an ImGui checkbox) returns a per-froxel occupancy ramp instead of shading. Moving assignment to a compute shader is the natural next step (§16 item 10).
 
 ### Gaps in the shading model
 - **No BRDF integration LUT** (split-sum): the env specular is `prefiltered * kS * (1-roughness)²`, an ad-hoc energy term rather than the standard `prefiltered * (F0*scale + bias)`. Visually plausible, not energy-correct.
-- **`MAX_LIGHTS 4`** (`PBRLightingDeferred_PS.hlsl:1`). The lighting loop is a flat iteration over at most four lights. There is no tiling/clustering, so this cannot scale to many lights. This is the single biggest *capability* limitation of the renderer.
+- **Transparents are lit but never shadowed.** The transparent pass consumes the cluster buffers and calls the same `PBRLighting`, but binds no shadow atlases and no CSM constants, so every light contributes unshadowed there. It also adds its analytic result at a reduced weight so transmission and refraction keep dominating the look.
 - **`sRGBToLinear` uses `pow(x,2.2)`** rather than the exact piecewise sRGB curve — universally fine, just noting it.
 
 ---
@@ -140,14 +157,14 @@ Three separate systems feed the lighting pass:
 
 **Spot lights → `ShadowMapRenderPass` (2D).** One `SHADOW_MAP_SIZE = 2048` slice of a `Texture2DArray` per spot light (`ShadowMapRenderPass.cpp:34`), rendered with a fixed depth bias (const 1000, slope 1.5) and `CULL_MODE_NONE`. Sampled with a **16-tap Poisson-disk PCF** comparison sampler (`ShadowSampling.hlsli:4`).
 
-**Point lights → cube shadow.** Six `LookAtLH` faces per light rendered into cube slices, distance stored normalized by far plane; sampled with a 3×3 PCF (`ShadowSampling.hlsli:47`).
+**Point lights → cube shadow.** Six `LookAtLH` faces per shadow-casting point light rendered into slices of a cube *array* (sampled as `TextureCubeArray`, §15 Bug 3), distance stored normalized by far plane; sampled with a 3×3 PCF (`ShadowSampling.hlsli:47`).
 
 **Directional → `CascadedShadowMapRenderPass`.** This is the most sophisticated piece. It computes **logarithmic/uniform blended split distances** (`SplitLambda`), fits each cascade to its frustum-slice bounding sphere, and applies **texel-snapping** (rounding the light-space center to whole texels, `CascadedShadowMapRenderPass.cpp:250`) to kill shadow swimming under camera motion. Sampling (`CascadedShadowSampling.hlsli`) uses per-cascade normal bias + slope-scaled depth bias, 16-tap Poisson PCF, and **smooth inter-cascade blending** across a configurable band. This is production-grade CSM logic.
 
 ### Shadow issues
-- **Point shadows: only one caster is usable.** The lighting shader binds a **single `TextureCube shadowCubeMap`** (`PBRLightingDeferred_PS.hlsl:49`), while the cube pass writes `6*count` slices (`ShadowMapRenderPass.cpp:200`). A second shadow-casting point light's faces are simply never sampled. See Bug 3.
-- **Spot shadow indexing is by global light index.** See Bug 2 — a real correctness bug under mixed light ordering.
-- **No reverse-Z.** The camera uses a standard LH perspective with depth clear 1.0 and `LESS` test (`Camera.cpp:115`). Both the main scene and shadows would benefit in precision from a reverse-Z (`D32`, `GREATER`) setup, which is nearly free.
+- **Shadow slots are capped per light type and handed out first-come-first-served.** `MAX_SHADOW_CASTING_SPOT_LIGHTS` and `MAX_SHADOW_CASTING_POINT_LIGHTS` (4 each, `Constants.h:17`) bound the atlases; `LightBuffer::AddLight` (`LightBuffer.cpp:40`) assigns a slot in creation order and gives everything past the cap `ShadowMapIndex = -1`. This cap is **load-bearing** — without it a 256-light scene would ask for 256 cube maps at `SHADOW_MAP_SIZE = 2048` and remove the device — but the policy is arrival order, not importance, so a scene that creates its hero caster late loses that shadow.
+- **Transparents receive no shadows at all** (§5).
+- **No shadow-atlas packing.** Every caster gets a full `SHADOW_MAP_SIZE` slice regardless of how much screen it covers, so the atlas cost is flat in distance and screen size.
 
 ---
 
@@ -183,11 +200,11 @@ This is a well-rounded TAA that mirrors the standard modern recipe (INSIDE/UE4-e
 
 ## 9. Post-processing and present
 
-The final present pass (`FinalRender_PS.hlsl`) offers a full **FXAA 3.11-style** implementation (edge detect, edge search, sub-pixel aliasing) plus optional gamma. AA mode is exclusive: `None`, `FXAA` (present-time), or `TAA` (dedicated pass) — `Renderer::UpdatePostProcessingCB` wires the flags.
+The final present pass (`FinalRender_PS.hlsl`) applies **exposure → ACES tone map → gamma encode**, then optionally runs a full **FXAA 3.11-style** pass (edge detect, edge search, sub-pixel aliasing) on the encoded result. AA mode is exclusive: `None`, `FXAA` (present-time), or `TAA` (dedicated pass) — `Renderer::UpdatePostProcessingCB` wires the flags, and `RendererOptions` exposes `ToneMapping` (`None`/`ACES`) plus a manual `Exposure` (default 1.5).
 
-**The conspicuous gap: there is no tone mapping and no exposure.** The pipeline is HDR end-to-end (`R16G16B16A16_FLOAT` intermediates), and then the present pass samples that HDR buffer and does only `pow(color, 1/2.2)` (`FinalRender_PS.hlsl:155`). Any luminance above 1.0 — bright emissives, sun-lit metal, strong point lights — **clips hard to white** with hue shifts. A single ACES/Reinhard/AgX operator (a few lines) would dramatically improve image quality and is the highest-value visual fix available. There is also no bloom, which is what normally sells emissive/HDR content.
+The grading order is the correct one: the scene is resolved in linear HDR, exposure and the tone curve run before the gamma encode, and FXAA runs **last**, on perceptually-encoded pixels where its luma thresholds actually belong (`FinalRender_PS.hlsl:158`). Highlights above 1.0 — bright emissives, sun-lit metal, strong point lights — now roll off instead of clipping to white.
 
-A minor ordering nit: FXAA runs on the **linear** HDR buffer *before* gamma. FXAA's luma thresholds were designed for perceptual/gamma-encoded input, so quality is slightly off; encoding first then AA would be more correct.
+What is still missing is **bloom**: there is no downsample/upsample chain, so emissives tone-map cleanly but never bleed, which is what normally sells HDR content. Exposure is also fully manual — no auto-exposure/eye adaptation, so a scene authored for one exposure needs the slider moved when its lighting changes.
 
 ---
 
@@ -198,21 +215,23 @@ A minor ordering nit: FXAA runs on the **linear** HDR buffer *before* gamma. FXA
 - a **persistent, non-shader-visible "staging" heap** (`SRV_PERSISTENT_CAPACITY = 1024`) holding one stable SRV per resource for its lifetime, and
 - a **shader-visible "render-pass" heap** (`SRV_TRANSIENT_CAPACITY_FRAME = 512`, times `FRAMES_IN_FLIGHT`) that is bump-allocated per frame.
 
-Each frame, `ResourceManager::UpdateSRVDescriptors` (`ResourceManager.cpp:546`) allocates a contiguous transient block and `CopyDescriptorsSimple` from each resource's persistent slot into it, then hands the pass a GPU handle for its table. `RenderPass::RebuildTransientDescriptors` (`RenderPass.cpp:31`) computes per-block base handles by offset so one pass's copies cannot clobber another's.
+Each frame, `ResourceManager::UpdateSRVDescriptors` (`ResourceManager.cpp:564`) allocates a contiguous transient block and `CopyDescriptorsSimple` from each resource's persistent slot into it, then hands the pass a GPU handle for its table. `RenderPass::RebuildTransientDescriptors` (`RenderPass.cpp:31`) computes per-block base handles by offset so one pass's copies cannot clobber another's.
 
-This is a clean, robust model that sidesteps the usual "one giant heap + manual ring + fences" hazards. Its cost is a `CopyDescriptors` per bound resource per frame; the production alternative is a **persistent bindless heap** where descriptors are written once and shaders index by integer, eliminating the per-frame copies. Debug builds even track heap high-water marks and warn at 80%/95% (`Renderer.cpp:611`) — a nice touch.
+This is a clean, robust model that sidesteps the usual "one giant heap + manual ring + fences" hazards. Its cost is a `CopyDescriptors` per bound resource per frame; the production alternative is a **persistent bindless heap** where descriptors are written once and shaders index by integer, eliminating the per-frame copies. Debug builds even track heap high-water marks and warn at 80%/95% (`Renderer.cpp:640`) — a nice touch.
 
 ### 10.2 PSO / root-signature caches
-`PipelineStateCache` and `RootSignatureCache` hash-and-cache by content. The root-sig cache hashes its fields properly. **The PSO cache does not** — see Bug 1. There is also no on-disk `ID3D12PipelineLibrary`, so every PSO recompiles on cold start (fine at this scale). In `_DEBUG`, shaders hot-reload: `ResourceManager::ReloadChangedShaders` bumps a generation counter that forces PSOs to rebuild and passes to recreate — a great iteration feature.
+`PipelineStateCache` and `RootSignatureCache` hash-and-cache by content; both now hash their full state, the PSO cache included (it used to truncate — Bug 1, §15). There is also no on-disk `ID3D12PipelineLibrary`, so every PSO recompiles on cold start (fine at this scale). In `_DEBUG`, shaders hot-reload: `ResourceManager::ReloadChangedShaders` bumps a generation counter that forces PSOs to rebuild and passes to recreate — a great iteration feature.
 
 ### 10.3 Constant buffers
-Every primitive binding gets its **own committed upload-heap constant buffer** (`RenderComponent.cpp:29`). Committed CBs are 64 KB-aligned minimum, so a scene with hundreds of primitives wastes tens of MB and does hundreds of small allocations. The standard fix is a per-frame **linear/ring constant allocator** (one big upload buffer, sub-allocated). As noted in §3.2, these single-buffered CBs are also why the full-frame stall can't be removed in isolation.
+Per-draw dynamic constants come from `FrameConstantAllocator` (`Buffers/FrameConstantAllocator.h`): one upload buffer per frame slot, `CONSTANT_RING_BYTES_PER_FRAME` (4 MB) each, bump-allocated and rewound in `BeginFrame`. `RenderComponent` writes its object data straight into the ring and hands the pass back a GPU virtual address (`RenderComponent.cpp:147`); all four clustered-lighting buffers do the same (§5). The per-primitive committed constant buffers this section used to describe — 64 KB-aligned minimum, hundreds of small allocations — are gone.
+
+Long-lived constants that change rarely (screen data, post-processing, CSM, SSR/TAA temporal state) remain committed `ConstantBuffer`s, but each is internally N-buffered and addressed through a static `s_FrameSlot`, so a CPU write is never visible to an in-flight frame. Ring high-water usage is printed every 60 frames in `_DEBUG` alongside the light-grid stats (`Renderer.cpp:646`); if it approaches `CONSTANT_RING_BYTES_PER_FRAME`, raise the constant — the allocator does not grow.
 
 ---
 
 ## 11. Culling and LOD
 
-- **Frustum culling** via `DirectXCollision` OBBs: each primitive's oriented bounding box is transformed by the model matrix each frame (`MeshPrimitive::ComputeOrientedBoundingBox`) and tested against the camera frustum (`Renderer.cpp:467`). Culled objects skip the opaque/transparent lists but **still** go into the shadow list (correct — off-screen casters can shadow on-screen receivers).
+- **Frustum culling** via `DirectXCollision` OBBs: each primitive's oriented bounding box is transformed by the model matrix each frame (`MeshPrimitive::ComputeOrientedBoundingBox`) and tested against the camera frustum (`Renderer.cpp:430`). Culled objects skip the opaque/transparent lists but **still** go into the shadow list (correct — off-screen casters can shadow on-screen receivers).
 - **Discrete LOD with hysteresis** (`Renderer.cpp:67`): a screen-space size metric (projected radius / distance·tan(fov)) selects a LOD level, with separate enter/exit thresholds so objects don't oscillate between levels at a boundary. LOD index buffers are produced offline by the `AssetCooker` via mesh simplification.
 
 Both are single-threaded and per-object on the CPU. There is **no occlusion culling** (no HZB / predication) and **no GPU-driven culling** (no `ExecuteIndirect`), so draw-call scaling is CPU-bound.
@@ -223,133 +242,111 @@ Both are single-threaded and per-object on the CPU. There is **no occlusion cull
 
 | Capability | DX12Engine | UE5 | Unity HDRP | Godot 4 | Typical tutorial engine |
 |---|---|---|---|---|---|
-| Lighting arch | Deferred, **≤4 lights**, no tiling | Clustered deferred (thousands) | Tiled/clustered deferred+forward | Clustered Forward+ | Usually forward, few lights |
+| Lighting arch | **Clustered deferred** (16×9×24 froxels, CPU assignment), no light cap | Clustered deferred (thousands) | Tiled/clustered deferred+forward | Clustered Forward+ | Usually forward, few lights |
 | GI | SSR only | **Lumen** (SW/HW RT GI) | SSGI/APV/ray tracing | SDFGI/VoxelGI | None |
 | Reflections | Custom SSR + env fallback | Lumen reflections + SSR | SSR + reflection probes | SSR + probes | Rarely any |
 | Shadows | Spot 2D, point cube, CSM | Virtual Shadow Maps | CSM + contact + RT | CSM/PSSM | Basic single shadow map |
 | AA / upscaling | Custom TAA / FXAA | **TSR**, DLSS/FSR/XeSS | TAA + DLSS/FSR | TAA/FSR | None/MSAA |
-| Tone mapping | **None** (gamma only) | ACES/AgX, auto-exposure, bloom | ACES + full grading | Filmic/AgX + glow | None |
+| Tone mapping | ACES + manual exposure, **no bloom** | ACES/AgX, auto-exposure, bloom | ACES + full grading | Filmic/AgX + glow | None |
 | Geometry LOD | Discrete + hysteresis | **Nanite** virtualized | LOD groups | Discrete/visibility | None |
 | Frame graph | Data-driven, manual barriers | **RDG** auto barriers + transient aliasing + async compute | SRP RenderGraph | RenderingDevice graph | None |
-| Submission | 1 frame in flight, per-pass submit, CPU-blocking | Fully pipelined, multi-threaded, async compute | Pipelined + jobs | Pipelined | Often 1 frame, blocking |
+| Submission | Pipelined (N=2), per-pass submit, ring constants | Fully pipelined, multi-threaded, async compute | Pipelined + jobs | Pipelined | Often 1 frame, blocking |
 | Bindless | No (copy-streaming) | Yes | Yes | Partial | No |
 
-**Reading of the comparison:** the engine's *shading and post feature list* (PBR + clearcoat + IBL, CSM, SSR, TAA, LOD, frame-graph-lite) is comfortably ahead of tutorial-tier renderers and reaches into UE4-era territory for individual techniques. Where it is generationally behind production engines is exactly where production engines invested the last decade: **light scalability (clustering), global illumination, virtualized geometry/shadows, GPU-driven submission, and a pipelined/async execution layer.** Its closest philosophical relative is a well-built personal "modern deferred renderer" — the tier above a learning project, below a shippable engine.
+**Reading of the comparison:** the engine's *shading and post feature list* (PBR + clearcoat + IBL, CSM, SSR, TAA, LOD, frame-graph-lite) is comfortably ahead of tutorial-tier renderers and reaches into UE4-era territory for individual techniques. Where it is still generationally behind production engines is exactly where production engines invested the last decade: **global illumination, virtualized geometry and shadows, GPU-driven and compute-based submission, and multi-threaded recording.** Light scalability and the pipelined execution layer, the two entries that used to head this list, no longer belong on it. Its closest philosophical relative is a well-built personal "modern deferred renderer" — the tier above a learning project, below a shippable engine.
 
 ---
 
 ## 13. Strengths
 
-1. **Data-driven pass graph.** `RenderPipelineConfig` + `CreateRenderPipeline` (`Renderer.cpp:231`) auto-wire pass outputs to inputs via a producer map, inject fallbacks (env map, reactive mask, CSM CB), and remap every transient target on resize (`RenderPass::OnResize`, `Renderer::OnResize`). Adding/removing a pass is a config edit, not a rewrite.
+1. **Data-driven pass graph.** `RenderPipelineConfig` + `CreateRenderPipeline` (`Renderer.cpp:242`) auto-wire pass outputs to inputs via a producer map, inject fallbacks (env map, reactive mask, CSM CB), and remap every transient target on resize (`RenderPass::OnResize`, `Renderer::OnResize`). Adding/removing a pass is a config edit, not a rewrite.
 2. **Correct, thoughtful temporal tech.** Unjittered motion vectors, dilated velocity, variance clipping, Catmull-Rom history, reactive masks, and camera-cut resets show real understanding of TAA/SSR failure modes — not copy-paste.
 3. **Production-quality CSM.** Sphere-fit cascades, texel snapping, log/uniform split blend, cross-cascade blending, separable bias controls.
 4. **Clean descriptor architecture.** Persistent-staging + transient-copy is robust and self-instrumented with heap stats/warnings.
 5. **State-change-minimizing draw path.** Multi-key sort + lazy binding + material PSO variants + LOD-aware IB switching.
 6. **Good engineering hygiene.** Shader hot-reload with PSO/pass invalidation, offline asset cooking (mips + LODs + material manifests) with an incremental cache, resize correctness with explicit GPU drains, and debug-layer enablement.
+7. **Clustered lighting that costs nothing to bind.** The light list, froxel grid and index list ride as root SRVs in `space1` (§5), so lifting the light cap touched neither the descriptor heaps nor a single existing register in any shader.
+8. **An execution layer that sizes itself from one constant.** `FRAMES_IN_FLIGHT` drives the allocator pool, the transient descriptor heap, the constant ring and the frame fence gate; deepening the pipeline is a one-line change (§3.2).
 
 ---
 
 ## 14. Weaknesses (non-bug, by impact)
 
-1. **No CPU/GPU frame overlap** (§3.2). Biggest performance ceiling; ~2× throughput left on the table.
-2. **≤4 lights, no clustering** (§5). Biggest capability ceiling.
-3. **No tone mapping / exposure / bloom** (§9). Biggest *visual* deficit; cheapest to fix.
+The first seven entries are the resolved items from this list's original form, kept struck through
+so the trajectory stays visible; 8–14 are what is actually outstanding.
+
+1. ~~**No CPU/GPU frame overlap**~~ **Done** — frames pipeline `FRAMES_IN_FLIGHT` deep behind a top-of-frame fence gate (§3.2).
+2. ~~**≤4 lights, no clustering**~~ **Done** — clustered assignment over a runtime-sized `StructuredBuffer`; no fixed light cap (§5).
+3. ~~**No tone mapping / exposure / bloom**~~ **Partly done** — ACES + manual exposure ship (§9); **bloom and auto-exposure are still missing**, and bloom is now the cheapest visual win left.
 4. ~~**Fat 52-byte G-buffer** with redundant position + dual full-fat normals.~~ **Done** — slimmed to 32 bytes/pixel (§4.1).
-5. **Per-primitive committed constant buffers** (§10.3). Memory + allocation overhead; blocks pipelining.
-6. **Synchronous, CPU-blocking uploads** (§3.3). Streaming hitches.
-7. **No compute shaders anywhere.** SSR/TAA/lighting/downsampling are all pixel-shader full-screen passes; the `_CS` loader path exists but no compute shader is shipped. Compute would be faster and enable HZB/clustering/mip-gen.
-8. **No occlusion or GPU-driven culling** (§11). CPU-bound draw scaling.
-9. **Single-threaded command recording.** One graphics command stream; no parallel pass recording, no async compute queue use for shadows/SSR.
-10. **No reverse-Z** (§6). Free depth-precision win being left unclaimed.
-11. **RenderWindow's D24S8 depth buffer appears unused** by the deferred pipeline (geometry builds its own D32; present uses no depth) — likely a dead allocation worth removing (`RenderWindow.cpp:99`).
+5. ~~**Per-primitive committed constant buffers**~~ **Done** — replaced by the per-frame ring allocator (§10.3).
+6. ~~**Synchronous, CPU-blocking uploads**~~ **Done** — copy-queue uploads retired against a fence (§3.3).
+7. ~~**No reverse-Z**~~ **Done** — near maps to NDC 1.0, far to 0.0, `GREATER` test (`Camera.cpp:115`).
+8. **No compute shaders anywhere.** Lighting, SSR, TAA, downsampling and now cluster assignment are all pixel-shader or CPU work. `ResourceManager` and `Shader` already handle `ShaderType::Compute`; the only thing in the way is CMake, which skips any file that is not `*VS*` or `*PS*` (§16 item 9). This is the single biggest *capability* gap left, because several other items wait on it.
+9. **Cluster assignment is single-threaded CPU work** (§5), proportional to lights × froxels touched. Comfortable into the hundreds of lights; it is the thousands-of-lights ceiling.
+10. **No occlusion or GPU-driven culling** (§11). CPU-bound draw scaling.
+11. **Single-threaded command recording.** One graphics command stream; no parallel pass recording, and `CommandQueueManager` creates a compute queue that nothing uses.
+12. **Transparents are lit but never shadowed** (§5), and receive neither SSR nor TAA (§2).
+13. **Shadow slots are capped at 4 spot + 4 point and assigned in creation order** (§6). Correct and necessary, but importance-blind.
+14. **RenderWindow's D24S8 depth buffer appears unused** by the deferred pipeline (geometry builds its own D32; present uses no depth) — likely a dead allocation worth removing (`RenderWindow.cpp:100`).
 
 ---
 
-## 15. Bugs (with suggested fixes)
+## 15. Bugs (all resolved)
 
-### Bug 1 — PSO cache hashes only the first 8 bytes of rasterizer/blend/depth state *(latent correctness)*
-`PipelineStateCache::HashPSO` (`PipelineStateCache.h:70`):
-```cpp
-HashCombine(seed, std::hash<uint64_t>()(*(const uint64_t*)&desc.RasterizerState));
-HashCombine(seed, std::hash<uint64_t>()(*(const uint64_t*)&desc.BlendState));
-HashCombine(seed, std::hash<uint64_t>()(*(const uint64_t*)&desc.DepthStencilState));
-```
-Only the first 8 bytes of each struct are hashed:
-- **Rasterizer:** captures `FillMode`+`CullMode`, **misses** `DepthBias`, `SlopeScaledDepthBias`, `DepthClipEnable`, `FrontCounterClockwise`, etc.
-- **Blend:** captures only `AlphaToCoverageEnable`+`IndependentBlendEnable`, **misses all** `RenderTarget[0]` blend config.
-- **Depth-stencil:** captures `DepthEnable`+`DepthWriteMask`, **misses** `DepthFunc` and all stencil state.
+Every bug this report originally carried is fixed. They are kept in short form because the failure
+modes are instructive and several of the fixes are load-bearing for what came after.
 
-**Impact:** two PSOs that share VS/PS + RTV/DSV formats + topology but differ only in depth bias, blend mode, or depth func **hash-collide**, and the cache returns whichever was built first. This is directly reachable through the material system: `MaterialTemplate::RebuildPipelineKey` treats `DepthBias` and `BlendPolicy` as *distinct* pipeline keys (`MaterialTemplate.cpp:139`), so the engine sorts them as different pipelines — but the PSO cache hands them the *same* PSO. Result: a material that expects, say, a polygon-offset or a blend mode silently gets another material's pipeline.
+### ~~Bug 1 — PSO cache hashes only the first 8 bytes of rasterizer/blend/depth state~~ **Fixed**
+`HashPSO` truncated each POD state struct to its leading `uint64_t`, so two PSOs differing only in depth bias, blend mode or depth func collided and the cache returned whichever was built first. It was directly reachable through the material system, which treats `DepthBias` and `BlendPolicy` as distinct pipeline keys. The hash now covers the full byte range of the rasterizer, blend and depth-stencil descriptors plus `pRootSignature` (`PipelineStateCache.h:46`).
 
-**Fix:** hash the *entire* relevant descriptor. Either hash the full byte range of each POD sub-struct (loop over `sizeof(desc.RasterizerState)`), or hash each field explicitly. Also fold in `desc.pRootSignature`, `desc.InputLayout`, `desc.PrimitiveTopologyType` (already), and `desc.NumRenderTargets`. Cheapest robust option:
-```cpp
-auto hashBytes = [&](const void* p, size_t n){
-    const auto* b = static_cast<const unsigned char*>(p);
-    for (size_t i=0;i<n;++i) HashCombine(seed, b[i]);
-};
-hashBytes(&desc.RasterizerState,   sizeof(desc.RasterizerState));
-hashBytes(&desc.BlendState,        sizeof(desc.BlendState));
-hashBytes(&desc.DepthStencilState, sizeof(desc.DepthStencilState));
-HashCombine(seed, reinterpret_cast<uintptr_t>(desc.pRootSignature));
-```
+### ~~Bug 2 — Spot-light shadows indexed by *global* light index~~ **Fixed**
+The shader sampled `shadowMaps[i]` with `i` running over *all* lights, while the atlas holds one slice per shadow-casting spot light — correct only when spots led the light list. `LightData` now carries `ShadowMapIndex`, assigned per type when the light is added (`LightBuffer.cpp:40`), and the shader samples `ShadowPCF(light.ShadowMapIndex, …)`.
 
-### Bug 2 — Spot-light shadows are indexed by *global* light index *(correctness)*
-In `PBRLightingDeferred_PS.hlsl:147`, for a spot light at loop index `i` over **all** lights:
-```cpp
-shadowFactor = ShadowPCF(i, lightSpacePosition, 2.0);   // samples shadowMaps[i]
-```
-But the `shadowMaps` `Texture2DArray` is filled by `ShadowMapRenderPass` with **one slice per spot light**, indexed 0..(numSpots-1) in the order returned by `GetLightsByType({Spot})` (`ShadowMapRenderPass.cpp:73`). The global light index `i` equals the spot-slice index **only when spot lights occupy the leading entries** of the light list. With any directional/point light ordered before a spot (as is typical), `i` over-indexes the array and the spot samples the wrong slice or an out-of-range layer (PCF then early-outs to "lit").
+### ~~Bug 3 — Only one shadow-casting point light representable~~ **Fixed**
+The lighting shader bound a plain `TextureCube`, so only the first light's six faces were reachable through it. It now binds `TextureCubeArray shadowCubeMaps` (`PBRLightingDeferred_PS.hlsl:31`), indexed by the same `ShadowMapIndex`.
 
-**Fix:** give each `LightData` a `ShadowIndex` (its slice within its type's atlas), assigned when the light buffer is built, and sample `ShadowPCF(light.ShadowIndex, …)`. This also generalizes cleanly to Bug 3.
+### ~~Bug 4 — Light buffer overflows past 4 lights~~ **Fixed**
+The fixed `LightData Lights[4]` constant buffer with an unchecked `AddLight` is gone; lights live in a runtime-sized `StructuredBuffer` (§5). What remains capped is shadow *slots*, not lights, and that cap is enforced (§6).
 
-### Bug 3 — Only one shadow-casting point light is representable *(correctness/limitation)*
-The lighting shader binds a single `TextureCube shadowCubeMap` (`PBRLightingDeferred_PS.hlsl:49`) and `PointLightShadowPCF` samples it directly, while the cube pass renders `6*count` slices into a cube-*array*-shaped resource (`ShadowMapRenderPass.cpp:200`, slice `j + 6*lightIndex`). Only the first light's six faces are visible through a plain `TextureCube` view; any second point light samples the first light's cube.
-
-**Fix:** bind a `TextureCubeArray` and index by the point light's shadow slot (per Bug 2's `ShadowIndex`). Pair with an `arraySize = 6*count` SRV.
-
-### Bug 4 — Light buffer overflows past 4 lights *(memory corruption)*
-`LightBufferData::Lights` is a fixed `LightData Lights[4]` (`LightBuffer.h:13`). `LightBuffer::AddLight` does:
-```cpp
-m_LightsBufferData.Lights[m_LightsBufferData.LightCount++] = light->GetLightData();  // no bound check
-```
-`LightBuffer.cpp:31`. Adding a **5th** light writes out of bounds, corrupting adjacent memory. `Update()` (`LightBuffer.cpp:21`) similarly loops `LightCount` with no clamp.
-
-**Fix (minimum):** guard `AddLight` with `if (LightCount >= MAX_LIGHTS) return;` and assert. **Fix (proper):** move lights to a `StructuredBuffer<LightData>` sized at runtime, drop the `[4]` cap, and combine with clustered light assignment to lift the 4-light ceiling entirely.
-
-### Bug 5 (minor) — FXAA operates in linear space
-`FinalRender_PS.hlsl:152` runs FXAA on the linear HDR sample, then applies gamma. FXAA's luma-based thresholds assume perceptual/gamma input. **Fix:** apply tone map + gamma first, then FXAA on the encoded result (or compute FXAA luma in gamma space). This becomes moot once a tone-map stage exists (see roadmap).
+### ~~Bug 5 (minor) — FXAA operates in linear space~~ **Fixed**
+Present now grades before it anti-aliases: exposure → ACES → gamma → FXAA (`FinalRender_PS.hlsl:158`).
 
 ---
 
 ## 16. Recommended future direction
 
-Ordered by value-to-effort.
+Ordered by value-to-effort. Struck-through items have shipped; each names the guide that did it.
 
 ### Tier 1 — cheap, high impact
-1. **Add a tone-mapping + exposure stage** (ACES or AgX) and reorder present to `resolve → tonemap → encode → FXAA`. Biggest visual upgrade for the least code. Optionally add **bloom** (a downsample/upsample chain) to sell emissives.
-2. **Fix Bugs 1–4.** All are small, localized, and either latent-correctness or memory-safety.
-3. **Reverse-Z.** Switch projection to reverse depth, clear to 0, `GREATER` test; near-free precision win for both camera and CSM.
+1. ~~**Add a tone-mapping + exposure stage**~~ **Done** — exposure → ACES → gamma → FXAA (§9). **Bloom is still outstanding** (a downsample/upsample chain to sell emissives) and is the cheapest visual win left, as is auto-exposure.
+2. ~~**Fix Bugs 1–4.**~~ **Done** — all five documented bugs are fixed (§15).
+3. ~~**Reverse-Z.**~~ **Done** — near maps to NDC 1.0, far to 0.0, `GREATER` test (`Camera.cpp:115`).
 
 ### Tier 2 — architectural, unlocks the ceiling
-4. **Real frame pipelining.** Double/triple-buffer the dynamic constant buffers (see #6), remove the per-frame `WaitForFenceCPUBlocking`, and gate on the swap-chain back-buffer fence instead. Target CPU/GPU overlap.
-5. **Per-frame ring constant allocator.** Replace per-primitive committed CBs with one large upload buffer, sub-allocated per draw, N-buffered. Prerequisite for #4 and a large memory/alloc win.
+4. ~~**Real frame pipelining.**~~ **Done** — the per-frame post-Present stall is replaced by a top-of-frame gate on the slot's own fence; `FRAMES_IN_FLIGHT` deep (§3.2, `docs/Frame-Pipelining-Guide.md`).
+5. ~~**Per-frame ring constant allocator.**~~ **Done** — `FrameConstantAllocator`, 4 MB per frame slot, bump-allocated (§10.3, same guide).
 6. ~~**Slim the G-buffer.**~~ **Done.** Position reconstructed from depth, both normals octahedral-encoded into one `RGBA16_UNORM` target, material narrowed to `RGBA8`: 8 targets at 52 B/px → 6 at 32 B/px, a 38% reduction (§4.1, `docs/GBuffer-Slimming-Guide.md`).
-7. **Async, batched uploads.** Keep uploads on the copy queue but make them fence-based/non-blocking; use a barrier on first-use rather than a synchronous graphics stall.
+7. ~~**Async, batched uploads.**~~ **Done** — copy-queue uploads with graphics-queue acquire barriers, retired against a fence (§3.3).
 
 ### Tier 3 — scale and modernization
-8. **Clustered/tiled lighting** with a `StructuredBuffer` light list to lift the 4-light limit into the hundreds/thousands; combine with the light-buffer rework from Bug 4.
-9. **Move full-screen passes to compute** (lighting, SSR, TAA), add an **HZB** for SSR acceleration and future occlusion culling, and generate mips on-GPU.
-10. **GPU-driven culling + `ExecuteIndirect`** and **multi-threaded / async-compute** command recording (shadows and SSR are natural async-compute candidates).
-11. **Screen-space or ray-traced GI/AO** (even SSAO/GTAO would meaningfully improve grounding) as the next step beyond SSR-only indirect specular.
+8. ~~**Clustered/tiled lighting**~~ **Done** — 16×9×24 froxels, a runtime-sized `StructuredBuffer` light list bound as root SRVs, no fixed light cap (§5, `docs/Clustered-Lighting-Guide.md`).
+9. **Move full-screen passes to compute** (lighting, SSR, TAA), add an **HZB** for SSR acceleration and future occlusion culling, and generate mips on-GPU. **First blocker, and it is two lines:** `CMakeLists.txt:236` infers shader stage from the filename and `continue()`s with a warning on anything that is not `*VS*` or `*PS*`, so a `*_CS.hlsl` is silently dropped from the build. `ResourceManager` and `Shader` already handle `ShaderType::Compute`; CMake is the only thing in the way.
+10. **Move cluster assignment to the GPU.** The consumer side does not change at all — same three buffers, same layout, same lookup (§5). What changes is the producer: a `ClusterBuild_CS` for the froxel AABBs and a `LightCull_CS` for assignment, writing through UAVs with an `InterlockedAdd` on the index-list cursor. Needs item 9's CMake fix, UAV descriptor creation in `StagingDescriptorHeap`, `CreateComputePipelineState` in `ResourceManager`/`PipelineStateCache`, and UAV barriers. `CommandQueueManager` already creates the compute queue. This is where the thousands-of-lights ceiling is.
+11. **Clustered shadows for transparents.** The transparent pass already consumes the cluster buffers; giving it shadows means three more descriptor tables plus the CSM constant buffer in **both** transparent root signatures — `TransparentRenderPass::CreatePSO` and `MaterialTemplate::BuildRootSignatureDesc` are hand-kept duplicates with nothing in the code linking them, so they must be edited in the same keystroke and diffed before building.
+12. **GPU-driven culling + `ExecuteIndirect`** and **multi-threaded / async-compute** command recording (shadows and SSR are natural async-compute candidates).
+13. **Screen-space or ray-traced GI/AO** (even SSAO/GTAO would meaningfully improve grounding) as the next step beyond SSR-only indirect specular.
 
 ### Tier 4 — correctness/quality polish
-12. **Split-sum BRDF LUT** for energy-correct IBL specular, replacing the ad-hoc `(1-roughness)²` weight.
-13. **Order-independent or depth-peeled transparency**, or at least per-triangle-sorted transparents; current sorting is per-object-center only.
-14. Remove the **unused D24S8 depth buffer** (`RenderWindow.cpp:99`) and audit other vestigial allocations.
-15. **Resolve the quarter-texel nudge in depth reconstruction.** `ReconstructViewPos` (`Shaders/Common/GBufferUtils.hlsli`) offsets clip-space by `0.5 / screenSize` before the `y` flip. One pixel spans `2 / screenSize` in NDC, so a half-texel correction would be `1 / screenSize` — this is a quarter texel, applied to both axes before the flip so they end up nudged in opposite directions. It was inherited verbatim from the pre-slimming `SSRPass_PS` so that the shared helper would be a provable no-op for SSR; SSR's heuristics are tuned around it. Worth fixing on its own, with SSR before/after screenshots in hand.
+14. **Split-sum BRDF LUT** for energy-correct IBL specular, replacing the ad-hoc `(1-roughness)²` weight.
+15. **Order-independent or depth-peeled transparency**, or at least per-triangle-sorted transparents; current sorting is per-object-center only.
+16. Remove the **unused D24S8 depth buffer** (`RenderWindow.cpp:100`) and audit other vestigial allocations.
+17. **Resolve the quarter-texel nudge in depth reconstruction.** `ReconstructViewPos` (`Shaders/Common/GBufferUtils.hlsli`) offsets clip-space by `0.5 / screenSize` before the `y` flip. One pixel spans `2 / screenSize` in NDC, so a half-texel correction would be `1 / screenSize` — this is a quarter texel, applied to both axes before the flip so they end up nudged in opposite directions. It was inherited verbatim from the pre-slimming `SSRPass_PS` so that the shared helper would be a provable no-op for SSR; SSR's heuristics are tuned around it. Worth fixing on its own, with SSR before/after screenshots in hand.
 
 ---
 
 ## 17. Closing assessment
 
-This is a strong, coherent renderer that clearly reflects real graphics knowledge: the temporal techniques, CSM, and pass-graph design are the work of someone who understands *why* each trick exists, not just how to copy it. Its ceiling is set almost entirely by the **execution layer** — the serialized single-frame submission model, the fixed 4-light cap, and per-object committed buffers — rather than by the effects themselves. Fix the handful of concrete bugs, add a tone-mapping stage, and invest in frame pipelining + clustered lighting, and this moves decisively from "excellent learning renderer" toward "small but real engine."
+This is a strong, coherent renderer that clearly reflects real graphics knowledge: the temporal techniques, CSM, and pass-graph design are the work of someone who understands *why* each trick exists, not just how to copy it. The **execution layer** that once set its ceiling — serialized single-frame submission, a fixed 4-light cap, per-object committed buffers, no tone mapping — has been worked through in order, and the correctness bugs with it; the renderer now pipelines its frames, clusters its lights, and grades its output.
+
+What remains is the work production engines do on the **GPU**. Cluster assignment, culling and every full-screen pass are still CPU or pixel-shader bound, nothing is recorded in parallel, and indirect lighting stops at SSR. The next meaningful jump is compute: it is the prerequisite for GPU light culling, an HZB, occlusion culling and async work, and it is the one missing capability that most of the remaining roadmap waits on. On the strength of the last four changes, "small but real engine" is no longer the aspiration — it is a fair description.

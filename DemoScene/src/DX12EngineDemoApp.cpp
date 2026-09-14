@@ -37,8 +37,8 @@ namespace DX12EngineDemo
 
 		m_PhysicsEngine = std::make_shared<DX12Engine::PhysicsEngine>();
 
-		m_Scene = std::make_unique<ClusteredLightingScene>(m_RenderContext, m_PhysicsEngine, windowSize);
-		//m_Scene = std::make_unique<ComplexDemoScene>(m_RenderContext, m_PhysicsEngine, windowSize);
+		//m_Scene = std::make_unique<ClusteredLightingScene>(m_RenderContext, m_PhysicsEngine, windowSize);
+		m_Scene = std::make_unique<ComplexDemoScene>(m_RenderContext, m_PhysicsEngine, windowSize);
 		m_Scene->Init();
 		m_Renderer->SetCurrentScene(m_Scene.get());
 

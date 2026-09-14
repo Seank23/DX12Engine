@@ -6,13 +6,6 @@
 
 namespace DX12Engine
 {
-	struct LightBufferData
-	{
-		int LightCount = 0;
-		DirectX::XMFLOAT3 Padding = { 0.0f, 0.0f, 0.0f };
-		LightData Lights[4];
-	};
-
 	class LightBuffer
 	{
 	public:

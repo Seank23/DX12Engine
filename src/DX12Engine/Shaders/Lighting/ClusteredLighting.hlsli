@@ -1,6 +1,8 @@
 #ifndef CLUSTERED_LIGHTING_HLSLI
 #define CLUSTERED_LIGHTING_HLSLI
 
+#include "PBRShading.hlsli" // Light
+
 StructuredBuffer<Light> Lights : register(t0, space1);
 StructuredBuffer<uint2> ClusterGrid : register(t1, space1);
 StructuredBuffer<uint> LightIndices : register(t2, space1);

@@ -1,4 +1,4 @@
-﻿#include "TransparentRenderPass.h"
+#include "TransparentRenderPass.h"
 #include "../../Resources/ResourceManager.h"
 #include "../RenderContext.h"
 #include "../PipelineStateBuilder.h"
@@ -102,9 +102,13 @@ namespace DX12Engine
 		auto bindPassInputTables = [this]()
 		{
 			m_CommandList.SetGraphicsRootConstantBufferView(1, m_RenderContext.GetScreenDataBuffer().GetGPUAddress());
-			m_CommandList.SetGraphicsRootDescriptorTable(4, m_InputResourceBlockHandles[InputResourceType::EnvironmentMap].GetGPUHandle());
-			m_CommandList.SetGraphicsRootDescriptorTable(5, m_InputResourceBlockHandles[InputResourceType::SceneColor].GetGPUHandle());
-			m_CommandList.SetGraphicsRootDescriptorTable(6, m_InputResourceBlockHandles[InputResourceType::Depth].GetGPUHandle());
+			m_CommandList.SetGraphicsRootConstantBufferView(3, m_LightGridAddresses.ClusterData);
+			m_CommandList.SetGraphicsRootDescriptorTable(5, m_InputResourceBlockHandles[InputResourceType::EnvironmentMap].GetGPUHandle());
+			m_CommandList.SetGraphicsRootDescriptorTable(6, m_InputResourceBlockHandles[InputResourceType::SceneColor].GetGPUHandle());
+			m_CommandList.SetGraphicsRootDescriptorTable(7, m_InputResourceBlockHandles[InputResourceType::Depth].GetGPUHandle());
+			m_CommandList.SetGraphicsRootShaderResourceView(8, m_LightGridAddresses.Lights);
+			m_CommandList.SetGraphicsRootShaderResourceView(9, m_LightGridAddresses.Grid);
+			m_CommandList.SetGraphicsRootShaderResourceView(10, m_LightGridAddresses.LightIndices);
 		};
 		bindPassInputTables();
 
@@ -154,7 +158,7 @@ namespace DX12Engine
 
 			if (item.Material != lastMaterial)
 			{
-				item.Material->Bind(&m_CommandList, 2, 3);
+				item.Material->Bind(&m_CommandList, 2, 4);
 				lastMaterial = item.Material;
 			}
 
@@ -220,9 +224,9 @@ namespace DX12Engine
 		depthDesc.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ZERO;
 
 		// Transparent root signature layout:
-		// b0 object, b1 material, b2 screen data,
-		// table2=t0..t5 material textures, table3=t6 opaque scene,
-		// table4=t7 env map, table5=t8 G-buffer depth.
+		// 0=b0 object, 1=b1 screen data, 2=b2 material, 3=b3 cluster data,
+		// 4=t0..t5 material textures, 5=t6 env map, 6=t7 opaque scene, 7=t8 G-buffer depth,
+		// 8/9/10=t0/t1/t2 space1 lights, cluster grid, light indices.
 		std::vector<DescriptorTableConfig> tables;
 		tables.emplace_back(6, D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 0);
 		tables.emplace_back(1, D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 6);
@@ -239,7 +243,11 @@ namespace DX12Engine
 								   .AddConstantBuffer(0)
 								   .AddConstantBuffer(1)
 								   .AddConstantBuffer(2)
+								   .AddConstantBuffer(3)
 								   .AddDescriptorTables(tables)
+								   .AddShaderResourceView(0, 1)
+								   .AddShaderResourceView(1, 1)
+								   .AddShaderResourceView(2, 1)
 								   .AddSampler(0, D3D12_FILTER_ANISOTROPIC)
 								   .AddSampler(1, D3D12_FILTER_ANISOTROPIC);
 

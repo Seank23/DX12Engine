@@ -56,20 +56,58 @@ struct PSInput
 
 #include "Common/ColorUtils.hlsli"
 #include "Lighting/PBRShading.hlsli"
+#define CLUSTER_DATA_REGISTER b3
+#include "Lighting/ClusteredLighting.hlsli"
 
-float4 main(PSInput i, bool isFrontFace : SV_IsFrontFace) : SV_TARGET
+// The transparent pass binds no shadow atlases, so every light here shades unshadowed.
+void ShadeLight(Light light, float3 worldPos, float3 worldNormal, float3 V,
+                float3 albedo, float metallic, float roughness, float clearcoat, float clearcoatRoughness,
+                inout float3 finalColor)
+{
+	float3 lightDir = normalize(light.Position - worldPos);
+	float3 lightContribution = float3(0, 0, 0);
+    
+	if (light.Type == 0) // Directional Light
+	{
+		float3 directionalL = normalize(-light.Direction);
+		lightContribution = PBRLighting(albedo, metallic, roughness, clearcoat, clearcoatRoughness, worldNormal, V, directionalL, light);
+	}
+	else if (light.Type == 1) // Point Light
+	{
+		float dist = length(light.Position - worldPos);
+		float distOverRange = dist / light.Range;
+		float window = saturate(1.0 - distOverRange * distOverRange * distOverRange * distOverRange);
+		float attenuation = (window * window) / (dist * dist + 1.0);
+		lightContribution = PBRLighting(albedo, metallic, roughness, clearcoat, clearcoatRoughness, worldNormal, V, lightDir, light) * attenuation;
+	}
+	else if (light.Type == 2) // Spot Light
+	{
+		float cosOuter = cos(light.SpotAngle);
+		float cosInner = cos(light.SpotAngle * 0.9);
+		float theta = dot(lightDir, normalize(-light.Direction));
+		float intensity = saturate((theta - cosOuter) / max(cosInner - cosOuter, 1e-4));
+		float dist = length(light.Position - worldPos);
+		float attenuation = saturate(1.0 - (dist * dist) / (light.Range * light.Range));
+		lightContribution = PBRLighting(albedo, metallic, roughness, clearcoat, clearcoatRoughness, worldNormal, V, lightDir, light) * intensity * attenuation;
+	}
+	finalColor += lightContribution;
+}
+
+float4 main(PSInput input, bool isFrontFace : SV_IsFrontFace) : SV_TARGET
 {
     // Manual depth test against the G-buffer depth so transparent fragments
     // are correctly occluded by opaque geometry without needing a bound DSV.
-    float2 screenUVdepth = i.positionCS.xy / ScreenSize;
+    float2 screenUVdepth = input.positionCS.xy / ScreenSize;
     float opaqueDepth = depthMap.Sample(sampClamp, screenUVdepth).r;
     // SV_POSITION.z is already the window-space depth in [MinDepth, MaxDepth]
     // that the hardware writes to the depth buffer, so no w-divide is needed.
-    float fragDepth = i.positionCS.z;
+    float fragDepth = input.positionCS.z;
     if (fragDepth < opaqueDepth) // Reverse-Z: smaller depth == behind opaque
         discard;
-    float4 baseSample = HasAlbedoMap ? albedoMap.Sample(sampWrap, i.uv) : float4(1, 1, 1, 1);
-    float3 baseColor = sRGBToLinear(baseSample.rgb * Albedo);
+	float viewDepth = mul(ViewMatrix, float4(input.worldPos, 1.0)).z;
+    float4 baseSample = HasAlbedoMap ? albedoMap.Sample(sampWrap, input.uv) : float4(1, 1, 1, 1);
+	float3 baseColorRaw = baseSample.rgb * Albedo;
+    float3 baseColor = sRGBToLinear(baseColorRaw);
 
     float baseAlpha = saturate(baseSample.a * BaseColorAlpha);
 
@@ -77,30 +115,30 @@ float4 main(PSInput i, bool isFrontFace : SV_IsFrontFace) : SV_TARGET
     float roughness = Roughness;
     if (HasMetallicMap != 0 && HasRoughnessMap != 0)
     {
-        float4 m = metallicMap.Sample(sampWrap, i.uv);
-        float4 r = roughnessMap.Sample(sampWrap, i.uv);
+        float4 m = metallicMap.Sample(sampWrap, input.uv);
+        float4 r = roughnessMap.Sample(sampWrap, input.uv);
         roughness *= HasRoughnessMap ? r.g : 1.0;
         metallic *= HasMetallicMap ? m.b : 1.0;
     }
 
     float ao = AO;
     if (HasAOMap != 0)
-        ao *= aoMap.Sample(sampWrap, i.uv).r;
+        ao *= aoMap.Sample(sampWrap, input.uv).r;
 
     float faceSign = isFrontFace ? 1.0 : -1.0;
-    float3 N = normalize(i.normalWS) * faceSign;
+    float3 N = normalize(input.normalWS) * faceSign;
     if (HasNormalMap != 0)
     {
-        float3 nTS = normalMap.Sample(sampWrap, i.uv).xyz * 2.0 - 1.0;
+        float3 nTS = normalMap.Sample(sampWrap, input.uv).xyz * 2.0 - 1.0;
         nTS.xy *= NormalScale;
         nTS = normalize(nTS);
-        float3 T = normalize(i.tangentWS) * faceSign;
-        float3 B = normalize(i.bitangentWS) * faceSign;
+        float3 T = normalize(input.tangentWS) * faceSign;
+        float3 B = normalize(input.bitangentWS) * faceSign;
         float3x3 TBN = float3x3(T, B, N);
         N = normalize(mul(nTS, TBN));
     }
 
-    float3 V = normalize(i.viewDirWS);
+    float3 V = normalize(input.viewDirWS);
     float NdotV = saturate(dot(N, V));
 
     float clampedIOR = max(IOR, 1.001);
@@ -147,13 +185,22 @@ float4 main(PSInput i, bool isFrontFace : SV_IsFrontFace) : SV_TARGET
     float3 emissive = Emissive * EmissiveStrength;
     if (HasEmissiveMap != 0)
     {
-        float3 e = sRGBToLinear(emissiveMap.Sample(sampWrap, i.uv).rgb);
+        float3 e = sRGBToLinear(emissiveMap.Sample(sampWrap, input.uv).rgb);
         emissive *= e;
     }
+
+	float3 shadedColor = float3(0, 0, 0);
+	for (int i = 0; i < DirectionalLightCount; i++)
+		ShadeLight(Lights[i], input.worldPos, N, V, baseColorRaw, metallic, roughness, Clearcoat, ClearcoatRoughness, shadedColor);
+
+	uint2 range = ClusterGrid[GetClusterIndex(input.positionCS.xy, viewDepth)];
+
+	for (int j = 0; j < range.y; j++)
+		ShadeLight(Lights[LightIndices[range.x + j]], input.worldPos, N, V, baseColorRaw, metallic, roughness, Clearcoat, ClearcoatRoughness, shadedColor);
 
     float transmissionAlpha = lerp(0.04, 0.18, 1.0 - NdotV);
     float outAlpha = saturate(lerp(baseAlpha, transmissionAlpha, saturate(Transmission)));
 
-    float3 outColor = glassColor + emissive;
+    float3 outColor = glassColor + shadedColor + emissive;
     return float4(outColor, outAlpha);
 }

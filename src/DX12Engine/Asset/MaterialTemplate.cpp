@@ -21,8 +21,9 @@ namespace DX12Engine
 
 		// Geometry:
 		//   b0 object, b1 material, t0..t5 material textures
-		// Transparent:
-		//   b0 object, b1 material, t0..t5 material textures, t6 opaque scene, t7 env map, t8 depth
+		// Transparent (must stay identical to TransparentRenderPass::CreatePSO -- nothing links them):
+		//   b0 object, b1 screen data, b2 material, b3 cluster data, t0..t5 material textures,
+		//   t6 env map, t7 opaque scene, t8 depth, t0/t1/t2 space1 lights, cluster grid, light indices
 		DescriptorTableConfig materialTexTable(6, D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 0);
 		m_RootSignatureBuilder.AddConstantBuffer(0).AddConstantBuffer(1);
 
@@ -33,7 +34,11 @@ namespace DX12Engine
 			DescriptorTableConfig depthTable(1, D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 8);
 			m_RootSignatureBuilder
 				.AddConstantBuffer(2)
+				.AddConstantBuffer(3)
 				.AddDescriptorTables({ materialTexTable, envMapTable, opaqueSceneTable, depthTable })
+				.AddShaderResourceView(0, 1)
+				.AddShaderResourceView(1, 1)
+				.AddShaderResourceView(2, 1)
 				.AddSampler(0, D3D12_FILTER_ANISOTROPIC)
 				.AddSampler(1, D3D12_FILTER_ANISOTROPIC);
 		}

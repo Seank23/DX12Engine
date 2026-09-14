@@ -566,6 +566,7 @@ namespace DX12Engine
 				break;
 			case RenderPassType::Transparent:
 				static_cast<TransparentRenderPass*>(renderPass)->SetDrawItems(transparentPassDrawItems);
+				static_cast<TransparentRenderPass*>(renderPass)->SetLightGridAddresses(lightGridFrameAddresses);
 				break;
 			case RenderPassType::TAA:
 			{
