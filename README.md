@@ -2,7 +2,7 @@
 
 A modular, learning-oriented DirectX 12 rendering engine written in modern C++20. The repository includes a reusable engine static library, an embedded demo application (`DemoScene`), shaders, and asset data for physically-based rendering (PBR), deferred lighting, shadows, and screen-space reflections (SSR).
 
-<img width="1906" height="1044" alt="DX12Engine" src="https://github.com/user-attachments/assets/ff8d6682-df56-4201-b5b7-10c006990803" />
+<img width="2376" height="1330" alt="image" src="https://github.com/user-attachments/assets/d8f6cf2a-284e-4658-a969-c8a3fdf45fcd" />
 
 ## Highlights
 
